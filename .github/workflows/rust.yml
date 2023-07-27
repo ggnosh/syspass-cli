@@ -61,9 +61,13 @@ jobs:
         with:
           command: test
 
-      - name: Clippy
-        run: rustup component add clippy
-        uses: actions-rs/cargo@v1
+  clippy_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup component add clippy
+      - uses: actions-rs/clippy-check@v1
         with:
-          command: clippy
-          args: -- -D warnings
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
