@@ -26,18 +26,17 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          components: clippy
 
       - name: Run cargo check
         uses: actions-rs/cargo@v1
         with:
           command: check
 
-      - name: Run fmt check
-        run: rustup component add rustfmt
-        uses: actions-rs/cargo@v1
+      - name: cargo fmt check
+        uses: mbrobbel/rustfmt-check@master
         with:
-          command: fmt
-          args: --all -- --check
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     name: Test Suite
@@ -61,15 +60,7 @@ jobs:
         with:
           command: test
 
-  clippy_check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-          override: true
+      - name: Clippy
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
