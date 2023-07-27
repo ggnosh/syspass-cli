@@ -1,5 +1,11 @@
 # CHANGELOG
 
-## 0.1.x (2023-07-24)
+## 0.1.2 - 2023-07-27
+
+- Build bug fix.
+
+## 0.1.0 - 2023-07-24
+
+Initial release
 
 * Added [development](DEVELOPMENT.md) instructions

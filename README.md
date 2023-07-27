@@ -1,3 +1,5 @@
+[![Run tests](https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml/badge.svg)](https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml)
+
 # syspass-cli
 
 A simple command line tool to interact with sysPass databases.
