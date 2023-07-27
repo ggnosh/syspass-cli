@@ -1,12 +1,11 @@
-use std::process;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use clap::ArgMatches;
-use inquire::{DateSelect, Password, PasswordDisplayMode, required, Text};
+use inquire::{required, DateSelect, Password, PasswordDisplayMode, Text};
 use log::error;
 use passwords::{analyzer, scorer};
+use std::process;
 
-pub fn ask_prompt(text: &str, required: bool, default: &str) -> String
-{
+pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
     let mut prompt = Text::new(text);
     if required {
         prompt = prompt.with_validator(required!());
@@ -24,8 +23,14 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> String
     }
 }
 
-pub fn get_match_string(matches: &ArgMatches, quiet: bool, match_id: &str, prompt_text: &str, default: &str, required: bool) -> String
-{
+pub fn get_match_string(
+    matches: &ArgMatches,
+    quiet: bool,
+    match_id: &str,
+    prompt_text: &str,
+    default: &str,
+    required: bool,
+) -> String {
     match matches.get_one::<String>(match_id) {
         Some(description) => {
             if description.is_empty() && !quiet {
@@ -53,16 +58,17 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
 
     match amount {
         Ok(None) => String::from(""),
-        Ok(Some(date)) => NaiveDateTime::new(date, NaiveTime::default()).timestamp().to_string(),
+        Ok(Some(date)) => NaiveDateTime::new(date, NaiveTime::default())
+            .timestamp()
+            .to_string(),
         Err(_) => {
             error!("Cancelled");
             process::exit(1);
-        },
+        }
     }
 }
 
-pub fn ask_for_password(prompt: &str) -> String
-{
+pub fn ask_for_password(prompt: &str) -> String {
     let password = Password::new(prompt)
         .with_display_toggle_enabled()
         .with_display_mode(PasswordDisplayMode::Masked)
@@ -75,12 +81,11 @@ pub fn ask_for_password(prompt: &str) -> String
         Err(_) => {
             error!("Cancelled");
             process::exit(1);
-        },
+        }
     }
 }
 
-pub fn password_strength(strength: f64) -> String
-{
+pub fn password_strength(strength: f64) -> String {
     if strength < 20.0 {
         "Very dangerous"
     } else if strength < 40.0 {
@@ -99,6 +104,6 @@ pub fn password_strength(strength: f64) -> String
         "Heat death"
     } else {
         panic!("Invalid strength")
-    }.to_string()
+    }
+    .to_string()
 }
-

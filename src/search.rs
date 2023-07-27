@@ -1,14 +1,14 @@
-use std::error::Error;
-use std::{env, process, thread};
-use std::time::Duration;
-use clap::{arg, Command, ArgMatches};
+use arboard::Clipboard;
+use clap::{arg, ArgMatches, Command};
+use colored::*;
 use inquire::{InquireError, Select};
-use term_table::{Table, TableStyle};
+use log::{error, warn};
+use std::error::Error;
+use std::time::Duration;
+use std::{env, process, thread};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
-use arboard::Clipboard;
-use log::{error, warn};
-use colored::*;
+use term_table::{Table, TableStyle};
 
 use crate::api::account::{Account, ViewPassword};
 use crate::api::api_client::{ApiClient, ApiError};
@@ -16,8 +16,7 @@ use crate::config::Config;
 
 pub const COMMAND_NAME: &str = "search";
 
-pub fn command_helper() -> Command
-{
+pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Search for account password")
         .arg(arg!([name] "Search for given account"))
@@ -25,15 +24,27 @@ pub fn command_helper() -> Command
         .arg(arg!(-p --showpassword "Show passwords as plain text. Do not copy to clipboard"))
         .arg(arg!(-i --id <ACCOUNTID> "Account id").value_parser(clap::value_parser!(u32)))
         .arg(arg!(-a --category <CATEGORYID> "Category id").value_parser(clap::value_parser!(u32)))
-        .arg(arg!(-u --disableusage).value_parser(clap::value_parser!(bool)))
+        .arg(arg!(-u - -disableusage).value_parser(clap::value_parser!(bool)))
         .arg(arg!(--clear "Clear clipboard").hide(true))
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) -> Result<u8, Box<dyn Error>>
-{
-    let name = matches.get_one::<String>("name").map(|s| s.to_owned()).unwrap_or("".to_string());
-    let id: u32 = matches.get_one::<u32>("id").map(|s| s.to_owned()).unwrap_or(0);
-    let category: u32 = matches.get_one::<u32>("category").map(|s| s.to_owned()).unwrap_or(0);
+pub fn command(
+    matches: &ArgMatches,
+    api_client: &dyn ApiClient,
+    quiet: bool,
+) -> Result<u8, Box<dyn Error>> {
+    let name = matches
+        .get_one::<String>("name")
+        .map(|s| s.to_owned())
+        .unwrap_or("".to_string());
+    let id: u32 = matches
+        .get_one::<u32>("id")
+        .map(|s| s.to_owned())
+        .unwrap_or(0);
+    let category: u32 = matches
+        .get_one::<u32>("category")
+        .map(|s| s.to_owned())
+        .unwrap_or(0);
     let show = matches.get_flag("showpassword");
     let config = api_client.get_config();
 
@@ -53,7 +64,11 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
     if id > 0 {
         accounts = vec![api_client.view_account(&id).expect("Invalid account id")]
     } else if name.is_empty() {
-        warn!("{} {}", "\u{2716}".bright_red(), "Name or id is required".red());
+        warn!(
+            "{} {}",
+            "\u{2716}".bright_red(),
+            "Name or id is required".red()
+        );
         process::exit(1);
     } else {
         let mut search_string = vec![("text", name)];
@@ -61,10 +76,15 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
             search_string.push(("categoryId", category.to_string()));
         }
 
-        accounts = match api_client.search_account(search_string, !matches.get_flag("disableusage")) {
+        accounts = match api_client.search_account(search_string, !matches.get_flag("disableusage"))
+        {
             Ok(accounts) => accounts,
             Err(error) => {
-                error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
+                error!(
+                    "{} Error while searching: {}",
+                    "\u{2716}".bright_red(),
+                    error
+                );
                 process::exit(1);
             }
         }
@@ -79,7 +99,11 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
             match select_account(accounts, api_client, matches.get_flag("disableusage")) {
                 Ok(account) => account,
                 Err(error) => {
-                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
+                    error!(
+                        "{} Error while searching: {}",
+                        "\u{2716}".bright_red(),
+                        error
+                    );
                     process::exit(1);
                 }
             }
@@ -95,7 +119,11 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
             match api_client.get_password(&account) {
                 Ok(password) => password,
                 Err(error) => {
-                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
+                    error!(
+                        "{} Error while searching: {}",
+                        "\u{2716}".bright_red(),
+                        error
+                    );
                     process::exit(1);
                 }
             }
@@ -107,10 +135,10 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
         clipboard.set_text(&account.password).unwrap();
 
         if config.password_timeout.unwrap_or(10) > 0 {
-            process::Command::new(env::current_exe()?.as_path().to_str().unwrap()).args([
-                "search",
-                "--clear",
-            ]).spawn().expect("Failed to start child");
+            process::Command::new(env::current_exe()?.as_path().to_str().unwrap())
+                .args(["search", "--clear"])
+                .spawn()
+                .expect("Failed to start child");
         }
     }
 
@@ -118,14 +146,22 @@ pub fn command(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) ->
 
     if !matches.get_flag("noshell") && account.account.url.contains("ssh://") {
         let host = account.account.login + "@" + account.account.url.replace("ssh://", "").as_str();
-        process::Command::new("ssh").arg(host).spawn().unwrap().wait().unwrap();
+        process::Command::new("ssh")
+            .arg(host)
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
     }
 
     Ok(0)
 }
 
-fn select_account(accounts: Vec<Account>, api_client: &dyn ApiClient, disable_usage: bool) -> Result<ViewPassword, ApiError>
-{
+fn select_account(
+    accounts: Vec<Account>,
+    api_client: &dyn ApiClient,
+    disable_usage: bool,
+) -> Result<ViewPassword, ApiError> {
     let count: usize = accounts.len();
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
         .with_help_message(format!("Number for accounts found: {}", count).as_str())
@@ -138,15 +174,14 @@ fn select_account(accounts: Vec<Account>, api_client: &dyn ApiClient, disable_us
                 Config::record_usage(choice.id.expect("Id should be set"));
             }
             api_client.get_password(&choice)
-        },
+        }
         Err(_) => {
             process::exit(0);
-        },
+        }
     }
 }
 
-fn print_table_for_account(data: &ViewPassword, show: bool) -> String
-{
+fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     let mut table = Table::new();
     table.max_column_width = 45;
 
@@ -160,9 +195,11 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String
         //TableCell::new("Tags".green()), // Tags are not implemented by the API for some reason
     ];
 
-    table.add_row(Row::new(vec![
-        TableCell::new_with_alignment(&data.account.name.green(), cells.len(), Alignment::Center)
-    ]));
+    table.add_row(Row::new(vec![TableCell::new_with_alignment(
+        &data.account.name.green(),
+        cells.len(),
+        Alignment::Center,
+    )]));
 
     table.add_row(Row::new(cells));
 
@@ -187,8 +224,7 @@ mod tests {
     use crate::api::account::{Account, ViewPassword};
     use crate::search::print_table_for_account;
 
-    fn get_test_account_data() -> ViewPassword
-    {
+    fn get_test_account_data() -> ViewPassword {
         ViewPassword {
             account: Account {
                 id: Option::from(1),
@@ -207,8 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_with_password()
-    {
+    fn test_print_table_for_account_with_password() {
         let account = get_test_account_data();
         let output = print_table_for_account(&account, true);
 
@@ -218,8 +253,7 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_without_password()
-    {
+    fn test_print_table_for_account_without_password() {
         let account = get_test_account_data();
         let output = print_table_for_account(&account, false);
 
