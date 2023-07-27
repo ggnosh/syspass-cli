@@ -241,7 +241,7 @@ pub fn get_password(prompt: &str) -> String {
     match answer_prompt {
         Ok(result) => {
             if result.strength_value == 0.0 {
-                return ask_for_password(prompt);
+                return ask_for_password(prompt, true);
             }
             result.password
         }

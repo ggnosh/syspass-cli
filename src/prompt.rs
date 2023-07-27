@@ -68,16 +68,21 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
     }
 }
 
-pub fn ask_for_password(prompt: &str) -> String {
-    let password = Password::new(prompt)
+pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
+    let mut password = Password::new(prompt)
         .with_display_toggle_enabled()
-        .with_display_mode(PasswordDisplayMode::Masked)
-        .with_formatter(&|input| password_strength(scorer::score(&analyzer::analyze(input))))
-        .with_custom_confirmation_error_message("The passwords don't match.")
-        .prompt();
+        .with_display_mode(PasswordDisplayMode::Masked);
 
-    match password {
-        Ok(_) => password.unwrap(),
+    if !confirm {
+        password = password.without_confirmation();
+    } else {
+        password = password
+            .with_custom_confirmation_error_message("The passwords don't match.")
+            .with_formatter(&|input| password_strength(scorer::score(&analyzer::analyze(input))));
+    }
+
+    match password.prompt() {
+        Ok(pass) => pass,
         Err(_) => {
             error!("Cancelled");
             process::exit(1);

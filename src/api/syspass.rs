@@ -16,7 +16,7 @@ static INIT: Once = Once::new();
 fn get_cached_password() -> &'static String {
     unsafe {
         INIT.call_once(|| {
-            PASSWORD = ask_for_password("Password: ");
+            PASSWORD = ask_for_password("API password: ", false);
         });
         &PASSWORD
     }
