@@ -1,0 +1,43 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "itemId": 70,
+    "result": {
+      "id": 70,
+      "userId": 1,
+      "userGroupId": 1,
+      "userEditId": 1,
+      "name": "TestAccount",
+      "clientId": 1,
+      "categoryId": 1,
+      "login": "test",
+      "url": "example.org",
+      "pass": "",
+      "key": "",
+      "notes": "nothing",
+      "otherUserEdit": "0",
+      "otherUserGroupEdit": "0",
+      "dateAdd": "2023-06-27 22:17:45",
+      "dateEdit": null,
+      "countView": 0,
+      "countDecrypt": 0,
+      "isPrivate": "0",
+      "isPrivateGroup": "0",
+      "passDate": 1687904265,
+      "passDateChange": 0,
+      "parentId": 0,
+      "categoryName": "asddasd",
+      "clientName": "asdasdas",
+      "userGroupName": "Admins",
+      "userName": "sysPass Admin",
+      "userLogin": "admin",
+      "userEditName": "sysPass Admin",
+      "userEditLogin": "admin",
+      "publicLinkHash": null
+    },
+    "resultCode": 0,
+    "resultMessage": "Account removed",
+    "count": null
+  },
+  "id": 1
+}

@@ -1,0 +1,8 @@
+{
+  "host": "https://localhost:5000/api.php",
+  "token": "8e8b4c4b7279ffdd52caca42647008386d3ec5204bede869e0a5ec59e5ffad45",
+  "password": "syspass",
+  "verifyHost": false,
+  "passwordTimeout": 15,
+  "apiVersion": "SyspassV3"
+}

@@ -1,0 +1,68 @@
+version: '3.5'
+services:
+  app:
+    container_name: syspass-app
+    image: syspass/syspass:latest
+    restart: always
+    ports:
+      - "5000:443"
+    links:
+      - db
+    volumes:
+      - syspass-config:/var/www/html/sysPass/app/config
+      - syspass-backup:/var/www/html/sysPass/app/backup
+    environment:
+      - USE_SSL=yes
+    networks:
+      - default
+  db:
+    container_name: syspass-db
+    restart: always
+    image: mariadb:10.3
+    environment:
+      - MYSQL_ROOT_PASSWORD=syspass
+    volumes:
+      - syspass-db:/var/lib/mysql
+    ports:
+      - "3306"
+    networks:
+      - default
+  appv2:
+    container_name: syspass-appv2
+    image: slllaps/syspass:latest
+    restart: always
+    ports:
+      - "5001:443"
+    links:
+      - dbv2
+    volumes:
+      - syspassv2-config:/var/www/html/sysPass/app/config
+      - syspassv2-backup:/var/www/html/sysPass/app/backup
+    environment:
+      - USE_SSL=yes
+    networks:
+      - default
+  dbv2:
+    container_name: syspass-dbv2
+    restart: always
+    image: mariadb:10.3
+    environment:
+      - MYSQL_ROOT_PASSWORD=syspass
+      - DB_REMOTE_ROOT_PASS=syspass
+    volumes:
+      - syspassv2-db:/var/lib/mysql
+    ports:
+      - "3306"
+    networks:
+      - default
+volumes:
+  syspass-config: {}
+  syspass-backup: {}
+  syspass-db: {}
+  syspassv2-config: {}
+  syspassv2-backup: {}
+  syspassv2-db: {}
+
+networks:
+    default:
+      name: syspass
