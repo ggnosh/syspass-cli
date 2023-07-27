@@ -50,7 +50,7 @@ impl fmt::Display for ApiError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Api {
     SyspassV3,
     SyspassV2,

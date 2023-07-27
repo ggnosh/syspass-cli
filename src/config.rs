@@ -10,7 +10,7 @@ use std::path::PathBuf;
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 
-#[derive(Deserialize, Debug, Default, Serialize)]
+#[derive(Deserialize, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub host: String,

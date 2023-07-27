@@ -1,10 +1,9 @@
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::api_client::{ApiClient, ApiError};
-use crate::api::syspass::{add_request_args, sort_accounts};
+use crate::api::syspass::{add_request_args, get_builder, get_response, sort_accounts, JsonReq};
 use crate::config::Config;
 use log::debug;
-use reqwest::blocking::ClientBuilder;
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
@@ -20,35 +19,15 @@ pub struct Syspass {
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
 
-#[derive(Deserialize, Debug, Serialize)]
-struct JsonReq {
-    jsonrpc: String,
-    method: String,
-    params: HashMap<String, String>,
-    id: u8,
-}
-
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ApiResult {
-    count: Option<u8>,
     item_id: Option<String>,
     result_code: i32,
-    result_message: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AccountSave {
-    item_id: u32,
-    result_code: i32,
-    result: String,
-}
-
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 struct ApiResponse {
-    id: u8,
-    jsonrpc: String,
     result: Option<ApiResult>,
     error: Option<ApiErrorResponse>,
 }
@@ -67,7 +46,7 @@ struct ApiErrorResponse {
     message: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct Client {
     pub customer_description: String,
@@ -86,7 +65,7 @@ impl Client {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum ApiResponseResult {
     Code(ApiResponse),
@@ -154,19 +133,7 @@ impl Syspass {
     ) -> Result<ApiResponseResult, serde_json::error::Error> {
         debug!("Sending request to {}:\n{:#?}\n", request_url, req);
 
-        let response = match self.client.post(request_url).json(&req).send() {
-            Ok(r) => match r.status().is_success() {
-                true => r,
-                false => {
-                    panic!("Error: Server responded with code {}", r.status())
-                }
-            },
-            Err(e) => {
-                panic!("Error: {}", e);
-            }
-        };
-
-        let json: Value = response
+        let json: Value = get_response(&self.client, request_url, req)
             .json()
             .expect("Server response did not contain JSON");
 
@@ -179,8 +146,9 @@ impl Syspass {
         &self,
         method: &str,
         args: Option<Vec<(&str, String)>>,
+        needs_password: bool,
     ) -> Result<ApiResponseResult, ApiError> {
-        let params = add_request_args(&args, &self.config);
+        let params = add_request_args(&args, &self.config, needs_password);
         let req = JsonReq {
             jsonrpc: String::from("2.0"),
             method: method.to_string(),
@@ -198,7 +166,7 @@ impl Syspass {
     }
 
     fn delete_request(&self, method: &str, id: &u32) -> Result<bool, ApiError> {
-        match self.forge_and_send(method, Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(method, Option::from(vec![("id", id.to_string())]), false) {
             Ok(result) => {
                 if let ApiResponseResult::Code(result) = result {
                     match result.error {
@@ -225,7 +193,7 @@ impl Syspass {
             }
         }
 
-        match self.forge_and_send(path, args) {
+        match self.forge_and_send(path, args, true) {
             Ok(result) => match result {
                 ApiResponseResult::Code(result) => match result.error {
                     Some(error) => Err(ApiError(error.message)),
@@ -268,11 +236,8 @@ impl Syspass {
 
 impl ApiClient for Syspass {
     fn from_config(config: Config) -> Syspass {
-        let mut builder = ClientBuilder::new();
-        builder = builder.danger_accept_invalid_certs(!config.verify_host);
-
         Self {
-            client: builder.build().expect("Got client"),
+            client: get_builder(&config).build().expect("Got client"),
             request_number: Cell::new(1),
             config,
         }
@@ -283,7 +248,7 @@ impl ApiClient for Syspass {
         search: Vec<(&str, String)>,
         usage: bool,
     ) -> Result<Vec<api::account::Account>, ApiError> {
-        match self.forge_and_send("getAccountSearch", Option::from(search)) {
+        match self.forge_and_send("getAccountSearch", Option::from(search), false) {
             Ok(response) => match response {
                 ApiResponseResult::Entity(result) => {
                     let mut list: Vec<api::account::Account> = vec![];
@@ -316,6 +281,7 @@ impl ApiClient for Syspass {
                 "id",
                 account.id.expect("Should not be empty").to_string(),
             )]),
+            true,
         ) {
             Ok(response) => {
                 if let ApiResponseResult::Entity(result) = response {
@@ -338,7 +304,7 @@ impl ApiClient for Syspass {
     }
 
     fn get_clients(&self) -> Result<Vec<api::client::Client>, ApiError> {
-        match self.forge_and_send("getCustomers", None) {
+        match self.forge_and_send("getCustomers", None, false) {
             Ok(response) => {
                 let mut list: Vec<api::client::Client> = vec![];
                 if let ApiResponseResult::Entity(result) = response {
@@ -358,7 +324,7 @@ impl ApiClient for Syspass {
     }
 
     fn get_categories(&self) -> Result<Vec<api::category::Category>, ApiError> {
-        match self.forge_and_send("getCategories", None) {
+        match self.forge_and_send("getCategories", None, false) {
             Ok(response) => {
                 let mut list: Vec<api::category::Category> = vec![];
                 if let ApiResponseResult::Entity(result) = response {
@@ -468,7 +434,11 @@ impl ApiClient for Syspass {
     }
 
     fn view_account(&self, id: &u32) -> Result<api::account::Account, ApiError> {
-        match self.forge_and_send("getAccountData", Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(
+            "getAccountData",
+            Option::from(vec![("id", id.to_string())]),
+            true,
+        ) {
             Ok(response) => match response {
                 ApiResponseResult::Entity(result) => {
                     let account: Account = serde_json::from_value(result.result).unwrap();

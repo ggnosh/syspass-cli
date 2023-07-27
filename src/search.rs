@@ -126,7 +126,7 @@ pub fn command(
                 }
             }
         } else {
-            let account = match accounts.first().cloned() {
+            let account = match accounts.first() {
                 Some(account) => account,
                 None => {
                     warn!("{} No account found", "\u{2716}".bright_red());
@@ -134,7 +134,7 @@ pub fn command(
                 }
             };
 
-            match api_client.get_password(&account) {
+            match api_client.get_password(account) {
                 Ok(password) => password,
                 Err(error) => {
                     error!(

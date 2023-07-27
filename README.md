@@ -48,6 +48,8 @@ Create a config file at `$(HOME)/.syspass/config.json`
 }
 ```
 
+If `password` is empty it will be prompted when needed.
+
 `passwordTimeout` if the value is 0 this feature is ignored.
 Otherwise, the clipboard will be cleared after given seconds unless the `--showpassword` flag is given.
 
