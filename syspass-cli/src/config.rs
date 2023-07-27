@@ -1,11 +1,12 @@
-use clap::ArgMatches;
-use colored::Colorize;
-use serde::Serialize;
-use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind::NotFound;
 use std::path::PathBuf;
+
+use clap::ArgMatches;
+use colored::Colorize;
+use serde::Serialize;
+use serde_derive::{Deserialize, Serialize};
 
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";

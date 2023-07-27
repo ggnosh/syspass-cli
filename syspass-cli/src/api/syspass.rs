@@ -1,11 +1,13 @@
-use crate::api::account::Account;
-use crate::config::Config;
-use crate::prompt::ask_for_password;
-use reqwest::blocking::{Client, ClientBuilder, Response};
-use serde_derive::Serialize;
 use std::collections::HashMap;
 use std::string::ToString;
 use std::sync::Once;
+
+use reqwest::blocking::{Client, ClientBuilder, Response};
+use serde_derive::Serialize;
+
+use crate::api::account::Account;
+use crate::config::Config;
+use crate::prompt::ask_for_password;
 
 pub mod v2;
 pub mod v3;
@@ -93,10 +95,12 @@ fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Response {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use mockito::{Mock, Server, ServerGuard};
+
     use crate::api::api_client::ApiClient;
     use crate::config::Config;
-    use mockito::{Mock, Server, ServerGuard};
-    use std::path::Path;
 
     pub fn create_server_response<T: ApiClient>(
         response: Option<impl AsRef<Path>>,

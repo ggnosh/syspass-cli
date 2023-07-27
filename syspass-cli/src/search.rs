@@ -1,11 +1,12 @@
+use std::error::Error;
+use std::time::Duration;
+use std::{env, process, thread};
+
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
 use colored::*;
 use inquire::{InquireError, Select};
 use log::{error, warn};
-use std::error::Error;
-use std::time::Duration;
-use std::{env, process, thread};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
 use term_table::{Table, TableStyle};

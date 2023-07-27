@@ -1,3 +1,11 @@
+use std::cell::Cell;
+use std::collections::HashMap;
+
+use log::debug;
+use serde::de::DeserializeOwned;
+use serde_derive::Deserialize;
+use serde_json::Value;
+
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::api_client::{ApiClient, ApiError};
 use crate::api::category::Category;
@@ -5,12 +13,6 @@ use crate::api::client::Client;
 use crate::api::entity::Entity;
 use crate::api::syspass::{add_request_args, get_builder, get_response, sort_accounts, JsonReq};
 use crate::config::Config;
-use log::debug;
-use serde::de::DeserializeOwned;
-use serde_derive::Deserialize;
-use serde_json::Value;
-use std::cell::Cell;
-use std::collections::HashMap;
 
 pub struct Syspass {
     client: reqwest::blocking::Client,
@@ -325,14 +327,15 @@ impl ApiClient for Syspass {
 
 #[cfg(test)]
 mod tests {
+    use proptest::strategy::{Just, Strategy};
+    use proptest::{prop_oneof, proptest};
+
     use crate::api::account::{Account, ChangePassword};
     use crate::api::api_client::ApiClient;
     use crate::api::entity::Entity;
     use crate::api::syspass::tests::create_server_response;
     use crate::api::syspass::v3::Syspass;
     use crate::config::Config;
-    use proptest::strategy::{Just, Strategy};
-    use proptest::{prop_oneof, proptest};
 
     fn success_status_list() -> impl Strategy<Value = usize> {
         prop_oneof![Just(200), Just(201), Just(202)]

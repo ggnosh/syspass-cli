@@ -1,10 +1,12 @@
-use crate::api::api_client::ApiClient;
-use crate::api::entity::Entity;
-use crate::prompt::ask_prompt;
+use std::fmt::{Display, Formatter, Result};
+
 use colored::Colorize;
 use inquire::Select;
 use serde_derive::Deserialize;
-use std::fmt::{Display, Formatter, Result};
+
+use crate::api::api_client::ApiClient;
+use crate::api::entity::Entity;
+use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
 

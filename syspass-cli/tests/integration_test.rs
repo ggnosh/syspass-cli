@@ -25,7 +25,7 @@ fn run_change_with_data() {
     let assert = cmd
         .args([
             "--config",
-            "test_config.json",
+            "../test_config.json",
             "edit",
             "password",
             "--id",

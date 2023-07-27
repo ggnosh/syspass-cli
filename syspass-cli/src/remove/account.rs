@@ -1,14 +1,16 @@
-use clap::{ArgMatches, Command};
-use colored::Colorize;
-use log::{error, warn};
 use std::error::Error;
 use std::process;
 
-pub const COMMAND_NAME: &str = "client";
+use clap::{ArgMatches, Command};
+use colored::Colorize;
+use log::{error, warn};
+
 use crate::api::api_client::ApiClient;
 
+pub const COMMAND_NAME: &str = "account";
+
 pub fn command_helper() -> Command {
-    Command::new(COMMAND_NAME).about("Remove client")
+    Command::new(COMMAND_NAME).about("Remove account")
 }
 
 pub fn command(
@@ -16,16 +18,16 @@ pub fn command(
     api_client: &dyn ApiClient,
     id: &u32,
 ) -> Result<u8, Box<dyn Error>> {
-    match api_client.delete_client(id) {
+    match api_client.delete_account(id) {
         Ok(status) => {
             if status {
-                warn!("{} Client removed", "\u{2714}".bright_green());
+                warn!("{} Account removed", "\u{2714}".bright_green());
             } else {
-                warn!("{} Failed to remove client", "\u{2716}".bright_red());
+                warn!("{} Failed to remove account", "\u{2716}".bright_red());
             }
         }
         Err(error) => {
-            error!("{} Api error: {}", "\u{2716}".bright_red(), error);
+            error!("{}", error);
             process::exit(1);
         }
     }

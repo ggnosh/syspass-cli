@@ -1,18 +1,20 @@
+use std::error::Error;
+use std::process::ExitCode;
+use std::result::Result;
+use std::str::FromStr;
+
+use clap::{arg, crate_description, crate_name, crate_version, Command};
+use log::{error, Level, LevelFilter, Metadata, Record};
+
+use crate::api::api_client::{Api, ApiClient};
+use crate::config::Config;
+
 mod api;
 mod config;
 mod edit;
 mod prompt;
 mod remove;
 mod search;
-
-use crate::api::api_client::{Api, ApiClient};
-use crate::config::Config;
-use clap::{arg, crate_description, crate_name, crate_version, Command};
-use log::{error, Level, LevelFilter, Metadata, Record};
-use std::error::Error;
-use std::process::ExitCode;
-use std::result::Result;
-use std::str::FromStr;
 
 struct SimpleLogger;
 

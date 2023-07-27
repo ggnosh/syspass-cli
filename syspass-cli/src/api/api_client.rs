@@ -1,3 +1,9 @@
+use std::error::Error;
+use std::fmt;
+use std::str::FromStr;
+
+use colored::Colorize;
+
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::api_client::Api::*;
 use crate::api::category::Category;
@@ -5,10 +11,6 @@ use crate::api::client::Client;
 use crate::api::syspass::v2;
 use crate::api::syspass::v3;
 use crate::config::Config;
-use colored::Colorize;
-use std::error::Error;
-use std::fmt;
-use std::str::FromStr;
 
 pub trait ApiConfig {
     fn from_config<T: ApiClient + 'static>(config: Config) -> Box<T>;

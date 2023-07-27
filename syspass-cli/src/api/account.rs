@@ -1,6 +1,8 @@
-use crate::api::entity::Entity;
-use serde_derive::Deserialize;
 use std::fmt::{Display, Formatter, Result};
+
+use serde_derive::Deserialize;
+
+use crate::api::entity::Entity;
 
 #[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]

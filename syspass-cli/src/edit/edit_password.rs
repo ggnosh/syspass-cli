@@ -1,6 +1,8 @@
-use crate::api::account::ChangePassword;
-use crate::api::api_client::ApiClient;
-use crate::prompt::{ask_for_date, ask_for_password, password_strength};
+use std::cmp::Ordering;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::process;
+
 use chrono::{NaiveDateTime, Utc};
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
@@ -9,10 +11,10 @@ use log::{error, info, warn};
 use passwords::analyzer;
 use passwords::scorer;
 use passwords::PasswordGenerator;
-use std::cmp::Ordering;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::process;
+
+use crate::api::account::ChangePassword;
+use crate::api::api_client::ApiClient;
+use crate::prompt::{ask_for_date, ask_for_password, password_strength};
 
 pub const COMMAND_NAME: &str = "password";
 

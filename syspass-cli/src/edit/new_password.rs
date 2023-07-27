@@ -1,16 +1,18 @@
-use crate::api::account::Account;
-use clap::{arg, ArgMatches, Command};
-use colored::Colorize;
-use log::warn;
 use std::error::Error;
 use std::process;
 
-pub const COMMAND_NAME: &str = "password";
+use clap::{arg, ArgMatches, Command};
+use colored::Colorize;
+use log::warn;
+
+use crate::api::account::Account;
 use crate::api::api_client::ApiClient;
 use crate::api::category::ask_for_category;
 use crate::api::client::ask_for_client;
 use crate::edit::edit_password::get_password;
 use crate::prompt::get_match_string;
+
+pub const COMMAND_NAME: &str = "password";
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)

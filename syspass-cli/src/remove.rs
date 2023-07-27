@@ -1,13 +1,15 @@
+use std::error::Error;
+
+use clap::{arg, ArgMatches, Command};
+use colored::Colorize;
+
+use crate::api::api_client::ApiClient;
+
 mod account;
 mod category;
 mod client;
 
-use clap::{arg, ArgMatches, Command};
-use colored::Colorize;
-use std::error::Error;
-
 pub const COMMAND_NAME: &str = "remove";
-use crate::api::api_client::ApiClient;
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)

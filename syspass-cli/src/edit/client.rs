@@ -1,11 +1,13 @@
-use crate::api::api_client::ApiClient;
-use crate::api::client::{ask_for_client, Client};
-use crate::prompt::get_match_string;
+use std::error::Error;
+use std::process;
+
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{error, info, warn};
-use std::error::Error;
-use std::process;
+
+use crate::api::api_client::ApiClient;
+use crate::api::client::{ask_for_client, Client};
+use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "client";
 

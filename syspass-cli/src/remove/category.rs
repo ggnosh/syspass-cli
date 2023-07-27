@@ -1,11 +1,13 @@
-use clap::{ArgMatches, Command};
-use colored::Colorize;
-use log::{error, warn};
 use std::error::Error;
 use std::process;
 
-pub const COMMAND_NAME: &str = "category";
+use clap::{ArgMatches, Command};
+use colored::Colorize;
+use log::{error, warn};
+
 use crate::api::api_client::ApiClient;
+
+pub const COMMAND_NAME: &str = "category";
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME).about("Remove category")

@@ -1,9 +1,10 @@
+use std::process;
+
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use clap::ArgMatches;
 use inquire::{required, DateSelect, Password, PasswordDisplayMode, Text};
 use log::error;
 use passwords::{analyzer, scorer};
-use std::process;
 
 pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
     let mut prompt = Text::new(text);

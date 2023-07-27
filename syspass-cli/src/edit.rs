@@ -1,12 +1,13 @@
+use std::error::Error;
+
+use clap::{ArgMatches, Command};
+
+use crate::api::api_client::ApiClient;
+
 mod category;
 mod client;
 mod edit_password;
 mod new_password;
-
-use clap::{ArgMatches, Command};
-use std::error::Error;
-
-use crate::api::api_client::ApiClient;
 
 pub const COMMAND_NAME_EDIT: &str = "edit";
 pub const COMMAND_NAME_NEW: &str = "new";

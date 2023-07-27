@@ -1,11 +1,13 @@
-use crate::api::api_client::ApiClient;
-use crate::api::category::{ask_for_category, Category};
-use crate::prompt::get_match_string;
+use std::error::Error;
+use std::process;
+
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{info, warn};
-use std::error::Error;
-use std::process;
+
+use crate::api::api_client::ApiClient;
+use crate::api::category::{ask_for_category, Category};
+use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "category";
 
