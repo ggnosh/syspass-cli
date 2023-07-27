@@ -1,11 +1,10 @@
-use std::fmt::{Display, Result, Formatter};
-use serde_derive::Deserialize;
 use crate::api::entity::Entity;
+use serde_derive::Deserialize;
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Account
-{
+pub struct Account {
     pub id: Option<u32>,
     pub name: String,
     pub login: String,
@@ -18,35 +17,35 @@ pub struct Account
     pub user_group_name: String,
 }
 
-impl Display for Account
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result
-    {
-        write!(f, "{}. {} - {}", self.id.expect("Id should not be empty"), self.name, self.url)
+impl Display for Account {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}. {} - {}",
+            self.id.expect("Id should not be empty"),
+            self.name,
+            self.url
+        )
     }
 }
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ViewPassword
-{
+pub struct ViewPassword {
     pub password: String,
-    pub account: Account
+    pub account: Account,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangePassword
-{
+pub struct ChangePassword {
     pub pass: String,
     pub id: u32,
-    pub expire_date: i64
+    pub expire_date: i64,
 }
 
-impl Entity for Account
-{
-    fn id(&mut self, new_id: Option<u32>) -> Option<u32>
-    {
+impl Entity for Account {
+    fn id(&mut self, new_id: Option<u32>) -> Option<u32> {
         if let Some(id) = new_id {
             self.id = Option::from(id);
         }

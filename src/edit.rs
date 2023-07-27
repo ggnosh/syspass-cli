@@ -1,10 +1,10 @@
-mod edit_password;
-mod new_password;
 mod category;
 mod client;
+mod edit_password;
+mod new_password;
 
+use clap::{ArgMatches, Command};
 use std::error::Error;
-use clap::{Command, ArgMatches};
 
 use crate::api::api_client::ApiClient;
 
@@ -21,13 +21,20 @@ pub fn command_helper_edit() -> Command {
         .subcommand(client::command_helper())
 }
 
-pub fn command_edit(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) -> Result<u8, Box<dyn Error>>
-{
+pub fn command_edit(
+    matches: &ArgMatches,
+    api_client: &dyn ApiClient,
+    quiet: bool,
+) -> Result<u8, Box<dyn Error>> {
     match matches.subcommand() {
-        Some((edit_password::COMMAND_NAME, matches)) => edit_password::command(matches, api_client, quiet),
-        Some((category::COMMAND_NAME, matches)) => category::command(matches, api_client, quiet, false),
+        Some((edit_password::COMMAND_NAME, matches)) => {
+            edit_password::command(matches, api_client, quiet)
+        }
+        Some((category::COMMAND_NAME, matches)) => {
+            category::command(matches, api_client, quiet, false)
+        }
         Some((client::COMMAND_NAME, matches)) => client::command(matches, api_client, quiet, false),
-        _ => unreachable!("Clap should keep us out from here")
+        _ => unreachable!("Clap should keep us out from here"),
     }
 }
 
@@ -37,15 +44,21 @@ pub fn command_helper_new() -> Command {
         .subcommand(new_password::command_helper())
         .subcommand(category::command_helper())
         .subcommand(client::command_helper())
-
 }
 
-pub fn command_new(matches: &ArgMatches, api_client: &dyn ApiClient, quiet: bool) -> Result<u8, Box<dyn Error>>
-{
+pub fn command_new(
+    matches: &ArgMatches,
+    api_client: &dyn ApiClient,
+    quiet: bool,
+) -> Result<u8, Box<dyn Error>> {
     match matches.subcommand() {
-        Some((new_password::COMMAND_NAME, matches)) => new_password::command(matches, api_client, quiet),
-        Some((category::COMMAND_NAME, matches)) => category::command(matches, api_client, quiet, true),
+        Some((new_password::COMMAND_NAME, matches)) => {
+            new_password::command(matches, api_client, quiet)
+        }
+        Some((category::COMMAND_NAME, matches)) => {
+            category::command(matches, api_client, quiet, true)
+        }
         Some((client::COMMAND_NAME, matches)) => client::command(matches, api_client, quiet, true),
-        _ => unreachable!("Clap should keep us out from here")
+        _ => unreachable!("Clap should keep us out from here"),
     }
 }

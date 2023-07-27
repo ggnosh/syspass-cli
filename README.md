@@ -4,7 +4,7 @@ A simple command line tool to interact with sysPass databases.
 
 [sysPass](https://www.syspass.org/) Intuitive, secure and multiuser password manager
 
-### Features
+## Features
 - Supports sysPass 2.1 and 3.1
   - 2.1 has limited functionality because the API doesn't support all the features such as but not limited to:
     - Changing passwords
@@ -61,7 +61,7 @@ Located at `$(HOME)/.syspass/usage.json`
 This file is used to sort the most commonly used accounts.
 The behaviour can be disabled by using `-u` or `--disableusage` during account search.
 
-### Usage:
+## Usage:
 
 ```text
 Usage: syspass-cli [OPTIONS] <COMMAND>
