@@ -12,7 +12,6 @@ pub mod v3;
 
 static mut PASSWORD: String = String::new();
 static INIT: Once = Once::new();
-pub mod v3;
 
 fn get_cached_password() -> &'static String {
     unsafe {
