@@ -41,7 +41,7 @@ Create a config file at `$(HOME)/.syspass/config.json`
 {
   "host": "https://example.org/api.php",
   "token": "AUTHORIZATION_TOKEN",
-  "password": "IF NO PASSWORD IS GIVEN IT IS PROMPTED",
+  "password": "PASSWORD",
   "verifyHost": true,
   "passwordTimeout": 15,
   "apiVersion": "SyspassV3"

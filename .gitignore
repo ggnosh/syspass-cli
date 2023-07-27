@@ -14,3 +14,4 @@ Cargo.lock
 *.pdb
 .idea
 /test_config.json
+/test_config_v2.json
