@@ -2,7 +2,7 @@ use crate::api::entity::Entity;
 use serde_derive::Deserialize;
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     pub id: Option<u32>,
@@ -29,15 +29,13 @@ impl Display for Account {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone)]
 pub struct ViewPassword {
     pub password: String,
     pub account: Account,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct ChangePassword {
     pub pass: String,
     pub id: u32,

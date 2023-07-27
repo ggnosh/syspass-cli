@@ -1,18 +1,42 @@
 use crate::api::account::Account;
 use crate::config::Config;
+use crate::prompt::ask_for_password;
+use reqwest::blocking::{Client, ClientBuilder, Response};
+use serde_derive::Serialize;
 use std::collections::HashMap;
+use std::string::ToString;
+use std::sync::Once;
+
+static mut PASSWORD: String = String::new();
+static INIT: Once = Once::new();
 
 pub mod v2;
 pub mod v3;
 
+fn get_cached_password() -> &'static String {
+    unsafe {
+        INIT.call_once(|| {
+            PASSWORD = ask_for_password("Password: ");
+        });
+        &PASSWORD
+    }
+}
+
 fn add_request_args(
     args: &Option<Vec<(&str, String)>>,
     config: &Config,
+    needs_password: bool,
 ) -> HashMap<String, String> {
-    let mut params: HashMap<String, String> = HashMap::from([
-        ("authToken".to_string(), config.token.to_string()),
-        ("tokenPass".to_string(), config.password.to_string()),
-    ]);
+    let mut params: HashMap<String, String> =
+        HashMap::from([("authToken".to_string(), config.token.to_string())]);
+
+    if needs_password {
+        let mut password = config.password.to_string();
+        if password.is_empty() {
+            password = get_cached_password().to_string();
+        }
+        params.insert("tokenPass".to_string(), password);
+    }
 
     if let Some(args) = args {
         for arg in args.iter() {
@@ -36,6 +60,21 @@ fn sort_accounts(list: &mut [Account], usage_data: &HashMap<u32, u32>) {
             right.cmp(left)
         }
     });
+}
+
+#[derive(Serialize, Debug)]
+struct JsonReq {
+    jsonrpc: String,
+    method: String,
+    params: HashMap<String, String>,
+    id: u8,
+}
+
+fn get_builder(config: &Config) -> ClientBuilder {
+    let mut builder = ClientBuilder::new();
+    builder = builder.danger_accept_invalid_certs(!config.verify_host);
+
+    builder
 }
 
 #[cfg(test)]
@@ -70,5 +109,19 @@ mod tests {
         });
 
         (mock, client, server)
+    }
+}
+
+fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Response {
+    match client.post(request_url).json(&req).send() {
+        Ok(r) => match r.status().is_success() {
+            true => r,
+            false => {
+                panic!("Error: Server responded with code {}", r.status())
+            }
+        },
+        Err(e) => {
+            panic!("Error: {}", e);
+        }
     }
 }

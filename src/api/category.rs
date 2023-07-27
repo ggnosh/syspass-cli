@@ -8,7 +8,7 @@ use std::fmt::{Display, Formatter, Result};
 
 const ID_EMPTY: &str = "Id should not be empty";
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub id: Option<u32>,

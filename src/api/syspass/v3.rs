@@ -3,12 +3,11 @@ use crate::api::api_client::{ApiClient, ApiError};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
-use crate::api::syspass::{add_request_args, sort_accounts};
+use crate::api::syspass::{add_request_args, get_builder, get_response, sort_accounts, JsonReq};
 use crate::config::Config;
 use log::debug;
-use reqwest::blocking::ClientBuilder;
 use serde::de::DeserializeOwned;
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::Deserialize;
 use serde_json::Value;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -21,35 +20,22 @@ pub struct Syspass {
 
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
-#[derive(Deserialize, Debug, Serialize)]
-struct JsonReq {
-    jsonrpc: String,
-    method: String,
-    params: HashMap<String, String>,
-    id: u8,
-}
-
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ApiResult {
-    count: Option<u8>,
     item_id: Option<u32>,
     result: Value,
     result_code: i32,
-    result_message: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 struct ApiResponse {
-    id: u8,
-    jsonrpc: String,
     result: Option<ApiResult>,
     error: Option<ApiErrorResponse>,
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 struct ApiErrorResponse {
-    code: i32,
     message: String,
 }
 
@@ -64,19 +50,7 @@ impl Syspass {
     ) -> Result<ApiResponse, serde_json::error::Error> {
         debug!("Sending request to {}:\n{:#?}\n", request_url, req);
 
-        let response = match self.client.post(request_url).json(&req).send() {
-            Ok(r) => match r.status().is_success() {
-                true => r,
-                false => {
-                    panic!("Error: Server responded with code {}", r.status())
-                }
-            },
-            Err(e) => {
-                panic!("Error: {}", e);
-            }
-        };
-
-        let json: Value = response
+        let json: Value = get_response(&self.client, request_url, req)
             .json()
             .expect("Server response did not contain JSON");
 
@@ -89,8 +63,9 @@ impl Syspass {
         &self,
         method: &str,
         args: Option<Vec<(&str, String)>>,
+        needs_password: bool,
     ) -> Result<ApiResult, ApiError> {
-        let params = add_request_args(&args, &self.config);
+        let params = add_request_args(&args, &self.config, needs_password);
         let req = JsonReq {
             jsonrpc: String::from("2.0"),
             method: method.to_string(),
@@ -124,7 +99,7 @@ impl Syspass {
     }
 
     fn delete_request(&self, method: &str, id: &u32) -> Result<bool, ApiError> {
-        match self.forge_and_send(method, Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(method, Option::from(vec![("id", id.to_string())]), false) {
             Ok(result) => Ok(result.result_code == 0),
             Err(error) => Err(error),
         }
@@ -152,7 +127,7 @@ impl Syspass {
             }
         }
 
-        match self.forge_and_send(&method, args) {
+        match self.forge_and_send(&method, args, true) {
             Ok(result) => {
                 let mut entity = serde_json::from_value::<T>(result.result).unwrap();
                 entity.id(result.item_id);
@@ -166,11 +141,8 @@ impl Syspass {
 
 impl ApiClient for Syspass {
     fn from_config(config: Config) -> Syspass {
-        let mut builder = ClientBuilder::new();
-        builder = builder.danger_accept_invalid_certs(!config.verify_host);
-
         Self {
-            client: builder.build().expect("Got client"),
+            client: get_builder(&config).build().expect("Got client"),
             request_number: Cell::new(1),
             config,
         }
@@ -181,7 +153,7 @@ impl ApiClient for Syspass {
         search: Vec<(&str, String)>,
         usage: bool,
     ) -> Result<Vec<Account>, ApiError> {
-        match self.forge_and_send("account/search", Option::from(search)) {
+        match self.forge_and_send("account/search", Option::from(search), false) {
             Ok(result) => {
                 let mut list: Vec<Account> =
                     serde_json::from_value(result.result).expect("Invalid response");
@@ -206,6 +178,7 @@ impl ApiClient for Syspass {
                 "id",
                 account.id.expect("Should not be empty").to_string(),
             )]),
+            true,
         ) {
             Ok(result) => Ok(ViewPassword {
                 account: account.to_owned(),
@@ -222,7 +195,7 @@ impl ApiClient for Syspass {
     }
 
     fn get_clients(&self) -> Result<Vec<Client>, ApiError> {
-        match self.forge_and_send("client/search", None) {
+        match self.forge_and_send("client/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Client> = serde_json::from_value(result.result).unwrap();
                 list.sort_by(|a, b| a.id.cmp(&b.id));
@@ -233,7 +206,7 @@ impl ApiClient for Syspass {
     }
 
     fn get_categories(&self) -> Result<Vec<Category>, ApiError> {
-        match self.forge_and_send("category/search", None) {
+        match self.forge_and_send("category/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Category> = serde_json::from_value(result.result).unwrap();
                 list.sort_by(|a, b| a.id.cmp(&b.id));
@@ -293,6 +266,7 @@ impl ApiClient for Syspass {
                 ("pass", password.pass.to_string()),
                 ("id", password.id.to_string()),
             ]),
+            true,
         ) {
             Ok(result) => Ok(serde_json::from_value::<Account>(result.result).unwrap()),
             Err(error) => Err(error),
@@ -312,21 +286,33 @@ impl ApiClient for Syspass {
     }
 
     fn view_account(&self, id: &u32) -> Result<Account, ApiError> {
-        match self.forge_and_send("account/view", Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(
+            "account/view",
+            Option::from(vec![("id", id.to_string())]),
+            true,
+        ) {
             Ok(result) => Ok(serde_json::from_value(result.result).unwrap()),
             Err(error) => Err(error),
         }
     }
 
     fn get_category(&self, id: &u32) -> Result<Category, ApiError> {
-        match self.forge_and_send("category/view", Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(
+            "category/view",
+            Option::from(vec![("id", id.to_string())]),
+            true,
+        ) {
             Ok(result) => Ok(serde_json::from_value(result.result).unwrap()),
             Err(error) => Err(error),
         }
     }
 
     fn get_client(&self, id: &u32) -> Result<Client, ApiError> {
-        match self.forge_and_send("client/view", Option::from(vec![("id", id.to_string())])) {
+        match self.forge_and_send(
+            "client/view",
+            Option::from(vec![("id", id.to_string())]),
+            true,
+        ) {
             Ok(result) => Ok(serde_json::from_value(result.result).unwrap()),
             Err(error) => Err(error),
         }
