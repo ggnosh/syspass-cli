@@ -325,8 +325,7 @@ impl ApiClient for Syspass {
 
 #[cfg(test)]
 mod tests {
-    use proptest::strategy::{Just, Strategy};
-    use proptest::{prop_oneof, proptest};
+    use test_case::test_case;
 
     use crate::api::account::{Account, ChangePassword};
     use crate::api::entity::Entity;
@@ -335,51 +334,49 @@ mod tests {
     use crate::api::ApiClient;
     use crate::config::Config;
 
-    fn success_status_list() -> impl Strategy<Value = usize> {
-        prop_oneof![Just(200), Just(201), Just(202)]
+    #[test_case(200)]
+    #[test_case(201)]
+    #[test_case(202)]
+    #[should_panic(expected = "Server response did not contain JSON")]
+    fn test_ok_server(status: usize) {
+        let test = create_server_response::<Syspass>(None::<String>, status);
+        test.1.search_account(vec![], false).expect("Panic");
     }
 
-    fn error_status_list() -> impl Strategy<Value = usize> {
-        prop_oneof![Just(400), Just(403), Just(404), Just(500),]
+    #[test_case(400)]
+    #[test_case(403)]
+    #[test_case(404)]
+    #[test_case(500)]
+    #[should_panic(expected = "Error: Server responded with code")]
+    fn test_bad_server(status: usize) {
+        let test = create_server_response::<Syspass>(None::<String>, status);
+        test.1.search_account(vec![], false).expect("Panic");
     }
 
-    proptest! {
-        #[test]
-        #[should_panic(expected = "Server response did not contain JSON")]
-        fn test_ok_server(status in success_status_list())
-        {
-            let test = create_server_response::<Syspass>(None::<String>, status);
-            test.1.search_account(vec![], false).expect("Panic");
-        }
+    #[test_case(400)]
+    #[test_case(403)]
+    #[test_case(404)]
+    #[test_case(500)]
+    #[should_panic(expected = "Error: Server responded with code")]
+    fn test_search_account_error_response(status: usize) {
+        // Request a new server from the pool
+        let test = create_server_response::<Syspass>(
+            Option::from("tests/responses/syspass/v3/account_search_empty.json"),
+            status,
+        );
 
-        #[test]
-        #[should_panic(expected = "Error: Server responded with code")]
-        fn test_bad_server(status in error_status_list())
-        {
-            let test = create_server_response::<Syspass>(None::<String>, status);
-            test.1.search_account(vec![], false).expect("Panic");
-        }
+        let accounts = test.1.search_account(vec![], false);
 
-        #[test]
-        #[should_panic(expected = "Error: Server responded with code")]
-        fn test_search_account_error_response(status in error_status_list())
-        {
-            // Request a new server from the pool
-            let test = create_server_response::<Syspass>(Option::from("tests/responses/syspass/v3/account_search_empty.json"), status);
-
-            let accounts = test.1.search_account(vec![], false);
-
-            match accounts {
-                Ok(accounts) => {
-                    assert_eq!(0, accounts.len())
-                }
-                _ => {
-                    panic!("Accounts should not have failed")
-                }
+        match accounts {
+            Ok(accounts) => {
+                assert_eq!(0, accounts.len())
             }
-
-            test.0.assert();
+            _ => {
+                panic!("Accounts should not have failed")
+            }
         }
+
+        test.0.assert();
     }
 
     #[test]
@@ -495,5 +492,44 @@ mod tests {
                 panic!("Request should not have failed")
             }
         }
+    }
+
+    #[test]
+    fn test_remove_account_not_found() {
+        let test = create_server_response::<Syspass>(
+            Option::from("tests/responses/syspass/v3/account_delete_not_found.json"),
+            200,
+        );
+        let response = test.1.delete_account(&1);
+
+        match response {
+            Ok(_) => {
+                panic!("Request should have failed")
+            }
+            Err(e) => {
+                assert_eq!("The account doesn't exist", e.0)
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_or_edit() {
+        let client = Syspass::from_config(Config {
+            host: "http://localhost/api.php".to_owned(),
+            token: "1234".to_owned(),
+            password: "<PASSWORD>".to_owned(),
+            verify_host: false,
+            api_version: Option::from("SyspassV3".to_owned()),
+            password_timeout: None,
+        });
+
+        let mut id: u32 = 0;
+
+        assert_eq!("create", client.create_or_edit(Option::from(&id)));
+        assert_eq!("create", client.create_or_edit(None));
+        id = 1;
+        assert_eq!("edit", client.create_or_edit(Option::from(&id)));
+        id = 100;
+        assert_eq!("edit", client.create_or_edit(Option::from(&id)));
     }
 }

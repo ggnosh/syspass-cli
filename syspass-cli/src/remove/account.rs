@@ -7,10 +7,13 @@ use log::{error, warn};
 
 use crate::api::ApiClient;
 
-pub const COMMAND_NAME: &str = "account";
+pub const COMMAND_NAME: &str = "password";
 
 pub fn command_helper() -> Command {
-    Command::new(COMMAND_NAME).about("Remove account")
+    Command::new(COMMAND_NAME)
+        .visible_alias("account")
+        .alias("pass")
+        .about("Remove account")
 }
 
 pub fn command(

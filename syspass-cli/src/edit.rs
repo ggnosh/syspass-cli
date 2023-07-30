@@ -41,6 +41,7 @@ pub fn command_edit(
 
 pub fn command_helper_new() -> Command {
     Command::new(COMMAND_NAME_NEW)
+        .alias("add")
         .about("Add a new entity")
         .subcommand(new_password::command_helper())
         .subcommand(category::command_helper())

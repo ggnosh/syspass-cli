@@ -214,6 +214,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new("Username".green()),
         TableCell::new("Password".green()),
         TableCell::new("Address".green()),
+        TableCell::new("Client name".green()),
         //TableCell::new("Tags".green()), // Tags are not implemented by the API for some reason
     ];
 
@@ -236,6 +237,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
             }
         }),
         TableCell::new(data.account.url()),
+        TableCell::new(data.account.client_name().unwrap_or("")),
     ]));
 
     table.render()
@@ -257,6 +259,7 @@ mod tests {
                 4,
                 5,
                 None,
+                Option::from("test_client".to_owned()),
             ),
             password: "<PASSWORD>".to_owned(),
         }

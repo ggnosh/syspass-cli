@@ -85,6 +85,7 @@ pub fn command(
                     get_password("Password: ")
                 }),
         ),
+        None,
     );
 
     warn!("Trying to save account");

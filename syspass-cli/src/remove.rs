@@ -13,6 +13,7 @@ pub const COMMAND_NAME: &str = "remove";
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
+        .alias("delete")
         .arg(
             arg!(-i --id <ID> "id")
                 .global(true)

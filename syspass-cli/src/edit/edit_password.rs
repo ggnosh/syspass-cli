@@ -134,74 +134,36 @@ impl Display for PasswordData {
     }
 }
 
+struct GeneratorParams(usize, bool, bool);
+
 fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
     let mut suggest: Vec<String> = vec![];
 
-    let generators = [
-        PasswordGenerator::new()
-            .length(25)
-            .symbols(true)
-            .exclude_similar_characters(false)
-            .spaces(false)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(25)
-            .symbols(false)
-            .exclude_similar_characters(false)
-            .spaces(false)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(20)
-            .symbols(true)
-            .spaces(false)
-            .exclude_similar_characters(true)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(16)
-            .symbols(true)
-            .spaces(false)
-            .exclude_similar_characters(true)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(16)
-            .symbols(false)
-            .spaces(false)
-            .exclude_similar_characters(true)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(10)
-            .symbols(true)
-            .spaces(false)
-            .exclude_similar_characters(true)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
-        PasswordGenerator::new()
-            .length(8)
-            .symbols(false)
-            .spaces(false)
-            .exclude_similar_characters(true)
-            .strict(true)
-            .numbers(true)
-            .lowercase_letters(true)
-            .uppercase_letters(true),
+    let params = [
+        GeneratorParams(25, true, true),
+        GeneratorParams(25, false, true),
+        GeneratorParams(20, true, true),
+        GeneratorParams(16, true, true),
+        GeneratorParams(16, false, true),
+        GeneratorParams(10, true, true),
+        GeneratorParams(8, false, true),
+        GeneratorParams(8, false, false),
     ];
+
+    let mut generators: Vec<PasswordGenerator> = vec![];
+    for flags in params {
+        generators.push(
+            PasswordGenerator::new()
+                .length(flags.0)
+                .symbols(flags.1)
+                .numbers(flags.2)
+                .exclude_similar_characters(true)
+                .strict(true)
+                .spaces(false)
+                .lowercase_letters(true)
+                .uppercase_letters(true),
+        );
+    }
 
     for generator in generators {
         suggest.append(&mut generator.generate(random_count).unwrap());

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 
+use colored::{ColoredString, Colorize};
 use serde_derive::Deserialize;
 
 use crate::api::entity::Entity;
@@ -15,9 +16,11 @@ pub struct Account {
     category_id: u32,
     client_id: u32,
     pass: Option<String>,
+    client_name: Option<String>,
 }
 
 impl Account {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: Option<u32>,
         name: String,
@@ -27,6 +30,7 @@ impl Account {
         category_id: u32,
         client_id: u32,
         pass: Option<String>,
+        client_name: Option<String>,
     ) -> Account {
         Account {
             id,
@@ -37,6 +41,7 @@ impl Account {
             category_id,
             client_id,
             pass,
+            client_name,
         }
     }
 
@@ -58,19 +63,39 @@ impl Account {
     pub fn client_id(&self) -> &u32 {
         &self.client_id
     }
-    pub fn pass(&self) -> Option<&String> {
-        self.pass.as_ref()
+    pub fn pass(&self) -> Option<&str> {
+        self.pass.as_deref()
+    }
+    pub fn client_name(&self) -> Option<&str> {
+        self.client_name.as_deref()
     }
 }
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(
-            f,
-            "{}. {} - {}",
+        let line = format!(
+            "{}. {} - {} ({})",
             self.id().expect("Id should not be empty"),
             self.name(),
-            self.url()
+            if !self.url().is_empty() {
+                self.url().replace("ssh://", "").green()
+            } else {
+                ColoredString::from("")
+            },
+            match self.client_name() {
+                Some(text) => text.yellow(),
+                _ => ColoredString::from(""),
+            }
+        );
+
+        write!(
+            f,
+            "{}",
+            line.trim()
+                .split(' ')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
         )
     }
 }

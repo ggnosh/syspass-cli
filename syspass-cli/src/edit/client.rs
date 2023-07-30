@@ -61,7 +61,7 @@ fn edit_client(
         warn!("Creating a new client");
         Client::default()
     } else {
-        api_client.get_client(&id).expect("Client not found")
+        api_client.get_client(&id)?
     };
 
     client

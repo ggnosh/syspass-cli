@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::process;
 
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
@@ -57,11 +56,8 @@ fn edit_category(
     let mut category: Category = if id == 0 {
         warn!("Creating a new category");
         Category::default()
-    } else if quiet {
-        warn!("Could not ask for category");
-        process::exit(1);
     } else {
-        api_client.get_category(&id).expect("Category not found")
+        api_client.get_category(&id)?
     };
 
     category.set_name(

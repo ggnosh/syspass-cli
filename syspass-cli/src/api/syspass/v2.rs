@@ -86,9 +86,8 @@ struct Account {
     pub account_name: String,
     pub account_notes: String,
     pub account_pass: String,
-    pub account_url: String,
+    pub account_url: Option<String>,
     pub customer_name: String,
-    pub usergroup_name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -114,11 +113,12 @@ impl Account {
             Option::from(self.account_id.parse::<u32>().unwrap()),
             self.account_name.to_owned(),
             self.account_login.to_owned(),
-            self.account_url.to_owned(),
+            self.account_url.clone().unwrap_or("".to_owned()),
             self.account_notes.to_owned(),
             self.account_categoryId.parse().unwrap(),
             self.account_customerId.parse().unwrap(),
-            Option::from(self.account_name.to_owned()),
+            Option::from(self.account_pass.to_owned()),
+            Option::from(self.customer_name.to_owned()),
         )
     }
 }
@@ -463,61 +463,59 @@ impl ApiClient for Syspass {
 
 #[cfg(test)]
 mod tests {
-    use proptest::strategy::{Just, Strategy};
-    use proptest::{prop_oneof, proptest};
+    use test_case::test_case;
 
-    use crate::api::account::{Account, ChangePassword};
+    use crate::api;
+    use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
     use crate::api::syspass::tests::create_server_response;
-    use crate::api::syspass::v2::{Syspass, NOT_SUPPORTED};
+    use crate::api::syspass::v2::{Account, Category, Client, Syspass, NOT_SUPPORTED};
     use crate::api::ApiClient;
     use crate::config::Config;
 
-    fn success_status_list() -> impl Strategy<Value = usize> {
-        prop_oneof![Just(200), Just(201), Just(202)]
+    #[test_case(200)]
+    #[test_case(201)]
+    #[test_case(202)]
+    #[should_panic(expected = "Server response did not contain JSON")]
+    fn test_ok_server(status: usize) {
+        let test = create_server_response::<Syspass>(None::<String>, status);
+        test.1.search_account(vec![], false).expect("Panic");
     }
 
-    fn error_status_list() -> impl Strategy<Value = usize> {
-        prop_oneof![Just(400), Just(403), Just(404), Just(500),]
+    #[test_case(400)]
+    #[test_case(403)]
+    #[test_case(404)]
+    #[test_case(500)]
+    #[should_panic(expected = "Error: Server responded with code")]
+    fn test_bad_server(status: usize) {
+        let test = create_server_response::<Syspass>(None::<String>, status);
+        test.1.search_account(vec![], false).expect("Panic");
     }
 
-    proptest! {
-        #[test]
-        #[should_panic(expected = "Server response did not contain JSON")]
-        fn test_ok_server(status in success_status_list())
-        {
-            let test = create_server_response::<Syspass>(None::<String>, status);
-            test.1.search_account(vec![], false).expect("Panic");
-        }
+    #[test_case(400)]
+    #[test_case(403)]
+    #[test_case(404)]
+    #[test_case(500)]
+    #[should_panic(expected = "Error: Server responded with code")]
+    fn test_search_account_error_response(status: usize) {
+        // Request a new server from the pool
+        let test = create_server_response::<Syspass>(
+            Option::from("tests/responses/syspass/v2/account_search_empty.json"),
+            status,
+        );
 
-        #[test]
-        #[should_panic(expected = "Error: Server responded with code")]
-        fn test_bad_server(status in error_status_list())
-        {
-            let test = create_server_response::<Syspass>(None::<String>, status);
-            test.1.search_account(vec![], false).expect("Panic");
-        }
+        let accounts = test.1.search_account(vec![], false);
 
-        #[test]
-        #[should_panic(expected = "Error: Server responded with code")]
-        fn test_search_account_error_response(status in error_status_list())
-        {
-            // Request a new server from the pool
-            let test = create_server_response::<Syspass>(Option::from("tests/responses/syspass/v2/account_search_empty.json"), status);
-
-            let accounts = test.1.search_account(vec![], false);
-
-            match accounts {
-                Ok(accounts) => {
-                    assert_eq!(0, accounts.len())
-                }
-                _ => {
-                    panic!("Accounts should not have failed")
-                }
+        match accounts {
+            Ok(accounts) => {
+                assert_eq!(0, accounts.len())
             }
-
-            test.0.assert();
+            _ => {
+                panic!("Accounts should not have failed")
+            }
         }
+
+        test.0.assert();
     }
 
     #[test]
@@ -572,7 +570,7 @@ mod tests {
             token: "1234".to_owned(),
             password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Option::from("SyspassV3".to_owned()),
+            api_version: Option::from("SyspassV2".to_owned()),
             password_timeout: None,
         });
 
@@ -598,7 +596,7 @@ mod tests {
             Option::from("tests/responses/syspass/v2/account_view_password.json"),
             200,
         );
-        let mut account = Account::default();
+        let mut account = api::account::Account::default();
         account.set_id(1);
 
         let response = test.1.get_password(&account);
@@ -629,5 +627,79 @@ mod tests {
                 panic!("Request should not have failed")
             }
         }
+    }
+
+    #[test]
+    fn test_client_conversion() {
+        let client = Client {
+            customer_description: "Customer description".to_owned(),
+            customer_id: "1337".to_owned(),
+            customer_name: "Customer name".to_owned(),
+        };
+
+        let converted = client.convert_to_api_entity();
+
+        assert_eq!(client.customer_description, converted.description());
+        assert_eq!(
+            client.customer_id.parse::<u32>().unwrap().to_owned(),
+            converted.id().unwrap().to_owned()
+        );
+        assert_eq!(client.customer_name, converted.name());
+    }
+
+    #[test]
+    fn test_category_conversion() {
+        let category = Category {
+            category_description: "Category description".to_owned(),
+            category_id: "1337".to_owned(),
+            category_name: "Category name".to_owned(),
+        };
+
+        let converted = category.convert_to_api_entity();
+
+        assert_eq!(category.category_description, converted.description());
+        assert_eq!(
+            category.category_id.parse::<u32>().unwrap().to_owned(),
+            converted.id().unwrap().to_owned()
+        );
+        assert_eq!(category.category_name, converted.name());
+    }
+
+    #[test]
+    fn test_account_conversion() {
+        let account = Account {
+            account_categoryId: "1".to_owned(),
+            account_countView: "2".to_owned(),
+            account_customerId: "3".to_owned(),
+            account_id: "4".to_owned(),
+            account_login: "username".to_owned(),
+            account_name: "account".to_owned(),
+            account_notes: "notes".to_owned(),
+            account_pass: "pass".to_owned(),
+            account_url: Option::from("example.org".to_owned()),
+            customer_name: "customer".to_owned(),
+        };
+
+        let converted = account.convert_to_api_entity();
+
+        assert_eq!(
+            account.account_categoryId.parse::<u32>().unwrap(),
+            *converted.category_id()
+        );
+        assert_eq!(
+            account.account_customerId.parse::<u32>().unwrap(),
+            *converted.client_id()
+        );
+        assert_eq!(
+            account.account_id.parse::<u32>().unwrap(),
+            *converted.id().unwrap()
+        );
+
+        assert_eq!(account.account_login, converted.login());
+        assert_eq!(account.account_name, converted.name());
+        assert_eq!(account.account_notes, converted.notes());
+        assert_eq!(account.account_pass, converted.pass().unwrap());
+        assert_eq!(account.account_url.unwrap(), converted.url());
+        assert_eq!(account.customer_name, converted.client_name().unwrap());
     }
 }

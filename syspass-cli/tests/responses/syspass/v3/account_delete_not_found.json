@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": 0,
+    "data": null,
+    "message": "The account doesn't exist"
+  },
+  "id": 1,
+  "jsonrpc": "2.0"
+}
