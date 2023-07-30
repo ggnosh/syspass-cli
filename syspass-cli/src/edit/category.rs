@@ -5,8 +5,9 @@ use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{info, warn};
 
-use crate::api::api_client::ApiClient;
 use crate::api::category::{ask_for_category, Category};
+use crate::api::entity::Entity;
+use crate::api::ApiClient;
 use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "category";
@@ -63,14 +64,19 @@ fn edit_category(
         api_client.get_category(&id).expect("Category not found")
     };
 
-    category.name = get_match_string(matches, quiet, "name", "Name: ", &category.name, true);
-    category.description = get_match_string(
-        matches,
-        quiet,
-        "description",
-        "Description: ",
-        &category.description,
-        false,
+    category.set_name(
+        get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref(),
+    );
+    category.set_description(
+        get_match_string(
+            matches,
+            quiet,
+            "description",
+            "Description: ",
+            category.description(),
+            false,
+        )
+        .as_ref(),
     );
 
     info!("Trying to edit category");
@@ -80,8 +86,8 @@ fn edit_category(
             warn!(
                 "{} Category {} ({}) saved!",
                 "\u{2714}".bright_green(),
-                category.name.green(),
-                category.id.unwrap()
+                category.name().green(),
+                category.id().unwrap()
             );
             Ok(0)
         }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind::NotFound;
-use std::path::PathBuf;
 
 use clap::ArgMatches;
 use colored::Colorize;
@@ -22,14 +22,12 @@ pub struct Config {
     pub password_timeout: Option<u64>,
 }
 
-fn get_config_path(file: &str) -> PathBuf {
+fn get_config_path(file: &str) -> OsString {
     match home::home_dir() {
         Some(path) => {
             let mut p = path.into_os_string();
-            p.push(DEFAULT_CONFIG_DIR.to_string() + file);
-            let buffer: PathBuf = p.into();
-
-            buffer
+            p.push(DEFAULT_CONFIG_DIR.to_owned() + file);
+            p
         }
         None => panic!(
             "{} Impossible to get your home dir!",
@@ -63,7 +61,7 @@ impl Config {
             .get_one::<String>(CONFIG)
             .map(|s| s.as_str())
             .unwrap_or("")
-            .to_string();
+            .to_owned();
 
         let data = if config_file.is_empty() {
             get_config_file_or_write("config.json", Config::default())
@@ -82,15 +80,15 @@ impl Config {
             .expect("JSON does not have correct format.")
     }
 
-    pub fn record_usage(id: u32) {
+    pub fn record_usage(id: &u32) {
         let mut usage = Config::get_usage_data();
 
-        match usage.get_mut(&id) {
+        match usage.get_mut(id) {
             Some(count) => {
                 *count += 1;
             }
             None => {
-                usage.insert(id, 1);
+                usage.insert(*id, 1);
             }
         }
 

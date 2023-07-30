@@ -7,16 +7,60 @@ use crate::api::entity::Entity;
 #[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    pub id: Option<u32>,
-    pub name: String,
-    pub login: String,
-    pub url: String,
-    pub notes: String,
-    pub category_name: String,
-    pub category_id: u32,
-    pub client_id: u32,
-    pub pass: Option<String>,
-    pub user_group_name: String,
+    id: Option<u32>,
+    name: String,
+    login: String,
+    url: String,
+    notes: String,
+    category_id: u32,
+    client_id: u32,
+    pass: Option<String>,
+}
+
+impl Account {
+    pub fn new(
+        id: Option<u32>,
+        name: String,
+        login: String,
+        url: String,
+        notes: String,
+        category_id: u32,
+        client_id: u32,
+        pass: Option<String>,
+    ) -> Account {
+        Account {
+            id,
+            name,
+            login,
+            url,
+            notes,
+            category_id,
+            client_id,
+            pass,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn login(&self) -> &str {
+        self.login.as_str()
+    }
+    pub fn url(&self) -> &str {
+        self.url.as_str()
+    }
+    pub fn notes(&self) -> &str {
+        self.notes.as_str()
+    }
+    pub fn category_id(&self) -> &u32 {
+        &self.category_id
+    }
+    pub fn client_id(&self) -> &u32 {
+        &self.client_id
+    }
+    pub fn pass(&self) -> Option<&String> {
+        self.pass.as_ref()
+    }
 }
 
 impl Display for Account {
@@ -24,9 +68,9 @@ impl Display for Account {
         write!(
             f,
             "{}. {} - {}",
-            self.id.expect("Id should not be empty"),
-            self.name,
-            self.url
+            self.id().expect("Id should not be empty"),
+            self.name(),
+            self.url()
         )
     }
 }
@@ -45,10 +89,11 @@ pub struct ChangePassword {
 }
 
 impl Entity for Account {
-    fn id(&mut self, new_id: Option<u32>) -> Option<u32> {
-        if let Some(id) = new_id {
-            self.id = Option::from(id);
-        }
-        self.id
+    fn id(&self) -> Option<&u32> {
+        self.id.as_ref()
+    }
+
+    fn set_id(&mut self, id: u32) {
+        self.id = Option::from(id);
     }
 }

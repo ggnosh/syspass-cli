@@ -45,7 +45,7 @@ pub fn get_match_string(
                 return ask_prompt(prompt_text, required, default);
             }
 
-            default.to_string()
+            default.to_owned()
         }
     }
 }
@@ -111,5 +111,5 @@ pub fn password_strength(strength: f64) -> String {
     } else {
         panic!("Invalid strength")
     }
-    .to_string()
+    .to_owned()
 }

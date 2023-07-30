@@ -14,7 +14,7 @@ services:
     environment:
       - USE_SSL=yes
     networks:
-      - default
+      - syspassv3
   db:
     container_name: syspass-db
     restart: always
@@ -26,7 +26,7 @@ services:
     ports:
       - "3306"
     networks:
-      - default
+      - syspassv3
   appv2:
     container_name: syspass-appv2
     image: slllaps/syspass:latest
@@ -41,7 +41,7 @@ services:
     environment:
       - USE_SSL=yes
     networks:
-      - default
+      - syspassv2
   dbv2:
     container_name: syspass-dbv2
     restart: always
@@ -54,7 +54,7 @@ services:
     ports:
       - "3306"
     networks:
-      - default
+      - syspassv2
 volumes:
   syspass-config: {}
   syspass-backup: {}
@@ -64,5 +64,7 @@ volumes:
   syspassv2-db: {}
 
 networks:
-    default:
-      name: syspass
+    syspassv3:
+      name: syspass-v3
+    syspassv2:
+      name: syspass-v2

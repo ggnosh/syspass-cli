@@ -38,7 +38,6 @@ Test authorization by running:
 cargo run -- --config test_config.json new client -n test -e notes
 cargo run -- --config test_config.json new category -n test -e notes
 cargo run -- --config test_config.json new password -n test -u example.org -l test -o nothing -i 1 -a 1 -p password
-cargo test
 ```
 
 ### Syspass v2 setup
@@ -59,11 +58,14 @@ After installing, you can log in using the same address and add API authorizatio
 
 Update [test_config_v2.json](test_config_v2.json) with the new authorization token.
 
+If asked to upgrade:
+```sh
+docker exec syspass-appv2 cat sysPass/config/config.xml | grep upgrade
+```
 
 Test authorization by running:
 ```sh
 cargo run -- --config test_config_v2.json new client -n test -e notes
 cargo run -- --config test_config_v2.json new category -n test -e notes
 cargo run -- --config test_config_v2.json new password -n test -u example.org -l test -o nothing -i 1 -a 1 -p password
-cargo test
 ```

@@ -2,10 +2,11 @@ use std::fmt::{Display, Formatter, Result};
 
 use colored::Colorize;
 use inquire::Select;
+use log::error;
 use serde_derive::Deserialize;
 
-use crate::api::api_client::ApiClient;
 use crate::api::entity::Entity;
+use crate::api::ApiClient;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -13,9 +14,31 @@ const ID_EMPTY: &str = "Id should not be empty";
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
-    pub id: Option<u32>,
-    pub name: String,
-    pub description: String,
+    id: Option<u32>,
+    name: String,
+    description: String,
+}
+
+impl Category {
+    pub fn new(id: Option<u32>, name: String, description: String) -> Self {
+        Category {
+            id,
+            name,
+            description,
+        }
+    }
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn description(&self) -> &str {
+        self.description.as_str()
+    }
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+    pub fn set_description(&mut self, description: &str) {
+        self.description = description.to_owned();
+    }
 }
 
 impl Display for Category {
@@ -23,23 +46,27 @@ impl Display for Category {
         write!(
             f,
             "{}. {}",
-            self.id.expect("Id should not be empty"),
-            self.name
+            self.id().expect("Id should not be empty"),
+            self.name()
         )
     }
 }
 
 impl Entity for Category {
-    fn id(&mut self, new_id: Option<u32>) -> Option<u32> {
-        if let Some(id) = new_id {
-            self.id = Option::from(id);
-        }
-        self.id
+    fn id(&self) -> Option<&u32> {
+        self.id.as_ref()
+    }
+
+    fn set_id(&mut self, id: u32) {
+        self.id = Option::from(id);
     }
 }
 
 pub fn ask_for_category(api_client: &dyn ApiClient) -> u32 {
-    let categories = api_client.get_categories().unwrap_or(vec![]);
+    let categories = api_client.get_categories().unwrap_or_else(|e| {
+        error!("{} while trying to list categories", e);
+        vec![]
+    });
     let count = categories.len();
 
     match Select::new("Select the right category (ESC for new):", categories)
@@ -47,7 +74,7 @@ pub fn ask_for_category(api_client: &dyn ApiClient) -> u32 {
         .with_page_size(10)
         .prompt()
     {
-        Ok(category) => category.id.expect(ID_EMPTY),
+        Ok(category) => *category.id().expect(ID_EMPTY),
         Err(_) => {
             let new_category = Category {
                 id: None,

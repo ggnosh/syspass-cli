@@ -1,3 +1,4 @@
 pub trait Entity {
-    fn id(&mut self, new_id: Option<u32>) -> Option<u32>;
+    fn id(&self) -> Option<&u32>;
+    fn set_id(&mut self, id: u32);
 }

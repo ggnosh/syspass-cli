@@ -2,7 +2,7 @@ use std::error::Error;
 
 use clap::{ArgMatches, Command};
 
-use crate::api::api_client::ApiClient;
+use crate::api::ApiClient;
 
 mod category;
 mod client;

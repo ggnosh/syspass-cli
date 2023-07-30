@@ -13,7 +13,7 @@ use passwords::scorer;
 use passwords::PasswordGenerator;
 
 use crate::api::account::ChangePassword;
-use crate::api::api_client::ApiClient;
+use crate::api::ApiClient;
 use crate::prompt::{ask_for_date, ask_for_password, password_strength};
 
 pub const COMMAND_NAME: &str = "password";
@@ -32,12 +32,12 @@ impl ChangeAccountArgs {
                 .get_one::<String>("password")
                 .map(|s| s.as_str())
                 .unwrap_or("")
-                .to_string(),
+                .to_owned(),
             expiration_date: matches
                 .get_one::<String>("expiration")
                 .map(|s| s.as_str())
                 .unwrap_or("")
-                .to_string(),
+                .to_owned(),
         };
     }
 }
@@ -128,7 +128,7 @@ impl Display for PasswordData {
             f,
             "{: <25} {}({})",
             self.password,
-            "".to_string().yellow(),
+            "".to_owned().yellow(),
             self.strength.yellow()
         )
     }
@@ -208,15 +208,15 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
     }
 
     let mut pairs: Vec<PasswordData> = vec![PasswordData {
-        password: "".to_string(),
-        strength: "use own".to_string(),
+        password: "".to_owned(),
+        strength: "use own".to_owned(),
         strength_value: 0.0,
     }];
 
     for password in suggest.iter() {
         let score = scorer::score(&analyzer::analyze(password));
         pairs.push(PasswordData {
-            password: password.replace('<', "").to_string(),
+            password: password.replace('<', "").to_owned(),
             strength_value: score,
             strength: password_strength(score),
         });
@@ -236,7 +236,6 @@ pub fn get_password(prompt: &str) -> String {
     let pairs: Vec<PasswordData> = generate_passwords(5);
     let answer_prompt = Select::new("Choose password", pairs)
         .with_help_message("[PASSWORD] (strength)")
-        .with_formatter(&|input| password_strength(input.value.strength_value))
         .with_page_size(10)
         .prompt();
 

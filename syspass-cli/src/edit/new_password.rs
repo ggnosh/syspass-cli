@@ -6,9 +6,10 @@ use colored::Colorize;
 use log::warn;
 
 use crate::api::account::Account;
-use crate::api::api_client::ApiClient;
 use crate::api::category::ask_for_category;
 use crate::api::client::ask_for_client;
+use crate::api::entity::Entity;
+use crate::api::ApiClient;
 use crate::edit::edit_password::get_password;
 use crate::prompt::get_match_string;
 
@@ -46,14 +47,13 @@ pub fn command(
     api_client: &dyn ApiClient,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let account: Account = Account {
-        id: Option::from(0),
-        name: get_match_string(matches, quiet, "name", "Name: ", "", true),
-        login: get_match_string(matches, quiet, "login", "Username: ", "", false),
-        url: get_match_string(matches, quiet, "url", "Url: ", "", false),
-        notes: get_match_string(matches, quiet, "note", "Notes: ", "", false),
-        category_name: "".to_string(),
-        category_id: matches
+    let account: Account = Account::new(
+        Option::from(0),
+        get_match_string(matches, quiet, "name", "Name: ", "", true),
+        get_match_string(matches, quiet, "login", "Username: ", "", false),
+        get_match_string(matches, quiet, "url", "Url: ", "", false),
+        get_match_string(matches, quiet, "note", "Notes: ", "", false),
+        matches
             .get_one::<u32>("category")
             .map(|s| s.to_owned())
             .unwrap_or_else(|| {
@@ -63,7 +63,7 @@ pub fn command(
                 }
                 ask_for_category(api_client)
             }),
-        client_id: matches
+        matches
             .get_one::<u32>("client")
             .map(|s| s.to_owned())
             .unwrap_or_else(|| {
@@ -73,10 +73,10 @@ pub fn command(
                 }
                 ask_for_client(api_client, matches)
             }),
-        pass: Option::from(
+        Option::from(
             matches
                 .get_one::<String>("password")
-                .map(|s| s.to_string())
+                .map(|s| s.to_owned())
                 .unwrap_or_else(|| {
                     if quiet {
                         warn!("Could not ask for client");
@@ -85,8 +85,7 @@ pub fn command(
                     get_password("Password: ")
                 }),
         ),
-        user_group_name: "".to_string(),
-    };
+    );
 
     warn!("Trying to save account");
     match api_client.save_account(&account) {
@@ -94,8 +93,8 @@ pub fn command(
             warn!(
                 "{} Account {} ({}) saved!",
                 "\u{2714}".bright_green(),
-                account.name.green(),
-                account.id.unwrap()
+                account.name().green(),
+                account.id().unwrap()
             );
             Ok(0)
         }

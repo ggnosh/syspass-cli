@@ -7,11 +7,13 @@ use serde_derive::Deserialize;
 use serde_json::Value;
 
 use crate::api::account::{Account, ChangePassword, ViewPassword};
-use crate::api::api_client::{ApiClient, ApiError};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
-use crate::api::syspass::{add_request_args, get_builder, get_response, sort_accounts, JsonReq};
+use crate::api::syspass::{
+    add_request_args, get_builder, get_response, sort_accounts, JsonReq, RequestArguments,
+};
+use crate::api::{ApiClient, ApiError};
 use crate::config::Config;
 
 pub struct Syspass {
@@ -64,13 +66,13 @@ impl Syspass {
     fn forge_and_send(
         &self,
         method: &str,
-        args: Option<Vec<(&str, String)>>,
+        args: RequestArguments,
         needs_password: bool,
     ) -> Result<ApiResult, ApiError> {
         let params = add_request_args(&args, &self.config, needs_password);
         let req = JsonReq {
             jsonrpc: String::from("2.0"),
-            method: method.to_string(),
+            method: method.to_owned(),
             params,
             id: self.request_number.get(),
         };
@@ -87,10 +89,10 @@ impl Syspass {
         }
     }
 
-    fn create_or_edit(&self, id: Option<u32>) -> &str {
+    fn create_or_edit(&self, id: Option<&u32>) -> &str {
         match id {
             Some(id) => {
-                if id == 0 {
+                if *id == 0 {
                     Self::CREATE
                 } else {
                     Self::EDIT
@@ -110,12 +112,11 @@ impl Syspass {
     fn save<T: Entity + DeserializeOwned>(
         &self,
         path: &str,
-        id: Option<u32>,
+        id: Option<&u32>,
         mut args: Option<Vec<(&str, String)>>,
     ) -> Result<T, ApiError> {
         let create_or_edit = self.create_or_edit(id);
-        let method = path.to_string() + "/" + create_or_edit;
-
+        let method = path.to_owned() + "/" + create_or_edit;
         if create_or_edit == Self::EDIT {
             args = match args {
                 Some(mut args) => {
@@ -132,7 +133,7 @@ impl Syspass {
         match self.forge_and_send(&method, args, true) {
             Ok(result) => {
                 let mut entity = serde_json::from_value::<T>(result.result).unwrap();
-                entity.id(result.item_id);
+                entity.set_id(result.item_id.expect("Id should be set"));
 
                 Ok(entity)
             }
@@ -178,7 +179,7 @@ impl ApiClient for Syspass {
             "account/viewPass",
             Option::from(vec![(
                 "id",
-                account.id.expect("Should not be empty").to_string(),
+                account.id().expect("Should not be empty").to_string(),
             )]),
             true,
         ) {
@@ -200,7 +201,7 @@ impl ApiClient for Syspass {
         match self.forge_and_send("client/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Client> = serde_json::from_value(result.result).unwrap();
-                list.sort_by(|a, b| a.id.cmp(&b.id));
+                list.sort_by(|a, b| a.id().cmp(&b.id()));
                 Ok(list)
             }
             Err(error) => Err(error),
@@ -211,7 +212,7 @@ impl ApiClient for Syspass {
         match self.forge_and_send("category/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Category> = serde_json::from_value(result.result).unwrap();
-                list.sort_by(|a, b| a.id.cmp(&b.id));
+                list.sort_by(|a, b| a.id().cmp(&b.id()));
                 Ok(list)
             }
             Err(error) => Err(error),
@@ -221,11 +222,11 @@ impl ApiClient for Syspass {
     fn save_client(&self, client: &Client) -> Result<Client, ApiError> {
         self.save::<Client>(
             "client",
-            client.id,
+            client.id(),
             Option::from(vec![
-                ("name", client.name.to_owned()),
-                ("description", client.description.to_owned()),
-                ("global", client.is_global.to_string()),
+                ("name", client.name().clone().to_owned()),
+                ("description", client.description().clone().to_owned()),
+                ("global", client.is_global().clone().to_string()),
             ]),
         )
     }
@@ -233,10 +234,10 @@ impl ApiClient for Syspass {
     fn save_category(&self, category: &Category) -> Result<Category, ApiError> {
         self.save::<Category>(
             "category",
-            category.id,
+            category.id(),
             Option::from(vec![
-                ("name", category.name.to_string()),
-                ("description", category.description.to_string()),
+                ("name", category.name().clone().to_owned()),
+                ("description", category.description().clone().to_owned()),
             ]),
         )
     }
@@ -244,18 +245,15 @@ impl ApiClient for Syspass {
     fn save_account(&self, account: &Account) -> Result<Account, ApiError> {
         self.save::<Account>(
             "account",
-            account.id,
+            account.id(),
             Option::from(vec![
-                ("name", account.name.to_string()),
-                ("categoryId", account.category_id.to_string()),
-                ("clientId", account.client_id.to_string()),
-                (
-                    "pass",
-                    account.pass.as_ref().expect("Password given").to_string(),
-                ),
-                ("login", account.login.to_string()),
-                ("url", account.url.to_string()),
-                ("notes", account.notes.to_string()),
+                ("name", account.name().to_owned()),
+                ("categoryId", account.category_id().to_string()),
+                ("clientId", account.client_id().to_string()),
+                ("pass", account.pass().unwrap().to_owned()),
+                ("login", account.login().to_owned()),
+                ("url", account.url().to_owned()),
+                ("notes", account.notes().to_owned()),
             ]),
         )
     }
@@ -265,7 +263,7 @@ impl ApiClient for Syspass {
             "account/editPass",
             Option::from(vec![
                 ("expireDate", password.expire_date.to_string()),
-                ("pass", password.pass.to_string()),
+                ("pass", password.pass.to_owned()),
                 ("id", password.id.to_string()),
             ]),
             true,
@@ -331,10 +329,10 @@ mod tests {
     use proptest::{prop_oneof, proptest};
 
     use crate::api::account::{Account, ChangePassword};
-    use crate::api::api_client::ApiClient;
     use crate::api::entity::Entity;
     use crate::api::syspass::tests::create_server_response;
     use crate::api::syspass::v3::Syspass;
+    use crate::api::ApiClient;
     use crate::config::Config;
 
     fn success_status_list() -> impl Strategy<Value = usize> {
@@ -432,11 +430,11 @@ mod tests {
     #[should_panic]
     fn test_invalid_server_address() {
         let client = Syspass::from_config(Config {
-            host: "http://localhost:1/api.php".to_string(),
-            token: "1234".to_string(),
-            password: "<PASSWORD>".to_string(),
+            host: "http://localhost:1/api.php".to_owned(),
+            token: "1234".to_owned(),
+            password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Option::from("SyspassV3".to_string()),
+            api_version: Option::from("SyspassV3".to_owned()),
             password_timeout: None,
         });
 
@@ -451,13 +449,13 @@ mod tests {
         );
         let change = ChangePassword {
             id: 1,
-            pass: "<NEW PASSWORD>".to_string(),
+            pass: "<NEW PASSWORD>".to_owned(),
             expire_date: 1689091943,
         };
 
         let response = test.1.change_password(&change);
 
-        assert_eq!("test account", response.unwrap().name);
+        assert_eq!("test account", response.unwrap().name());
     }
 
     #[test]
@@ -467,7 +465,7 @@ mod tests {
             200,
         );
         let mut account = Account::default();
-        account.id(Option::from(1));
+        account.set_id(1);
 
         let response = test.1.get_password(&account);
 

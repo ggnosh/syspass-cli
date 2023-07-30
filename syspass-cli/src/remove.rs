@@ -3,7 +3,7 @@ use std::error::Error;
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 
-use crate::api::api_client::ApiClient;
+use crate::api::ApiClient;
 
 mod account;
 mod category;

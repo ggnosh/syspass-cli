@@ -12,7 +12,8 @@ use term_table::table_cell::{Alignment, TableCell};
 use term_table::{Table, TableStyle};
 
 use crate::api::account::{Account, ViewPassword};
-use crate::api::api_client::{ApiClient, ApiError};
+use crate::api::entity::Entity;
+use crate::api::{ApiClient, ApiError};
 use crate::config::Config;
 
 pub const COMMAND_NAME: &str = "search";
@@ -55,7 +56,7 @@ pub fn command(
     let name = matches
         .get_one::<String>("name")
         .map(|s| s.to_owned())
-        .unwrap_or("".to_string());
+        .unwrap_or("".to_owned());
     let id: u32 = matches
         .get_one::<u32>("id")
         .map(|s| s.to_owned())
@@ -163,8 +164,10 @@ pub fn command(
 
     warn!("{}", print_table_for_account(&account, show));
 
-    if !matches.get_flag("no-shell") && account.account.url.contains("ssh://") {
-        let host = account.account.login + "@" + account.account.url.replace("ssh://", "").as_str();
+    if !matches.get_flag("no-shell") && account.account.url().contains("ssh://") {
+        let host = account.account.login().to_owned()
+            + "@"
+            + account.account.url().replace("ssh://", "").as_str();
         process::Command::new("ssh")
             .arg(host)
             .spawn()
@@ -190,7 +193,7 @@ fn select_account(
     match answer {
         Ok(choice) => {
             if !disable_usage {
-                Config::record_usage(choice.id.expect("Id should be set"));
+                Config::record_usage(choice.id().expect("Id should be set"));
             }
             api_client.get_password(&choice)
         }
@@ -215,7 +218,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     ];
 
     table.add_row(Row::new(vec![TableCell::new_with_alignment(
-        &data.account.name.green(),
+        &data.account.name().green(),
         cells.len(),
         Alignment::Center,
     )]));
@@ -223,8 +226,8 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.add_row(Row::new(cells));
 
     table.add_row(Row::new(vec![
-        TableCell::new(data.account.id.expect("Id should not be empty")),
-        TableCell::new(&data.account.login),
+        TableCell::new(data.account.id().expect("Id should not be empty")),
+        TableCell::new(data.account.login()),
         TableCell::new({
             if show {
                 data.password.bright_green()
@@ -232,7 +235,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
                 "\u{2714} Copied to clipboard \u{2714}".bright_green()
             }
         }),
-        TableCell::new(&data.account.url),
+        TableCell::new(data.account.url()),
     ]));
 
     table.render()
@@ -245,19 +248,17 @@ mod tests {
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
-            account: Account {
-                id: Option::from(1),
-                name: "Test".to_string(),
-                login: "test".to_string(),
-                url: "https://example.org".to_string(),
-                notes: "notes".to_string(),
-                category_name: "category".to_string(),
-                category_id: 4,
-                client_id: 5,
-                user_group_name: "user_group".to_string(),
-                pass: None,
-            },
-            password: "<PASSWORD>".to_string(),
+            account: Account::new(
+                Option::from(1),
+                "Test".to_owned(),
+                "test".to_owned(),
+                "https://example.org".to_owned(),
+                "notes".to_owned(),
+                4,
+                5,
+                None,
+            ),
+            password: "<PASSWORD>".to_owned(),
         }
     }
 
@@ -267,8 +268,8 @@ mod tests {
         let output = print_table_for_account(&account, true);
 
         assert!(output.contains(account.password.as_str()));
-        assert!(output.contains(account.account.login.as_str()));
-        assert!(output.contains(account.account.url.as_str()));
+        assert!(output.contains(account.account.login()));
+        assert!(output.contains(account.account.url()));
     }
 
     #[test]
@@ -277,7 +278,7 @@ mod tests {
         let output = print_table_for_account(&account, false);
 
         assert!(!output.contains(account.password.as_str()));
-        assert!(output.contains(account.account.login.as_str()));
-        assert!(output.contains(account.account.url.as_str()));
+        assert!(output.contains(account.account.login()));
+        assert!(output.contains(account.account.url()));
     }
 }

@@ -5,7 +5,7 @@ use clap::{ArgMatches, Command};
 use colored::Colorize;
 use log::{error, warn};
 
-use crate::api::api_client::ApiClient;
+use crate::api::ApiClient;
 
 pub const COMMAND_NAME: &str = "client";
 

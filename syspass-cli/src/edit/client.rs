@@ -5,8 +5,9 @@ use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{error, info, warn};
 
-use crate::api::api_client::ApiClient;
 use crate::api::client::{ask_for_client, Client};
+use crate::api::entity::Entity;
+use crate::api::ApiClient;
 use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "client";
@@ -63,14 +64,18 @@ fn edit_client(
         api_client.get_client(&id).expect("Client not found")
     };
 
-    client.name = get_match_string(matches, quiet, "name", "Name: ", &client.name, true);
-    client.description = get_match_string(
-        matches,
-        quiet,
-        "description",
-        "Description: ",
-        &client.description,
-        false,
+    client
+        .set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
+    client.set_description(
+        get_match_string(
+            matches,
+            quiet,
+            "description",
+            "Description: ",
+            client.description(),
+            false,
+        )
+        .as_ref(),
     );
 
     info!("Trying to edit client");
@@ -80,8 +85,8 @@ fn edit_client(
             warn!(
                 "{} Client {} ({}) saved!",
                 "\u{2714}".bright_green(),
-                client.name.green(),
-                client.id.unwrap()
+                client.name().green(),
+                client.id().unwrap()
             );
             Ok(0)
         }

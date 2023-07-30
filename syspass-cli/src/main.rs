@@ -6,7 +6,7 @@ use std::str::FromStr;
 use clap::{arg, crate_description, crate_name, crate_version, Command};
 use log::{error, Level, LevelFilter, Metadata, Record};
 
-use crate::api::api_client::{Api, ApiClient};
+use crate::api::{Api, ApiClient};
 use crate::config::Config;
 
 mod api;
@@ -81,7 +81,7 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
     };
     let api_client_box: Box<dyn ApiClient> = Api::from_str(api_version)
         .unwrap_or_else(|_| panic!("No such API is supported ({})", &api_version))
-        .get(Config::from_config(&matches));
+        .get(config);
 
     let api_client = api_client_box.as_ref();
 

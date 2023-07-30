@@ -2,3 +2,8 @@
 members = [
     "syspass-cli",
 ]
+
+[profile.release]
+strip = true
+lto = true
+panic = "abort"

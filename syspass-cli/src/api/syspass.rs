@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::string::ToString;
 use std::sync::Once;
 
 use reqwest::blocking::{Client, ClientBuilder, Response};
 use serde_derive::Serialize;
 
 use crate::api::account::Account;
+use crate::api::entity::Entity;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
 
@@ -24,26 +24,28 @@ fn get_cached_password() -> &'static String {
     }
 }
 
+type RequestArguments<'a> = Option<Vec<(&'a str, String)>>;
+
 fn add_request_args(
-    args: &Option<Vec<(&str, String)>>,
+    args: &RequestArguments,
     config: &Config,
     needs_password: bool,
 ) -> HashMap<String, String> {
     let mut params: HashMap<String, String> =
-        HashMap::from([("authToken".to_string(), config.token.to_string())]);
+        HashMap::from([("authToken".to_owned(), config.token.to_owned())]);
 
     if needs_password {
-        let mut password = config.password.to_string();
+        let mut password = config.password.to_owned();
         if password.is_empty() {
-            password = get_cached_password().to_string();
+            password = get_cached_password().to_owned();
         }
-        params.insert("tokenPass".to_string(), password);
+        params.insert("tokenPass".to_owned(), password);
     }
 
     if let Some(args) = args {
         for arg in args.iter() {
             if !arg.0.is_empty() && !arg.1.is_empty() {
-                params.insert(arg.0.to_string(), arg.1.to_string());
+                params.insert(arg.0.to_owned(), arg.1.to_owned());
             }
         }
     }
@@ -53,11 +55,11 @@ fn add_request_args(
 
 fn sort_accounts(list: &mut [Account], usage_data: &HashMap<u32, u32>) {
     list.sort_by(|a, b| {
-        let left = usage_data.get(&a.id.expect("Id is set")).unwrap_or(&0);
-        let right = usage_data.get(&b.id.expect("Id is set")).unwrap_or(&0);
+        let left = usage_data.get(a.id().expect("Id is set")).unwrap_or(&0);
+        let right = usage_data.get(b.id().expect("Id is set")).unwrap_or(&0);
 
         if *left == 0 && *right == 0 {
-            a.id.cmp(&b.id)
+            a.id().cmp(&b.id())
         } else {
             right.cmp(left)
         }
@@ -99,7 +101,7 @@ mod tests {
 
     use mockito::{Mock, Server, ServerGuard};
 
-    use crate::api::api_client::ApiClient;
+    use crate::api::ApiClient;
     use crate::config::Config;
 
     pub fn create_server_response<T: ApiClient>(
@@ -119,10 +121,10 @@ mod tests {
 
         let client = T::from_config(Config {
             host: url + "/api.php",
-            token: "1234".to_string(),
-            password: "<PASSWORD>".to_string(),
+            token: "1234".to_owned(),
+            password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Option::from("SyspassV3".to_string()),
+            api_version: Option::from("SyspassV3".to_owned()),
             password_timeout: None,
         });
 
