@@ -2,7 +2,6 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::string::ToString;
 
-use log::debug;
 use serde::de::DeserializeOwned;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,7 +9,7 @@ use serde_json::Value;
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::syspass::{add_request_args, get_builder, get_response, sort_accounts, JsonReq};
+use crate::api::syspass::{add_request_args, get_builder, send_request, sort_accounts, JsonReq};
 use crate::api::{ApiClient, ApiError};
 use crate::config::Config;
 
@@ -49,20 +48,20 @@ struct ApiErrorResponse {
     message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[allow(non_snake_case)]
 struct Client {
-    pub customer_description: String,
-    pub customer_id: String,
-    pub customer_name: String,
+    customer_description: String,
+    customer_id: String,
+    customer_name: String,
 }
 
-impl Client {
-    fn convert_to_api_entity(&self) -> api::client::Client {
+impl From<Client> for api::client::Client {
+    fn from(value: Client) -> Self {
         api::client::Client::new(
-            Option::from(self.customer_id.parse::<u32>().unwrap()),
-            self.customer_name.to_owned(),
-            self.customer_description.to_owned(),
+            Some(value.customer_id.parse::<u32>().unwrap()),
+            value.customer_name.to_owned(),
+            value.customer_description.to_owned(),
             0,
         )
     }
@@ -75,50 +74,50 @@ enum ApiResponseResult {
     Entity(ApiResponseEntity),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[allow(non_snake_case)]
 struct Account {
-    pub account_categoryId: String,
-    pub account_countView: String,
-    pub account_customerId: String,
-    pub account_id: String,
-    pub account_login: String,
-    pub account_name: String,
-    pub account_notes: String,
-    pub account_pass: String,
-    pub account_url: Option<String>,
-    pub customer_name: String,
+    account_categoryId: String,
+    account_countView: String,
+    account_customerId: String,
+    account_id: String,
+    account_login: String,
+    account_name: String,
+    account_notes: String,
+    account_pass: String,
+    account_url: Option<String>,
+    customer_name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Category {
-    pub category_description: String,
-    pub category_id: String,
-    pub category_name: String,
+    category_description: String,
+    category_id: String,
+    category_name: String,
 }
 
-impl Category {
-    fn convert_to_api_entity(&self) -> api::category::Category {
+impl From<Category> for api::category::Category {
+    fn from(value: Category) -> Self {
         api::category::Category::new(
-            Option::from(self.category_id.parse::<u32>().unwrap()),
-            self.category_name.to_owned(),
-            self.category_description.to_owned(),
+            Some(value.category_id.parse::<u32>().unwrap()),
+            value.category_name.to_owned(),
+            value.category_description.to_owned(),
         )
     }
 }
 
-impl Account {
-    fn convert_to_api_entity(&self) -> api::account::Account {
+impl From<Account> for api::account::Account {
+    fn from(value: Account) -> Self {
         api::account::Account::new(
-            Option::from(self.account_id.parse::<u32>().unwrap()),
-            self.account_name.to_owned(),
-            self.account_login.to_owned(),
-            self.account_url.clone().unwrap_or("".to_owned()),
-            self.account_notes.to_owned(),
-            self.account_categoryId.parse().unwrap(),
-            self.account_customerId.parse().unwrap(),
-            Option::from(self.account_pass.to_owned()),
-            Option::from(self.customer_name.to_owned()),
+            Some(value.account_id.parse::<u32>().unwrap()),
+            value.account_name.to_owned(),
+            value.account_login.to_owned(),
+            value.account_url.clone().unwrap_or("".to_owned()),
+            value.account_notes.to_owned(),
+            value.account_categoryId.parse().unwrap(),
+            value.account_customerId.parse().unwrap(),
+            Some(value.account_pass.to_owned()),
+            Some(value.customer_name.to_owned()),
         )
     }
 }
@@ -126,22 +125,6 @@ impl Account {
 const NOT_SUPPORTED: &str = "SyspassV2 does not support this";
 
 impl Syspass {
-    fn send_request(
-        &self,
-        request_url: &str,
-        req: &JsonReq,
-    ) -> Result<ApiResponseResult, serde_json::error::Error> {
-        debug!("Sending request to {}:\n{:#?}\n", request_url, req);
-
-        let json: Value = get_response(&self.client, request_url, req)
-            .json()
-            .expect("Server response did not contain JSON");
-
-        debug!("Received response:\n{:#?}\n", json);
-
-        serde_json::from_value(json)
-    }
-
     fn forge_and_send(
         &self,
         method: &str,
@@ -155,7 +138,7 @@ impl Syspass {
             params,
             id: self.request_number.get(),
         };
-        let response = self.send_request(&self.config.host, &req);
+        let response = send_request::<ApiResponseResult>(&self.client, &self.config.host, &req);
 
         self.request_number.set(self.request_number.get() + 1);
 
@@ -166,7 +149,7 @@ impl Syspass {
     }
 
     fn delete_request(&self, method: &str, id: &u32) -> Result<bool, ApiError> {
-        match self.forge_and_send(method, Option::from(vec![("id", id.to_string())]), false) {
+        match self.forge_and_send(method, Some(vec![("id", id.to_string())]), false) {
             Ok(result) => {
                 if let ApiResponseResult::Code(result) = result {
                     match result.error {
@@ -234,28 +217,30 @@ impl Syspass {
     }
 }
 
-impl ApiClient for Syspass {
-    fn from_config(config: Config) -> Syspass {
-        Self {
-            client: get_builder(&config).build().expect("Got client"),
+impl From<Config> for Syspass {
+    fn from(value: Config) -> Self {
+        Syspass {
+            client: get_builder(&value).build().expect("Got client"),
             request_number: Cell::new(1),
-            config,
+            config: value,
         }
     }
+}
 
+impl ApiClient for Syspass {
     fn search_account(
         &self,
         search: Vec<(&str, String)>,
         usage: bool,
     ) -> Result<Vec<api::account::Account>, ApiError> {
-        match self.forge_and_send("getAccountSearch", Option::from(search), false) {
+        match self.forge_and_send("getAccountSearch", Some(search), false) {
             Ok(response) => match response {
                 ApiResponseResult::Entity(result) => {
                     let mut list: Vec<api::account::Account> = vec![];
                     let convert_list: Vec<Account> =
                         serde_json::from_value(result.result).expect("Invalid response");
                     for account in convert_list {
-                        list.push(account.convert_to_api_entity());
+                        list.push(api::account::Account::from(account));
                     }
 
                     let usage_data: HashMap<u32, u32> = if usage {
@@ -277,7 +262,7 @@ impl ApiClient for Syspass {
     fn get_password(&self, account: &api::account::Account) -> Result<ViewPassword, ApiError> {
         match self.forge_and_send(
             "getAccountPassword",
-            Option::from(vec![(
+            Some(vec![(
                 "id",
                 account.id().expect("Should not be empty").to_string(),
             )]),
@@ -312,7 +297,7 @@ impl ApiClient for Syspass {
                         Syspass::fix_result_object::<Client>(result.result);
 
                     for client in convert_list {
-                        list.push(client.convert_to_api_entity());
+                        list.push(api::client::Client::from(client));
                     }
 
                     list.sort_by(|a, b| a.id().cmp(&b.id()));
@@ -332,7 +317,7 @@ impl ApiClient for Syspass {
                         Syspass::fix_result_object::<Category>(result.result);
 
                     for category in convert_list {
-                        list.push(category.convert_to_api_entity());
+                        list.push(api::category::Category::from(category));
                     }
 
                     list.sort_by(|a, b| a.id().cmp(&b.id()));
@@ -347,7 +332,7 @@ impl ApiClient for Syspass {
         let id = self.save(
             "addCustomer",
             client.id(),
-            Option::from(vec![
+            Some(vec![
                 ("name", client.name().to_owned()),
                 ("description", client.description().to_owned()),
             ]),
@@ -355,7 +340,7 @@ impl ApiClient for Syspass {
 
         match id {
             Ok(id) => Ok(api::client::Client::new(
-                Option::from(id),
+                Some(id),
                 client.name().to_owned(),
                 client.description().to_owned(),
                 0,
@@ -371,7 +356,7 @@ impl ApiClient for Syspass {
         let id = self.save(
             "addCategory",
             category.id(),
-            Option::from(vec![
+            Some(vec![
                 ("name", category.name().to_owned()),
                 ("description", category.description().to_owned()),
             ]),
@@ -379,7 +364,7 @@ impl ApiClient for Syspass {
 
         match id {
             Ok(id) => Ok(api::category::Category::new(
-                Option::from(id),
+                Some(id),
                 category.name().to_owned(),
                 category.description().to_owned(),
             )),
@@ -394,7 +379,7 @@ impl ApiClient for Syspass {
         let id = self.save(
             "addAccount",
             account.id(),
-            Option::from(vec![
+            Some(vec![
                 ("name", account.name().to_owned()),
                 ("categoryId", account.category_id().to_string()),
                 ("customerId", account.client_id().to_string()),
@@ -431,17 +416,11 @@ impl ApiClient for Syspass {
     }
 
     fn view_account(&self, id: &u32) -> Result<api::account::Account, ApiError> {
-        match self.forge_and_send(
-            "getAccountData",
-            Option::from(vec![("id", id.to_string())]),
-            true,
-        ) {
+        match self.forge_and_send("getAccountData", Some(vec![("id", id.to_string())]), true) {
             Ok(response) => match response {
-                ApiResponseResult::Entity(result) => {
-                    let account: Account = serde_json::from_value(result.result).unwrap();
-
-                    Ok(account.convert_to_api_entity())
-                }
+                ApiResponseResult::Entity(result) => Ok(api::account::Account::from(
+                    serde_json::from_value::<Account>(result.result).unwrap(),
+                )),
                 _ => Err(ApiError(format!("Invalid response: {:?}", response))),
             },
             Err(error) => Err(error),
@@ -463,22 +442,44 @@ impl ApiClient for Syspass {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use mockito::{Mock, ServerGuard};
     use test_case::test_case;
 
     use crate::api;
     use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
-    use crate::api::syspass::tests::create_server_response;
     use crate::api::syspass::v2::{Account, Category, Client, Syspass, NOT_SUPPORTED};
     use crate::api::ApiClient;
     use crate::config::Config;
+
+    fn create_server_response(
+        response: Option<impl AsRef<Path>>,
+        status: usize,
+    ) -> (Mock, Syspass, ServerGuard) {
+        let response = api::syspass::tests::create_server_response(response, status);
+
+        let url = response.1.url();
+
+        let client = Syspass::from(Config {
+            host: url + "/api.php",
+            token: "1234".to_owned(),
+            password: "<PASSWORD>".to_owned(),
+            verify_host: false,
+            api_version: Option::from("SyspassV2".to_owned()),
+            password_timeout: None,
+        });
+
+        (response.0, client, response.1)
+    }
 
     #[test_case(200)]
     #[test_case(201)]
     #[test_case(202)]
     #[should_panic(expected = "Server response did not contain JSON")]
     fn test_ok_server(status: usize) {
-        let test = create_server_response::<Syspass>(None::<String>, status);
+        let test = create_server_response(None::<String>, status);
         test.1.search_account(vec![], false).expect("Panic");
     }
 
@@ -486,34 +487,32 @@ mod tests {
     #[test_case(403)]
     #[test_case(404)]
     #[test_case(500)]
-    #[should_panic(expected = "Error: Server responded with code")]
     fn test_bad_server(status: usize) {
-        let test = create_server_response::<Syspass>(None::<String>, status);
-        test.1.search_account(vec![], false).expect("Panic");
+        let test = create_server_response(None::<String>, status);
+        let response = test.1.search_account(vec![], false);
+        assert!(response.is_err());
+        let search = format!("Server responded with code {}", status);
+        assert!(response.err().unwrap().0.contains(search.as_str()));
+
+        test.0.assert();
     }
 
     #[test_case(400)]
     #[test_case(403)]
     #[test_case(404)]
     #[test_case(500)]
-    #[should_panic(expected = "Error: Server responded with code")]
     fn test_search_account_error_response(status: usize) {
         // Request a new server from the pool
-        let test = create_server_response::<Syspass>(
-            Option::from("tests/responses/syspass/v2/account_search_empty.json"),
+        let test = create_server_response(
+            Some("tests/responses/syspass/v2/account_search_empty.json"),
             status,
         );
 
         let accounts = test.1.search_account(vec![], false);
 
-        match accounts {
-            Ok(accounts) => {
-                assert_eq!(0, accounts.len())
-            }
-            _ => {
-                panic!("Accounts should not have failed")
-            }
-        }
+        assert!(accounts.is_err());
+        let search = format!("Server responded with code {}", status);
+        assert!(accounts.err().unwrap().0.contains(search.as_str()));
 
         test.0.assert();
     }
@@ -521,8 +520,8 @@ mod tests {
     #[test]
     fn test_search_account_empty() {
         // Request a new server from the pool
-        let test = create_server_response::<Syspass>(
-            Option::from("tests/responses/syspass/v2/account_search_empty.json"),
+        let test = create_server_response(
+            Some("tests/responses/syspass/v2/account_search_empty.json"),
             200,
         );
 
@@ -543,8 +542,8 @@ mod tests {
     #[test]
     fn test_search_account_list() {
         // Request a new server from the pool
-        let test = create_server_response::<Syspass>(
-            Option::from("tests/responses/syspass/v2/accounts_search_results.json"),
+        let test = create_server_response(
+            Some("tests/responses/syspass/v2/accounts_search_results.json"),
             200,
         );
 
@@ -565,12 +564,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_invalid_server_address() {
-        let client = Syspass::from_config(Config {
+        let client = Syspass::from(Config {
             host: "http://localhost:1/api.php".to_owned(),
             token: "1234".to_owned(),
             password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Option::from("SyspassV2".to_owned()),
+            api_version: Some("SyspassV2".to_owned()),
             password_timeout: None,
         });
 
@@ -580,7 +579,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "SyspassV2 does not support this")]
     fn test_change_account_password() {
-        let test = create_server_response::<Syspass>(None::<String>, 200);
+        let test = create_server_response(None::<String>, 200);
         let change = ChangePassword {
             id: 1,
             pass: "<NEW PASSWORD>".to_owned(),
@@ -592,8 +591,8 @@ mod tests {
 
     #[test]
     fn test_get_password() {
-        let test = create_server_response::<Syspass>(
-            Option::from("tests/responses/syspass/v2/account_view_password.json"),
+        let test = create_server_response(
+            Some("tests/responses/syspass/v2/account_view_password.json"),
             200,
         );
         let mut account = api::account::Account::default();
@@ -613,10 +612,8 @@ mod tests {
 
     #[test]
     fn test_remove_account() {
-        let test = create_server_response::<Syspass>(
-            Option::from("tests/responses/syspass/v2/account_delete.json"),
-            200,
-        );
+        let test =
+            create_server_response(Some("tests/responses/syspass/v2/account_delete.json"), 200);
         let response = test.1.delete_account(&1);
 
         match response {
@@ -637,7 +634,7 @@ mod tests {
             customer_name: "Customer name".to_owned(),
         };
 
-        let converted = client.convert_to_api_entity();
+        let converted = api::client::Client::from(client.clone());
 
         assert_eq!(client.customer_description, converted.description());
         assert_eq!(
@@ -655,7 +652,7 @@ mod tests {
             category_name: "Category name".to_owned(),
         };
 
-        let converted = category.convert_to_api_entity();
+        let converted = api::category::Category::from(category.clone());
 
         assert_eq!(category.category_description, converted.description());
         assert_eq!(
@@ -676,11 +673,11 @@ mod tests {
             account_name: "account".to_owned(),
             account_notes: "notes".to_owned(),
             account_pass: "pass".to_owned(),
-            account_url: Option::from("example.org".to_owned()),
+            account_url: Some("example.org".to_owned()),
             customer_name: "customer".to_owned(),
         };
 
-        let converted = account.convert_to_api_entity();
+        let converted = api::account::Account::from(account.clone());
 
         assert_eq!(
             account.account_categoryId.parse::<u32>().unwrap(),

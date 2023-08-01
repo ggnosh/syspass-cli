@@ -58,7 +58,7 @@ impl Entity for Category {
     }
 
     fn set_id(&mut self, id: u32) {
-        self.id = Option::from(id);
+        self.id = Some(id);
     }
 }
 

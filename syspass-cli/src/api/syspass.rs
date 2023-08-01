@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Once;
 
+use log::debug;
 use reqwest::blocking::{Client, ClientBuilder, Response};
+use serde::de::DeserializeOwned;
 use serde_derive::Serialize;
+use serde_json::Value;
 
 use crate::api::account::Account;
 use crate::api::entity::Entity;
+use crate::api::ApiError;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
 
@@ -81,17 +85,38 @@ fn get_builder(config: &Config) -> ClientBuilder {
     builder
 }
 
-fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Response {
+fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Result<Response, ApiError> {
     match client.post(request_url).json(&req).send() {
         Ok(r) => match r.status().is_success() {
-            true => r,
-            false => {
-                panic!("Error: Server responded with code {}", r.status())
-            }
+            true => Ok(r),
+            false => Err(ApiError(format!(
+                "Server responded with code {}",
+                r.status()
+            ))),
         },
-        Err(e) => {
-            panic!("Error: {}", e);
+        Err(e) => Err(ApiError(e.to_string())),
+    }
+}
+
+fn send_request<T: DeserializeOwned>(
+    client: &Client,
+    request_url: &str,
+    req: &JsonReq,
+) -> Result<T, ApiError> {
+    debug!("Sending request to {}:\n{:#?}\n", request_url, req);
+
+    match get_response(client, request_url, req) {
+        Ok(result) => {
+            let json: Value = result.json().expect("Server response did not contain JSON");
+
+            debug!("Received response:\n{:#?}\n", json);
+
+            match serde_json::from_value::<T>(json) {
+                Ok(result) => Ok(result),
+                Err(error) => Err(ApiError(error.to_string())),
+            }
         }
+        Err(error) => Err(error),
     }
 }
 
@@ -101,15 +126,11 @@ mod tests {
 
     use mockito::{Mock, Server, ServerGuard};
 
-    use crate::api::ApiClient;
-    use crate::config::Config;
-
-    pub fn create_server_response<T: ApiClient>(
+    pub fn create_server_response(
         response: Option<impl AsRef<Path>>,
         status: usize,
-    ) -> (Mock, T, ServerGuard) {
+    ) -> (Mock, ServerGuard) {
         let mut server = Server::new();
-        let url = server.url();
         let mut mock = server.mock("POST", "/api.php");
 
         mock = match response {
@@ -119,15 +140,6 @@ mod tests {
         .with_status(status)
         .create();
 
-        let client = T::from_config(Config {
-            host: url + "/api.php",
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Option::from("SyspassV3".to_owned()),
-            password_timeout: None,
-        });
-
-        (mock, client, server)
+        (mock, server)
     }
 }

@@ -32,7 +32,7 @@ pub fn command(
 ) -> Result<u8, Box<dyn Error>> {
     let id = match matches
         .get_one::<u32>("id")
-        .map(|s| Option::from(s.to_owned()))
+        .map(|s| Some(s.to_owned()))
         .unwrap_or(None)
     {
         Some(id) => id,
@@ -86,7 +86,7 @@ fn edit_client(
                 "{} Client {} ({}) saved!",
                 "\u{2714}".bright_green(),
                 client.name().green(),
-                client.id().unwrap()
+                client.id().unwrap_or(&0)
             );
             Ok(0)
         }

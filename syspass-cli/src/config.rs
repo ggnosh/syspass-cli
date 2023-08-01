@@ -36,7 +36,7 @@ fn get_config_path(file: &str) -> OsString {
     }
 }
 
-pub fn get_config_file_or_write<T>(file: &str, value: T) -> String
+fn get_config_file_or_write<T>(file: &str, value: T) -> String
 where
     T: Sized + Serialize,
 {
@@ -55,9 +55,9 @@ where
     }
 }
 
-impl Config {
-    pub fn from_config(matches: &ArgMatches) -> Config {
-        let config_file = matches
+impl From<&ArgMatches> for Config {
+    fn from(value: &ArgMatches) -> Self {
+        let config_file = value
             .get_one::<String>(CONFIG)
             .map(|s| s.as_str())
             .unwrap_or("")
@@ -72,7 +72,9 @@ impl Config {
 
         serde_json::from_str(&data).expect("JSON does not have correct format.")
     }
+}
 
+impl Config {
     pub fn get_usage_data() -> HashMap<u32, u32> {
         let data = get_config_file_or_write("usage.json", HashMap::from([(0, 0)]));
 
@@ -94,7 +96,8 @@ impl Config {
 
         fs::write(
             get_config_path("usage.json"),
-            serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed"),
+            serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed")
+                + "\n",
         )
         .expect("Unable to write file");
     }

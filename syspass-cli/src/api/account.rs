@@ -75,7 +75,7 @@ impl Display for Account {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let line = format!(
             "{}. {} - {} ({})",
-            self.id().expect("Id should not be empty"),
+            self.id().unwrap_or(&0),
             self.name(),
             if !self.url().is_empty() {
                 self.url().replace("ssh://", "").green()
@@ -119,6 +119,6 @@ impl Entity for Account {
     }
 
     fn set_id(&mut self, id: u32) {
-        self.id = Option::from(id);
+        self.id = Some(id);
     }
 }

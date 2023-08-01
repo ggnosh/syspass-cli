@@ -70,7 +70,7 @@ impl Entity for Client {
     }
 
     fn set_id(&mut self, id: u32) {
-        self.id = Option::from(id);
+        self.id = Some(id);
     }
 }
 

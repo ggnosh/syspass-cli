@@ -48,7 +48,7 @@ pub fn command(
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
     let account: Account = Account::new(
-        Option::from(0),
+        Some(0),
         get_match_string(matches, quiet, "name", "Name: ", "", true),
         get_match_string(matches, quiet, "login", "Username: ", "", false),
         get_match_string(matches, quiet, "url", "Url: ", "", false),
@@ -73,7 +73,7 @@ pub fn command(
                 }
                 ask_for_client(api_client, matches)
             }),
-        Option::from(
+        Some(
             matches
                 .get_one::<String>("password")
                 .map(|s| s.to_owned())

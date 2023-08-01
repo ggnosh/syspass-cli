@@ -13,7 +13,7 @@ use term_table::{Table, TableStyle};
 
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::{ApiClient, ApiError};
+use crate::api::{ApiClient, AppError};
 use crate::config::Config;
 
 pub const COMMAND_NAME: &str = "search";
@@ -183,7 +183,7 @@ fn select_account(
     accounts: Vec<Account>,
     api_client: &dyn ApiClient,
     disable_usage: bool,
-) -> Result<ViewPassword, ApiError> {
+) -> Result<ViewPassword, AppError> {
     let count: usize = accounts.len();
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
         .with_help_message(format!("Number for accounts found: {}", count).as_str())
@@ -195,11 +195,9 @@ fn select_account(
             if !disable_usage {
                 Config::record_usage(choice.id().expect("Id should be set"));
             }
-            api_client.get_password(&choice)
+            Ok(api_client.get_password(&choice)?)
         }
-        Err(_) => {
-            process::exit(0);
-        }
+        Err(err) => Err(AppError(err.to_string())),
     }
 }
 
@@ -251,7 +249,7 @@ mod tests {
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
             account: Account::new(
-                Option::from(1),
+                Some(1),
                 "Test".to_owned(),
                 "test".to_owned(),
                 "https://example.org".to_owned(),
@@ -259,7 +257,7 @@ mod tests {
                 4,
                 5,
                 None,
-                Option::from("test_client".to_owned()),
+                Some("test_client".to_owned()),
             ),
             password: "<PASSWORD>".to_owned(),
         }

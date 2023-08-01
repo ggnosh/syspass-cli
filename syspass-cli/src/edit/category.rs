@@ -31,7 +31,7 @@ pub fn command(
 ) -> Result<u8, Box<dyn Error>> {
     let id = match matches
         .get_one::<u32>("id")
-        .map(|s| Option::from(s.to_owned()))
+        .map(|s| Some(s.to_owned()))
         .unwrap_or(None)
     {
         Some(id) => id,

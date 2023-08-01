@@ -18,14 +18,7 @@ pub mod client;
 pub mod entity;
 mod syspass;
 
-pub trait ApiConfig {
-    fn from_config<T: ApiClient + 'static>(config: Config) -> Box<T>;
-}
-
 pub trait ApiClient {
-    fn from_config(config: Config) -> Self
-    where
-        Self: Sized;
     fn search_account(
         &self,
         search: Vec<(&str, String)>,
@@ -48,13 +41,30 @@ pub trait ApiClient {
 }
 
 #[derive(Debug)]
-pub struct ApiError(pub String);
+pub struct ApiError(String);
+
+#[derive(Debug)]
+pub struct AppError(pub String);
 
 impl Error for ApiError {}
 
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Error for AppError {}
+
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} Error: {}", "\u{2716}".bright_red(), self.0)
+    }
+}
+
+impl From<ApiError> for AppError {
+    fn from(value: ApiError) -> Self {
+        AppError(value.0)
     }
 }
 
@@ -67,8 +77,8 @@ pub enum Api {
 impl Api {
     pub fn get(&self, config: Config) -> Box<dyn ApiClient> {
         match self {
-            SyspassV3 => Box::new(v3::Syspass::from_config(config)),
-            SyspassV2 => Box::new(v2::Syspass::from_config(config)),
+            SyspassV3 => Box::new(v3::Syspass::from(config)),
+            SyspassV2 => Box::new(v2::Syspass::from(config)),
         }
     }
 }

@@ -74,7 +74,7 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         .subcommand(edit::command_helper_new())
         .get_matches();
 
-    let config = Config::from_config(&matches);
+    let config = Config::from(&matches);
     let api_version = match &config.api_version {
         Some(version) => version,
         None => "",

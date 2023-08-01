@@ -23,6 +23,7 @@ A simple command line tool to interact with sysPass databases.
 git clone https://github.com/ggnosh/syspass-cli.git
 cd syspass-cli
 cargo build --release
+# cp target/release/syspass-cli somewhere
 ```
 
 **From release:**
