@@ -3,13 +3,11 @@ use std::process;
 
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
-use log::warn;
+use log::{error, warn};
 
+use crate::api;
 use crate::api::account::Account;
-use crate::api::category::ask_for_category;
-use crate::api::client::ask_for_client;
 use crate::api::entity::Entity;
-use crate::api::ApiClient;
 use crate::edit::edit_password::get_password;
 use crate::prompt::get_match_string;
 
@@ -18,7 +16,8 @@ pub const COMMAND_NAME: &str = "password";
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .visible_alias("account")
-        .alias("pass")
+        .visible_alias("pass")
+        .short_flag('p')
         .about("Add a new account")
         .arg(arg!(-n --name <NAME> "Account name").required(false))
         .arg(arg!(-u --url <URL> "Url for site").required(false))
@@ -44,7 +43,7 @@ pub fn command_helper() -> Command {
 
 pub fn command(
     matches: &ArgMatches,
-    api_client: &dyn ApiClient,
+    api_client: &dyn api::Client,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
     let account: Account = Account::new(
@@ -53,38 +52,39 @@ pub fn command(
         get_match_string(matches, quiet, "login", "Username: ", "", false),
         get_match_string(matches, quiet, "url", "Url: ", "", false),
         get_match_string(matches, quiet, "note", "Notes: ", "", false),
-        matches
-            .get_one::<u32>("category")
-            .map(|s| s.to_owned())
-            .unwrap_or_else(|| {
+        matches.get_one::<u32>("category").map_or_else(
+            || {
                 if quiet {
                     warn!("Could not ask for client");
                     process::exit(1);
                 }
-                ask_for_category(api_client)
-            }),
-        matches
-            .get_one::<u32>("client")
-            .map(|s| s.to_owned())
-            .unwrap_or_else(|| {
-                if quiet {
-                    warn!("Could not ask for client");
+                api::category::ask_for(api_client).unwrap_or_else(|error| {
+                    error!("{} {}", "\u{2716}".bright_red(), error.to_string());
                     process::exit(1);
-                }
-                ask_for_client(api_client, matches)
-            }),
-        Some(
-            matches
-                .get_one::<String>("password")
-                .map(|s| s.to_owned())
-                .unwrap_or_else(|| {
-                    if quiet {
-                        warn!("Could not ask for client");
-                        process::exit(1);
-                    }
-                    get_password("Password: ")
-                }),
+                })
+            },
+            std::borrow::ToOwned::to_owned,
         ),
+        matches.get_one::<u32>("client").map_or_else(
+            || {
+                if quiet {
+                    warn!("Could not ask for client");
+                    process::exit(1);
+                }
+                api::client::ask_for(api_client, matches)
+            },
+            std::borrow::ToOwned::to_owned,
+        ),
+        Some(matches.get_one::<String>("password").map_or_else(
+            || {
+                if quiet {
+                    warn!("Could not ask for client");
+                    process::exit(1);
+                }
+                get_password("Password: ")
+            },
+            std::clone::Clone::clone,
+        )),
         None,
     );
 
@@ -95,7 +95,7 @@ pub fn command(
                 "{} Account {} ({}) saved!",
                 "\u{2714}".bright_green(),
                 account.name().green(),
-                account.id().unwrap()
+                account.id().expect("Id should not be empty")
             );
             Ok(0)
         }

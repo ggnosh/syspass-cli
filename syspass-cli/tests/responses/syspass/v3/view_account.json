@@ -1,0 +1,43 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "count": null,
+    "itemId": 3,
+    "result": {
+      "categoryId": 1,
+      "categoryName": "test_name",
+      "clientId": 1,
+      "clientName": "test_name",
+      "countDecrypt": 2,
+      "countView": 1,
+      "dateAdd": "2023-07-30 17:39:29",
+      "dateEdit": null,
+      "id": 3,
+      "isPrivate": "0",
+      "isPrivateGroup": "0",
+      "key": "",
+      "login": "test",
+      "name": "test",
+      "notes": "nothing",
+      "otherUserEdit": "0",
+      "otherUserGroupEdit": "0",
+      "parentId": 0,
+      "pass": "",
+      "passDate": 1690738769,
+      "passDateChange": 0,
+      "publicLinkHash": null,
+      "url": "localhost",
+      "userEditId": 1,
+      "userEditLogin": "admin",
+      "userEditName": "sysPass Admin",
+      "userGroupId": 1,
+      "userGroupName": "Admins",
+      "userId": 1,
+      "userLogin": "admin",
+      "userName": "sysPass Admin"
+    },
+    "resultCode": 0,
+    "resultMessage": null
+  }
+}

@@ -13,7 +13,6 @@ use passwords::scorer;
 use passwords::PasswordGenerator;
 
 use crate::api::account::ChangePassword;
-use crate::api::ApiClient;
 use crate::prompt::{ask_for_date, ask_for_password, password_strength};
 
 pub const COMMAND_NAME: &str = "password";
@@ -25,18 +24,19 @@ struct ChangeAccountArgs {
 }
 
 impl ChangeAccountArgs {
-    fn new(matches: &ArgMatches) -> ChangeAccountArgs {
-        return ChangeAccountArgs {
-            id: matches.get_one::<u32>("id").map(|s| s.to_owned()).unwrap(),
+    fn new(matches: &ArgMatches) -> Self {
+        return Self {
+            id: matches
+                .get_one::<u32>("id")
+                .map(std::borrow::ToOwned::to_owned)
+                .expect("Id is required"),
             password: matches
                 .get_one::<String>("password")
-                .map(|s| s.as_str())
-                .unwrap_or("")
+                .map_or("", String::as_str)
                 .to_owned(),
             expiration_date: matches
                 .get_one::<String>("expiration")
-                .map(|s| s.as_str())
-                .unwrap_or("")
+                .map_or("", |s| s.as_str())
                 .to_owned(),
         };
     }
@@ -44,9 +44,9 @@ impl ChangeAccountArgs {
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
-        .visible_alias("account")
-        .alias("pass")
         .about("Change account password. Requires permissions: [Edit Account Password]")
+        .visible_aliases(["account", "pass"])
+        .short_flag('p')
         .arg(
             arg!(-i --id <ID> "Account ID")
                 .required(true)
@@ -58,13 +58,13 @@ pub fn command_helper() -> Command {
 
 pub fn command(
     matches: &ArgMatches,
-    api_client: &dyn ApiClient,
+    api_client: &dyn crate::api::Client,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
     let args: ChangeAccountArgs = get_args(matches, quiet);
 
     if args.password.is_empty() {
-        Err("Password can't be empty")?
+        Err("Password can't be empty")?;
     }
 
     let change = ChangePassword {
@@ -80,7 +80,7 @@ pub fn command(
             warn!(
                 "{} Password changed for account {}",
                 "\u{2714}".bright_green(),
-                format!("{}", account).green()
+                format!("{account}").green()
             );
         }
         Err(error) => Err(error)?,
@@ -98,19 +98,18 @@ fn get_args(matches: &ArgMatches, quiet: bool) -> ChangeAccountArgs {
 
     if args.expiration_date.is_empty() {
         if !quiet {
-            let date = match Utc::now().checked_add_months(chrono::Months::new(18)) {
-                Some(date) => date.date_naive(),
-                _ => panic!("Could not modify date"),
-            };
+            let date = Utc::now()
+                .checked_add_months(chrono::Months::new(18))
+                .map_or_else(|| panic!("Could not modify date"), |date| date.date_naive());
 
             args.expiration_date = ask_for_date("Expiration date:", date);
         }
     } else {
         let expiration = args.expiration_date + "23:59:59";
         args.expiration_date = NaiveDateTime::parse_from_str(&expiration, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
+            .expect("Failed to parse expiration date")
             .timestamp()
-            .to_string()
+            .to_string();
     }
 
     args
@@ -128,7 +127,7 @@ impl Display for PasswordData {
             f,
             "{: <25} {}({})",
             self.password,
-            "".to_owned().yellow(),
+            String::new().yellow(),
             self.strength.yellow()
         )
     }
@@ -166,19 +165,23 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
     }
 
     for generator in generators {
-        suggest.append(&mut generator.generate(random_count).unwrap());
+        suggest.append(
+            &mut generator
+                .generate(random_count)
+                .expect("Password generator failed"),
+        );
     }
 
     let mut pairs: Vec<PasswordData> = vec![PasswordData {
-        password: "".to_owned(),
+        password: String::new(),
         strength: "use own".to_owned(),
         strength_value: 0.0,
     }];
 
-    for password in suggest.iter() {
+    for password in &suggest {
         let score = scorer::score(&analyzer::analyze(password));
         pairs.push(PasswordData {
-            password: password.replace('<', "").to_owned(),
+            password: password.replace('<', "").clone(),
             strength_value: score,
             strength: password_strength(score),
         });
@@ -201,16 +204,13 @@ pub fn get_password(prompt: &str) -> String {
         .with_page_size(10)
         .prompt();
 
-    match answer_prompt {
-        Ok(result) => {
-            if result.strength_value == 0.0 {
-                return ask_for_password(prompt, true);
-            }
-            result.password
+    if let Ok(result) = answer_prompt {
+        if result.strength_value == 0.0 {
+            return ask_for_password(prompt, true);
         }
-        Err(_) => {
-            error!("Cancelled");
-            process::exit(1);
-        }
+        result.password
+    } else {
+        error!("Cancelled");
+        process::exit(1);
     }
 }

@@ -2,10 +2,12 @@ use std::process;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use clap::ArgMatches;
+use inquire::validator::ValueRequiredValidator;
 use inquire::{required, DateSelect, Password, PasswordDisplayMode, Text};
 use log::error;
 use passwords::{analyzer, scorer};
 
+#[allow(clippy::module_name_repetitions)]
 pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
     let mut prompt = Text::new(text);
     if required {
@@ -16,12 +18,12 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
         prompt = prompt.with_default(default);
     }
 
-    match prompt.prompt() {
-        Ok(name) => name,
-        Err(_) => {
+    prompt.prompt().map_or_else(
+        |_| {
             process::exit(1);
-        }
-    }
+        },
+        |name| name,
+    )
 }
 
 pub fn get_match_string(
@@ -32,21 +34,18 @@ pub fn get_match_string(
     default: &str,
     required: bool,
 ) -> String {
-    match matches.get_one::<String>(match_id) {
-        Some(description) => {
-            if description.is_empty() && !quiet {
-                ask_prompt(prompt_text, required, default)
-            } else {
-                description.to_owned()
-            }
+    if let Some(description) = matches.get_one::<String>(match_id) {
+        if description.is_empty() && !quiet {
+            ask_prompt(prompt_text, required, default)
+        } else {
+            description.clone()
         }
-        None => {
-            if !quiet {
-                return ask_prompt(prompt_text, required, default);
-            }
+    } else {
+        if !quiet {
+            return ask_prompt(prompt_text, required, default);
+        }
 
-            default.to_owned()
-        }
+        default.to_owned()
     }
 }
 
@@ -58,7 +57,7 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
         .prompt_skippable();
 
     match amount {
-        Ok(None) => String::from(""),
+        Ok(None) => String::new(),
         Ok(Some(date)) => NaiveDateTime::new(date, NaiveTime::default())
             .timestamp()
             .to_string(),
@@ -74,21 +73,23 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
         .with_display_toggle_enabled()
         .with_display_mode(PasswordDisplayMode::Masked);
 
-    if !confirm {
-        password = password.without_confirmation();
-    } else {
+    if confirm {
         password = password
             .with_custom_confirmation_error_message("The passwords don't match.")
             .with_formatter(&|input| password_strength(scorer::score(&analyzer::analyze(input))));
+    } else {
+        password = password
+            .without_confirmation()
+            .with_validator(ValueRequiredValidator::default());
     }
 
-    match password.prompt() {
-        Ok(pass) => pass,
-        Err(_) => {
+    password.prompt().map_or_else(
+        |_| {
             error!("Cancelled");
             process::exit(1);
-        }
-    }
+        },
+        |pass| pass,
+    )
 }
 
 pub fn password_strength(strength: f64) -> String {

@@ -1,22 +1,21 @@
 use std::error::Error;
-use std::process;
 
 use clap::{ArgMatches, Command};
 use colored::Colorize;
-use log::{error, warn};
-
-use crate::api::ApiClient;
+use log::warn;
 
 pub const COMMAND_NAME: &str = "category";
 
 pub fn command_helper() -> Command {
-    Command::new(COMMAND_NAME).about("Remove category")
+    Command::new(COMMAND_NAME)
+        .about("Remove category")
+        .short_flag('a')
 }
 
 pub fn command(
     _matches: &ArgMatches,
-    api_client: &dyn ApiClient,
-    id: &u32,
+    api_client: &dyn crate::api::Client,
+    id: u32,
 ) -> Result<u8, Box<dyn Error>> {
     match api_client.delete_category(id) {
         Ok(status) => {
@@ -27,8 +26,7 @@ pub fn command(
             }
         }
         Err(error) => {
-            error!("{} Api error: {}", "\u{2716}".bright_red(), error);
-            process::exit(1);
+            Err(error)?;
         }
     }
 

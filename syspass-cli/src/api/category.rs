@@ -1,12 +1,11 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
 use inquire::Select;
-use log::error;
 use serde_derive::Deserialize;
 
+use crate::api;
 use crate::api::entity::Entity;
-use crate::api::ApiClient;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -21,7 +20,7 @@ pub struct Category {
 
 impl Category {
     pub fn new(id: Option<u32>, name: String, description: String) -> Self {
-        Category {
+        Self {
             id,
             name,
             description,
@@ -42,7 +41,7 @@ impl Category {
 }
 
 impl Display for Category {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}. {}",
@@ -62,36 +61,41 @@ impl Entity for Category {
     }
 }
 
-pub fn ask_for_category(api_client: &dyn ApiClient) -> u32 {
-    let categories = api_client.get_categories().unwrap_or_else(|e| {
-        error!("{} while trying to list categories", e);
-        vec![]
-    });
+pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
+    let categories = match api_client.get_categories() {
+        Ok(categories) => categories,
+        Err(error) => {
+            return Err(api::Error(format!("{error}: Could not list categories")));
+        }
+    };
+
     let count = categories.len();
 
-    match Select::new("Select the right category (ESC for new):", categories)
-        .with_help_message(format!("Number for accounts found: {}", count).as_str())
-        .with_page_size(10)
-        .prompt()
-    {
-        Ok(category) => *category.id().expect(ID_EMPTY),
-        Err(_) => {
-            let new_category = Category {
-                id: None,
-                name: ask_prompt("Name", true, ""),
-                description: ask_prompt("Description", false, ""),
-            };
+    Ok(
+        Select::new("Select the right category (ESC for new):", categories)
+            .with_help_message(format!("Number for accounts found: {count}").as_str())
+            .with_page_size(10)
+            .prompt()
+            .map_or_else(
+                |_| {
+                    let new_category = Category {
+                        id: None,
+                        name: ask_prompt("Name", true, ""),
+                        description: ask_prompt("Description", false, ""),
+                    };
 
-            match api_client.save_category(&new_category) {
-                Ok(client) => client.id.expect(ID_EMPTY),
-                Err(error) => {
-                    panic!(
-                        "{} Failed to save client: {}",
-                        "\u{2716}".bright_red(),
-                        error
-                    );
-                }
-            }
-        }
-    }
+                    match api_client.save_category(&new_category) {
+                        Ok(client) => client.id.expect(ID_EMPTY),
+                        Err(error) => {
+                            panic!(
+                                "{} Failed to save client: {}",
+                                "\u{2716}".bright_red(),
+                                error
+                            );
+                        }
+                    }
+                },
+                |category| *category.id().expect(ID_EMPTY),
+            ),
+    )
 }

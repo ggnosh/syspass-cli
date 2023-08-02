@@ -6,8 +6,8 @@ use inquire::{Confirm, Select};
 use log::error;
 use serde_derive::Deserialize;
 
+use crate::api;
 use crate::api::entity::Entity;
-use crate::api::ApiClient;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -22,8 +22,8 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(id: Option<u32>, name: String, description: String, is_global: usize) -> Client {
-        Client {
+    pub fn new(id: Option<u32>, name: String, description: String, is_global: usize) -> Self {
+        Self {
             id,
             name,
             description,
@@ -74,14 +74,14 @@ impl Entity for Client {
     }
 }
 
-pub fn ask_for_client(api_client: &dyn ApiClient, matches: &ArgMatches) -> u32 {
+pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
     let clients = api_client.get_clients().unwrap_or_else(|e| {
         error!("{} while trying to list clients", e);
         vec![]
     });
     let count = clients.len();
 
-    match Select::new("Select the right client (ESC for new):", clients)
+    Select::new("Select the right client (ESC for new):", clients)
         .with_help_message(
             format!(
                 "Number of clients found: {}, {}{}",
@@ -93,40 +93,34 @@ pub fn ask_for_client(api_client: &dyn ApiClient, matches: &ArgMatches) -> u32 {
         )
         .with_page_size(10)
         .prompt()
-    {
-        Ok(client) => *client.id().expect(ID_EMPTY),
-        Err(_) => {
-            let new_client = Client {
-                id: None,
-                name: ask_prompt("Name:", true, ""),
-                description: ask_prompt("Description:", false, ""),
-                is_global: matches
-                    .get_one::<usize>("global")
-                    .map(|s| s.to_owned())
-                    .unwrap_or_else(|| {
-                        match Confirm::new("Global:").with_default(false).prompt() {
-                            Ok(result) => {
-                                if result {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            Err(_) => 0,
-                        }
-                    }),
-            };
+        .map_or_else(
+            |_| {
+                let new_client = Client {
+                    id: None,
+                    name: ask_prompt("Name:", true, ""),
+                    description: ask_prompt("Description:", false, ""),
+                    is_global: matches.get_one::<usize>("global").map_or_else(
+                        || {
+                            Confirm::new("Global:")
+                                .with_default(false)
+                                .prompt()
+                                .map_or(0, usize::from)
+                        },
+                        std::borrow::ToOwned::to_owned,
+                    ),
+                };
 
-            match api_client.save_client(&new_client) {
-                Ok(client) => *client.id().expect(ID_EMPTY),
-                Err(error) => {
-                    panic!(
-                        "{} Failed to save client: {}",
-                        "\u{2716}".bright_red(),
-                        error
-                    );
+                match api_client.save_client(&new_client) {
+                    Ok(client) => *client.id().expect(ID_EMPTY),
+                    Err(error) => {
+                        panic!(
+                            "{} Failed to save client: {}",
+                            "\u{2716}".bright_red(),
+                            error
+                        );
+                    }
                 }
-            }
-        }
-    }
+            },
+            |client| *client.id().expect(ID_EMPTY),
+        )
 }

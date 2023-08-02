@@ -3,11 +3,11 @@ use std::process;
 
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
-use log::{error, info, warn};
+use log::{info, warn};
 
-use crate::api::client::{ask_for_client, Client};
+use crate::api;
+use crate::api::client::{ask_for, Client};
 use crate::api::entity::Entity;
-use crate::api::ApiClient;
 use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "client";
@@ -26,34 +26,33 @@ pub fn command_helper() -> Command {
 
 pub fn command(
     matches: &ArgMatches,
-    api_client: &dyn ApiClient,
+    api_client: &dyn api::Client,
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = match matches
+    let id = matches
         .get_one::<u32>("id")
-        .map(|s| Some(s.to_owned()))
-        .unwrap_or(None)
-    {
-        Some(id) => id,
-        None => {
-            if new {
-                0
-            } else if quiet {
-                warn!("Could not ask for client");
-                process::exit(1);
-            } else {
-                ask_for_client(api_client, matches)
-            }
-        }
-    };
+        .map_or_else(|| None, |s| Some(s.to_owned()))
+        .map_or_else(
+            || {
+                if new {
+                    0
+                } else if quiet {
+                    warn!("Could not ask for client");
+                    process::exit(1);
+                } else {
+                    ask_for(api_client, matches)
+                }
+            },
+            |id| id,
+        );
 
     edit_client(matches, api_client, id, quiet)
 }
 
 fn edit_client(
     matches: &ArgMatches,
-    api_client: &dyn ApiClient,
+    api_client: &dyn api::Client,
     id: u32,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
@@ -61,7 +60,7 @@ fn edit_client(
         warn!("Creating a new client");
         Client::default()
     } else {
-        api_client.get_client(&id)?
+        api_client.get_client(id)?
     };
 
     client
@@ -86,17 +85,10 @@ fn edit_client(
                 "{} Client {} ({}) saved!",
                 "\u{2714}".bright_green(),
                 client.name().green(),
-                client.id().unwrap_or(&0)
+                client.id().expect("Id should be set after saving")
             );
             Ok(0)
         }
-        Err(error) => {
-            error!(
-                "{} Could not save client\n{}",
-                "\u{2716}".bright_red(),
-                error
-            );
-            Err(error)?
-        }
+        Err(error) => Err(format!("{error}: Could not save client"))?,
     }
 }

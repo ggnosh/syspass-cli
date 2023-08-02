@@ -6,7 +6,7 @@ use test_case::test_case;
 
 #[test]
 fn run_help() {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd.args(["--help"]).assert();
 
     assert.success().code(0);
@@ -14,7 +14,7 @@ fn run_help() {
 
 #[test]
 fn run_help_without_arguments() {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd.assert();
 
     assert.failure().code(2);
@@ -24,7 +24,7 @@ fn run_help_without_arguments() {
 #[test_case("../test_config_v2.json"; "syspass-v2")]
 #[ignore]
 fn run_search_with_no_results(version: &str) {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q",
@@ -48,7 +48,7 @@ fn run_search_with_no_results(version: &str) {
 #[test_case("../test_config_v2.json"; "syspass-v2")]
 #[ignore]
 fn run_search_with_results(version: &str) {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q", "-d", "-c", version, "search", "-i", "2", "-u", "-s", "-p",
@@ -67,7 +67,7 @@ fn run_search_with_results(version: &str) {
 #[test_case("../test_config_v2.json", false; "syspass-v2")]
 #[ignore]
 fn run_change_with_data(version: &str, success: bool) {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-c",
@@ -96,7 +96,7 @@ fn run_change_with_data(version: &str, success: bool) {
 #[test_case("../test_config_v2.json", "client", false; "client syspass-v2")]
 #[ignore]
 fn run_edit_category_client(version: &str, category_client: &str, success: bool) {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q",
@@ -129,7 +129,7 @@ fn run_edit_category_client(version: &str, category_client: &str, success: bool)
 fn run_create_delete_category_client(version: &str, category_client: &str, success: bool) {
     let id = create_new_category_client(version, category_client).to_string();
 
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q",
@@ -151,7 +151,7 @@ fn run_create_delete_category_client(version: &str, category_client: &str, succe
 }
 
 fn create_new_category_client(version: &str, category_client: &str) -> u32 {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
 
     let generator = PasswordGenerator::new()
         .length(8)
@@ -163,7 +163,9 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
         .lowercase_letters(true)
         .uppercase_letters(true);
 
-    let password = generator.generate_one().unwrap();
+    let password = generator
+        .generate_one()
+        .expect("Password generator should not have failed");
 
     let assert = cmd
         .args([
@@ -181,29 +183,30 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
         .assert();
 
     let success = assert.success();
-    let reg = Regex::new(r" (:?Client|Category) .+? \((\d+)\) saved!\n$").unwrap();
-    let data: String = String::from_utf8(success.get_output().clone().stdout).unwrap();
+    let reg = Regex::new(r" (:?Client|Category) .+? \((\d+)\) saved!\n$").expect("Regex failed");
+    let data: String =
+        String::from_utf8(success.get_output().clone().stdout).expect("Failed to read data");
 
     success.code(0);
 
-    match reg.captures(data.as_str()) {
-        Some(c) => {
-            let id = c[2].parse::<u32>().unwrap();
+    reg.captures(data.as_str()).map_or_else(
+        || {
+            panic!("Could not create new {category_client}");
+        },
+        |c| {
+            let id = c[2].parse::<u32>().expect("Failed to parse id");
             assert!(id > 1);
 
             id
-        }
-        _ => {
-            panic!("Could not create new {}", category_client);
-        }
-    }
+        },
+    )
 }
 
 #[test_case("../test_config.json", true; "syspass-v3")]
 #[test_case("../test_config_v2.json", true; "syspass-v2")]
 #[ignore]
 fn run_new_delete_password(version: &str, success: bool) {
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q",
@@ -235,23 +238,27 @@ fn run_new_delete_password(version: &str, success: bool) {
         assert.failure().code(1)
     };
 
-    let reg = Regex::new(r" Account new_password_test \((\d+)\) saved!\n$").unwrap();
-    let data: String = String::from_utf8(status.get_output().clone().stdout).unwrap();
+    let reg = Regex::new(r" Account new_password_test \((\d+)\) saved!\n$")
+        .expect("Failed to create regex");
+    let data: String =
+        String::from_utf8(status.get_output().clone().stdout).expect("Failed to get output");
 
-    let id = match reg.captures(data.as_str()) {
-        Some(c) => {
-            let id = c[1].parse::<u32>().unwrap();
-            assert!(id > 1);
+    let id = reg
+        .captures(data.as_str())
+        .map_or_else(
+            || {
+                panic!("Could not create new account");
+            },
+            |c| {
+                let id = c[1].parse::<u32>().expect("Id is required");
+                assert!(id > 1);
 
-            id
-        }
-        _ => {
-            panic!("Could not create new account");
-        }
-    }
-    .to_string();
+                id
+            },
+        )
+        .to_string();
 
-    let mut cmd = Command::cargo_bin("syspass-cli").unwrap();
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
         .args([
             "-q",

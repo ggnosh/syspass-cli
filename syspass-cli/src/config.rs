@@ -23,17 +23,19 @@ pub struct Config {
 }
 
 fn get_config_path(file: &str) -> OsString {
-    match home::home_dir() {
-        Some(path) => {
+    home::home_dir().map_or_else(
+        || {
+            panic!(
+                "{} Impossible to get your home dir!",
+                "\u{2716}".bright_red()
+            )
+        },
+        |path| {
             let mut p = path.into_os_string();
             p.push(DEFAULT_CONFIG_DIR.to_owned() + file);
             p
-        }
-        None => panic!(
-            "{} Impossible to get your home dir!",
-            "\u{2716}".bright_red()
-        ),
-    }
+        },
+    )
 }
 
 fn get_config_file_or_write<T>(file: &str, value: T) -> String
@@ -59,12 +61,11 @@ impl From<&ArgMatches> for Config {
     fn from(value: &ArgMatches) -> Self {
         let config_file = value
             .get_one::<String>(CONFIG)
-            .map(|s| s.as_str())
-            .unwrap_or("")
+            .map_or_else(|| "", |s| s.as_str())
             .to_owned();
 
         let data = if config_file.is_empty() {
-            get_config_file_or_write("config.json", Config::default())
+            get_config_file_or_write("config.json", Self::default())
         } else {
             fs::read_to_string(shellexpand::tilde(&config_file).to_string())
                 .expect("Unable to read file")
@@ -82,17 +83,18 @@ impl Config {
             .expect("JSON does not have correct format.")
     }
 
-    pub fn record_usage(id: &u32) {
-        let mut usage = Config::get_usage_data();
+    pub fn record_usage(id: u32) {
+        let mut usage = Self::get_usage_data();
 
-        match usage.get_mut(id) {
+        #[allow(clippy::option_if_let_else)]
+        match usage.get_mut(&id) {
             Some(count) => {
                 *count += 1;
             }
             None => {
-                usage.insert(*id, 1);
+                usage.insert(id, 1);
             }
-        }
+        };
 
         fs::write(
             get_config_path("usage.json"),

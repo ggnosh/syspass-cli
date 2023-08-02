@@ -1,12 +1,14 @@
-use std::error::Error;
+#![forbid(unsafe_code, non_ascii_idents)]
+#![deny(warnings)]
+
 use std::process::ExitCode;
-use std::result::Result;
 use std::str::FromStr;
 
 use clap::{arg, crate_description, crate_name, crate_version, Command};
+use colored::Colorize;
 use log::{error, Level, LevelFilter, Metadata, Record};
 
-use crate::api::{Api, ApiClient};
+use crate::api::{Api, Client};
 use crate::config::Config;
 
 mod api;
@@ -38,7 +40,7 @@ impl log::Log for SimpleLogger {
 
 static LOGGER: SimpleLogger = SimpleLogger;
 
-fn main() -> Result<ExitCode, Box<dyn Error>> {
+fn main() -> ExitCode {
     let matches = Command::new(crate_name!())
         .about(crate_description!())
         .subcommand_required(true)
@@ -75,11 +77,8 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         .get_matches();
 
     let config = Config::from(&matches);
-    let api_version = match &config.api_version {
-        Some(version) => version,
-        None => "",
-    };
-    let api_client_box: Box<dyn ApiClient> = Api::from_str(api_version)
+    let api_version = config.api_version.as_ref().map_or("", |version| version);
+    let api_client_box: Box<dyn Client> = Api::from_str(api_version)
         .unwrap_or_else(|_| panic!("No such API is supported ({})", &api_version))
         .get(config);
 
@@ -108,10 +107,10 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
         _ => unreachable!("Clap should keep us out from here"),
     } {
-        Ok(code) => Ok(ExitCode::from(code)),
+        Ok(code) => ExitCode::from(code),
         Err(e) => {
-            error!("{}", e);
-            Ok(ExitCode::from(1))
+            error!("{} {}", "\u{2716}".bright_red(), e);
+            ExitCode::from(1)
         }
     }
 }

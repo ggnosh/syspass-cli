@@ -1,0 +1,22 @@
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "0": {
+      "customer_description": "description_1",
+      "customer_id": "35",
+      "customer_name": "test_1"
+    },
+    "1": {
+      "customer_description": "description_3",
+      "customer_id": "36",
+      "customer_name": "test_2"
+    },
+    "2": {
+      "customer_description": "description_2",
+      "customer_id": "1",
+      "customer_name": "test_3"
+    },
+    "count": 3
+  }
+}

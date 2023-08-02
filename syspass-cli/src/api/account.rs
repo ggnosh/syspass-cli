@@ -31,8 +31,8 @@ impl Account {
         client_id: u32,
         pass: Option<String>,
         client_name: Option<String>,
-    ) -> Account {
-        Account {
+    ) -> Self {
+        Self {
             id,
             name,
             login,
@@ -77,15 +77,13 @@ impl Display for Account {
             "{}. {} - {} ({})",
             self.id().unwrap_or(&0),
             self.name(),
-            if !self.url().is_empty() {
-                self.url().replace("ssh://", "").green()
-            } else {
+            if self.url().is_empty() {
                 ColoredString::from("")
+            } else {
+                self.url().replace("ssh://", "").green()
             },
-            match self.client_name() {
-                Some(text) => text.yellow(),
-                _ => ColoredString::from(""),
-            }
+            self.client_name()
+                .map_or_else(|| ColoredString::from(""), Colorize::yellow)
         );
 
         write!(

@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
@@ -6,10 +5,10 @@ use colored::Colorize;
 
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
-use crate::api::client::Client;
+use crate::api::client::Client as SyspassClient;
 use crate::api::syspass::v2;
 use crate::api::syspass::v3;
-use crate::api::Api::*;
+use crate::api::Api::{SyspassV2, SyspassV3};
 use crate::config::Config;
 
 pub mod account;
@@ -18,43 +17,43 @@ pub mod client;
 pub mod entity;
 mod syspass;
 
-pub trait ApiClient {
+pub trait Client {
     fn search_account(
         &self,
         search: Vec<(&str, String)>,
         usage: bool,
-    ) -> Result<Vec<Account>, ApiError>;
-    fn get_password(&self, account: &Account) -> Result<ViewPassword, ApiError>;
-    fn get_clients(&self) -> Result<Vec<Client>, ApiError>;
-    fn get_categories(&self) -> Result<Vec<Category>, ApiError>;
-    fn save_client(&self, client: &Client) -> Result<Client, ApiError>;
-    fn save_category(&self, category: &Category) -> Result<Category, ApiError>;
-    fn save_account(&self, account: &Account) -> Result<Account, ApiError>;
-    fn change_password(&self, password: &ChangePassword) -> Result<Account, ApiError>;
-    fn delete_client(&self, id: &u32) -> Result<bool, ApiError>;
-    fn delete_category(&self, id: &u32) -> Result<bool, ApiError>;
-    fn delete_account(&self, id: &u32) -> Result<bool, ApiError>;
-    fn view_account(&self, id: &u32) -> Result<Account, ApiError>;
-    fn get_category(&self, id: &u32) -> Result<Category, ApiError>;
-    fn get_client(&self, id: &u32) -> Result<Client, ApiError>;
+    ) -> Result<Vec<Account>, Error>;
+    fn get_password(&self, account: &Account) -> Result<ViewPassword, Error>;
+    fn get_clients(&self) -> Result<Vec<SyspassClient>, Error>;
+    fn get_categories(&self) -> Result<Vec<Category>, Error>;
+    fn save_client(&self, client: &SyspassClient) -> Result<SyspassClient, Error>;
+    fn save_category(&self, category: &Category) -> Result<Category, Error>;
+    fn save_account(&self, account: &Account) -> Result<Account, Error>;
+    fn change_password(&self, password: &ChangePassword) -> Result<Account, Error>;
+    fn delete_client(&self, id: u32) -> Result<bool, Error>;
+    fn delete_category(&self, id: u32) -> Result<bool, Error>;
+    fn delete_account(&self, id: u32) -> Result<bool, Error>;
+    fn view_account(&self, id: u32) -> Result<Account, Error>;
+    fn get_category(&self, id: u32) -> Result<Category, Error>;
+    fn get_client(&self, id: u32) -> Result<SyspassClient, Error>;
     fn get_config(&self) -> &Config;
 }
 
 #[derive(Debug)]
-pub struct ApiError(String);
+pub struct Error(String);
 
 #[derive(Debug)]
 pub struct AppError(pub String);
 
-impl Error for ApiError {}
+impl std::error::Error for Error {}
 
-impl fmt::Display for ApiError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Error for AppError {}
+impl std::error::Error for AppError {}
 
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -62,9 +61,9 @@ impl fmt::Display for AppError {
     }
 }
 
-impl From<ApiError> for AppError {
-    fn from(value: ApiError) -> Self {
-        AppError(value.0)
+impl From<Error> for AppError {
+    fn from(value: Error) -> Self {
+        Self(value.0)
     }
 }
 
@@ -75,7 +74,7 @@ pub enum Api {
 }
 
 impl Api {
-    pub fn get(&self, config: Config) -> Box<dyn ApiClient> {
+    pub fn get(&self, config: Config) -> Box<dyn Client> {
         match self {
             SyspassV3 => Box::new(v3::Syspass::from(config)),
             SyspassV2 => Box::new(v2::Syspass::from(config)),
@@ -86,10 +85,9 @@ impl Api {
 impl FromStr for Api {
     type Err = ();
 
-    fn from_str(input: &str) -> Result<Api, Self::Err> {
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "" => Ok(SyspassV3),
-            "SyspassV3" => Ok(SyspassV3),
+            "SyspassV3" | "" => Ok(SyspassV3),
             "SyspassV2" => Ok(SyspassV2),
             _ => Err(()),
         }

@@ -1,5 +1,5 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Once;
 
 use log::debug;
 use reqwest::blocking::{Client, ClientBuilder, Response};
@@ -7,25 +7,31 @@ use serde::de::DeserializeOwned;
 use serde_derive::Serialize;
 use serde_json::Value;
 
+use crate::api;
 use crate::api::account::Account;
 use crate::api::entity::Entity;
-use crate::api::ApiError;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
 
 pub mod v2;
 pub mod v3;
 
-static mut PASSWORD: String = String::new();
-static INIT: Once = Once::new();
+thread_local! {
+    static PASSWORD: RefCell<String> = RefCell::new(String::new());
+}
 
-fn get_cached_password() -> &'static String {
-    unsafe {
-        INIT.call_once(|| {
-            PASSWORD = ask_for_password("API password: ", false);
+fn get_cached_password() -> String {
+    let password = PASSWORD.with(|f| f.borrow().clone());
+    if password.is_empty() {
+        PASSWORD.with(|f| {
+            let mut password = f.borrow_mut();
+            if password.as_str() == "" {
+                *password = ask_for_password("API password: ", false);
+            }
         });
-        &PASSWORD
     }
+
+    PASSWORD.with(|f| f.borrow().clone())
 }
 
 type RequestArguments<'a> = Option<Vec<(&'a str, String)>>;
@@ -36,20 +42,20 @@ fn add_request_args(
     needs_password: bool,
 ) -> HashMap<String, String> {
     let mut params: HashMap<String, String> =
-        HashMap::from([("authToken".to_owned(), config.token.to_owned())]);
+        HashMap::from([("authToken".to_owned(), config.token.clone())]);
 
     if needs_password {
-        let mut password = config.password.to_owned();
+        let mut password = config.password.clone();
         if password.is_empty() {
-            password = get_cached_password().to_owned();
+            password = get_cached_password();
         }
         params.insert("tokenPass".to_owned(), password);
     }
 
     if let Some(args) = args {
-        for arg in args.iter() {
+        for arg in args {
             if !arg.0.is_empty() && !arg.1.is_empty() {
-                params.insert(arg.0.to_owned(), arg.1.to_owned());
+                params.insert(arg.0.to_owned(), arg.1.clone());
             }
         }
     }
@@ -85,16 +91,19 @@ fn get_builder(config: &Config) -> ClientBuilder {
     builder
 }
 
-fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Result<Response, ApiError> {
+fn get_response(client: &Client, request_url: &str, req: &JsonReq) -> Result<Response, api::Error> {
     match client.post(request_url).json(&req).send() {
-        Ok(r) => match r.status().is_success() {
-            true => Ok(r),
-            false => Err(ApiError(format!(
-                "Server responded with code {}",
-                r.status()
-            ))),
-        },
-        Err(e) => Err(ApiError(e.to_string())),
+        Ok(r) => {
+            if r.status().is_success() {
+                Ok(r)
+            } else {
+                Err(api::Error(format!(
+                    "Server responded with code {}",
+                    r.status()
+                )))
+            }
+        }
+        Err(e) => Err(api::Error(e.to_string())),
     }
 }
 
@@ -102,7 +111,7 @@ fn send_request<T: DeserializeOwned>(
     client: &Client,
     request_url: &str,
     req: &JsonReq,
-) -> Result<T, ApiError> {
+) -> Result<T, api::Error> {
     debug!("Sending request to {}:\n{:#?}\n", request_url, req);
 
     match get_response(client, request_url, req) {
@@ -113,7 +122,7 @@ fn send_request<T: DeserializeOwned>(
 
             match serde_json::from_value::<T>(json) {
                 Ok(result) => Ok(result),
-                Err(error) => Err(ApiError(error.to_string())),
+                Err(error) => Err(api::Error(error.to_string())),
             }
         }
         Err(error) => Err(error),

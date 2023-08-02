@@ -1,0 +1,27 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "0": {
+      "category_description": "description_1",
+      "category_id": "37",
+      "category_name": "test_1"
+    },
+    "1": {
+      "category_description": "description_2",
+      "category_id": "5",
+      "category_name": "test_2"
+    },
+    "2": {
+      "category_description": "description_3",
+      "category_id": "1",
+      "category_name": "test_3"
+    },
+    "3": {
+      "category_description": "description_4",
+      "category_id": "36",
+      "category_name": "test_4"
+    },
+    "count": 4
+  }
+}

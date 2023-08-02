@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.2.0 - 
+
+- Add short flags for all commands
+- Improved error handling
+- Cleanup with clippy linting
+
 ## 0.1.3 - 2023-07-30
 
 - Internal changes

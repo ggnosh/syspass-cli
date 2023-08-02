@@ -4,7 +4,7 @@ use std::{env, process, thread};
 
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
-use colored::*;
+use colored::Colorize;
 use inquire::{InquireError, Select};
 use log::{error, warn};
 use term_table::row::Row;
@@ -13,7 +13,7 @@ use term_table::{Table, TableStyle};
 
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::{ApiClient, AppError};
+use crate::api::{AppError, Client};
 use crate::config::Config;
 
 pub const COMMAND_NAME: &str = "search";
@@ -21,6 +21,9 @@ pub const COMMAND_NAME: &str = "search";
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Search for account password")
+        .short_flag('s')
+        .short_flag_alias('f')
+        .visible_aliases(["find"])
         .arg(arg!([name] "Search for given account"))
         .arg(
             Arg::new("no-shell")
@@ -48,41 +51,62 @@ pub fn command_helper() -> Command {
         .arg(arg!(--clear "Clear clipboard").hide(true))
 }
 
+fn get_accounts_list(
+    api_client: &dyn Client,
+    search_string: Vec<(&str, String)>,
+    usage_disabled: bool,
+) -> Vec<Account> {
+    match api_client.search_account(search_string, usage_disabled) {
+        Ok(accounts) => accounts,
+        Err(error) => {
+            error!(
+                "{} Error while searching: {}",
+                "\u{2716}".bright_red(),
+                error
+            );
+            process::exit(1);
+        }
+    }
+}
+
+fn clear_clipboard(timeout: u64) -> Result<u8, Box<dyn Error>> {
+    if timeout > 0 {
+        thread::sleep(Duration::from_secs(timeout));
+        if let Ok(mut clipboard) = Clipboard::new() {
+            clipboard.clear().expect("Failed to clear clipboard");
+        } else {
+            return Err(Box::from(AppError("Could not clear clipboard".to_owned())));
+        }
+    }
+
+    Ok(0)
+}
+
 pub fn command(
     matches: &ArgMatches,
-    api_client: &dyn ApiClient,
+    api_client: &dyn Client,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
     let name = matches
         .get_one::<String>("name")
-        .map(|s| s.to_owned())
-        .unwrap_or("".to_owned());
+        .map_or_else(String::new, std::borrow::ToOwned::to_owned);
     let id: u32 = matches
         .get_one::<u32>("id")
-        .map(|s| s.to_owned())
-        .unwrap_or(0);
+        .map_or(0, std::borrow::ToOwned::to_owned);
     let category: u32 = matches
         .get_one::<u32>("category")
-        .map(|s| s.to_owned())
-        .unwrap_or(0);
+        .map_or(0, std::borrow::ToOwned::to_owned);
     let show = matches.get_flag("show-password");
     let config = api_client.get_config();
 
     if matches.get_flag("clear") {
-        let timeout = config.password_timeout.unwrap_or(10);
-        if timeout > 0 {
-            thread::sleep(Duration::from_secs(timeout));
-            let mut clipboard = Clipboard::new().unwrap();
-            clipboard.clear().unwrap();
-        }
-
-        return Ok(0);
+        return clear_clipboard(config.password_timeout.unwrap_or(10));
     }
 
     let accounts: Vec<Account>;
 
     if id > 0 {
-        accounts = vec![api_client.view_account(&id).expect("Invalid account id")]
+        accounts = vec![api_client.view_account(id).expect("Invalid account id")];
     } else if name.is_empty() {
         warn!(
             "{} {}",
@@ -96,18 +120,11 @@ pub fn command(
             search_string.push(("categoryId", category.to_string()));
         }
 
-        accounts =
-            match api_client.search_account(search_string, !matches.get_flag("disable-usage")) {
-                Ok(accounts) => accounts,
-                Err(error) => {
-                    error!(
-                        "{} Error while searching: {}",
-                        "\u{2716}".bright_red(),
-                        error
-                    );
-                    process::exit(1);
-                }
-            }
+        accounts = get_accounts_list(
+            api_client,
+            search_string,
+            !matches.get_flag("disable-usage"),
+        );
     }
 
     if accounts.len() > 1 && quiet {
@@ -128,13 +145,10 @@ pub fn command(
                 }
             }
         } else {
-            let account = match accounts.first() {
-                Some(account) => account,
-                None => {
+            let Some(account) = accounts.first() else {
                     warn!("{} No account found", "\u{2716}".bright_red());
                     process::exit(1);
-                }
-            };
+                };
 
             match api_client.get_password(account) {
                 Ok(password) => password,
@@ -151,49 +165,56 @@ pub fn command(
     };
 
     if !show {
-        let mut clipboard = Clipboard::new().unwrap();
-        clipboard.set_text(&account.password).unwrap();
+        if let Ok(mut clipboard) = Clipboard::new() {
+            clipboard
+                .set_text(&account.password)
+                .expect("Couldn't set password");
+        }
 
         if config.password_timeout.unwrap_or(10) > 0 {
-            process::Command::new(env::current_exe()?.as_path().to_str().unwrap())
-                .args(["search", "--clear"])
-                .spawn()
-                .expect("Failed to start child");
+            if let Some(path) = env::current_exe()?.as_path().to_str() {
+                process::Command::new(path)
+                    .args(["search", "--clear"])
+                    .spawn()
+                    .expect("Failed to start child");
+            }
         }
     }
 
     warn!("{}", print_table_for_account(&account, show));
 
     if !matches.get_flag("no-shell") && account.account.url().contains("ssh://") {
-        let host = account.account.login().to_owned()
-            + "@"
-            + account.account.url().replace("ssh://", "").as_str();
-        process::Command::new("ssh")
-            .arg(host)
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
+        open_shell(&account.account);
     }
 
     Ok(0)
 }
 
+fn open_shell(account: &Account) {
+    let host = account.login().to_owned() + "@" + account.url().replace("ssh://", "").as_str();
+    process::Command::new("ssh")
+        .arg(host)
+        .spawn()
+        .expect("Failed to start ssh")
+        .wait()
+        .expect("Failed to exit ssh");
+}
+
 fn select_account(
     accounts: Vec<Account>,
-    api_client: &dyn ApiClient,
+    api_client: &dyn Client,
     disable_usage: bool,
 ) -> Result<ViewPassword, AppError> {
     let count: usize = accounts.len();
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
-        .with_help_message(format!("Number for accounts found: {}", count).as_str())
+        .with_help_message(format!("Number for accounts found: {count}").as_str())
         .with_page_size(10)
         .prompt();
 
     match answer {
         Ok(choice) => {
             if !disable_usage {
-                Config::record_usage(choice.id().expect("Id should be set"));
+                Config::record_usage(*choice.id().expect("Id should be set"));
             }
             Ok(api_client.get_password(&choice)?)
         }

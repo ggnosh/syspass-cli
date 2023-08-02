@@ -1,25 +1,22 @@
 use std::error::Error;
-use std::process;
 
 use clap::{ArgMatches, Command};
 use colored::Colorize;
-use log::{error, warn};
-
-use crate::api::ApiClient;
+use log::warn;
 
 pub const COMMAND_NAME: &str = "password";
 
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
-        .visible_alias("account")
-        .alias("pass")
+        .visible_aliases(["account", "pass"])
+        .short_flag('p')
         .about("Remove account")
 }
 
 pub fn command(
     _matches: &ArgMatches,
-    api_client: &dyn ApiClient,
-    id: &u32,
+    api_client: &dyn crate::api::Client,
+    id: u32,
 ) -> Result<u8, Box<dyn Error>> {
     match api_client.delete_account(id) {
         Ok(status) => {
@@ -30,8 +27,7 @@ pub fn command(
             }
         }
         Err(error) => {
-            error!("{}", error);
-            process::exit(1);
+            Err(error)?;
         }
     }
 
