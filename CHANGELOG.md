@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.2.0 - 
+## 0.2.0 - 7.8.2023
 
 - Add short flags for all commands
 - Improved error handling
