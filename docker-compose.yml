@@ -14,7 +14,8 @@ services:
     environment:
       - USE_SSL=yes
     networks:
-      - syspassv3
+      syspassv3:
+        ipv4_address: 172.18.0.3
   db:
     container_name: syspass-db
     restart: always
@@ -24,7 +25,7 @@ services:
     volumes:
       - syspass-db:/var/lib/mysql
     ports:
-      - "3306"
+      - "5002:3306"
     networks:
       - syspassv3
   appv2:
@@ -36,12 +37,13 @@ services:
     links:
       - dbv2
     volumes:
-      - syspassv2-config:/var/www/html/sysPass/app/config
-      - syspassv2-backup:/var/www/html/sysPass/app/backup
+      - syspassv2-config:/var/www/html/sysPass/config
+      - syspassv2-backup:/var/www/html/sysPass/backup
     environment:
       - USE_SSL=yes
     networks:
-      - syspassv2
+      syspassv2:
+        ipv4_address: 172.22.0.3
   dbv2:
     container_name: syspass-dbv2
     restart: always
@@ -52,7 +54,7 @@ services:
     volumes:
       - syspassv2-db:/var/lib/mysql
     ports:
-      - "3306"
+      - "5003:3306"
     networks:
       - syspassv2
 volumes:
@@ -66,5 +68,11 @@ volumes:
 networks:
     syspassv3:
       name: syspass-v3
+      ipam:
+        config:
+          - subnet: 172.18.0.0/16
     syspassv2:
       name: syspass-v2
+      ipam:
+        config:
+          - subnet: 172.22.0.0/16
