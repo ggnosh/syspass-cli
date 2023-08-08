@@ -72,11 +72,12 @@ The behaviour can be disabled by using `-u` or `--disableusage` during account s
 Usage: syspass-cli [OPTIONS] <COMMAND>
 
 Commands:
-  search  Search for account password
-  edit    Edit entity
-  remove  Remove entity
-  new     Add a new entity
-  help    Print this message or the help of the given subcommand(s)
+  search, -s    Search for account password [aliases: find]
+  edit, -e      Edit entity [aliases: change]
+  remove, -r    Remove entity [aliases: delete]
+  new, -n       Add a new entity [aliases: add]
+  check-update  Update syspass-cli
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
   -c, --config <FILE>  Sets a custom config file

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.2.1 - 
+
+- Added `check-update` command to check for newest release on GitHub
+- Improved formatting on smaller terminals
+
 ## 0.2.0 - 7.8.2023
 
 - Add short flags for all commands

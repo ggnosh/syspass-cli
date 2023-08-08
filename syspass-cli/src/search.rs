@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::time::Duration;
-use std::{env, process, thread};
+use std::{cmp, env, process, thread};
 
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
@@ -15,6 +16,7 @@ use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AppError, Client};
 use crate::config::Config;
+use crate::TERMINAL_SIZE;
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -209,6 +211,7 @@ fn select_account(
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
         .with_help_message(format!("Number for accounts found: {count}").as_str())
         .with_page_size(10)
+        .with_formatter(&|i| i.value.name().to_string())
         .prompt();
 
     match answer {
@@ -224,8 +227,27 @@ fn select_account(
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     let mut table = Table::new();
-    table.max_column_width = 45;
+    let terminal_width = TERMINAL_SIZE.try_lock().expect("Failed").0;
+    let width = [
+        terminal_width * 7 / 100,
+        terminal_width * 29 / 100,
+        terminal_width * 33 / 100,
+    ];
 
+    let widths = HashMap::from([
+        (0, width[0]),
+        (1, width[1]),
+        (
+            2,
+            cmp::max(
+                terminal_width * 30 / 100,
+                terminal_width - width.iter().sum::<usize>(),
+            ),
+        ),
+        (3, width[2]),
+    ]);
+
+    table.max_column_widths = widths;
     table.style = TableStyle::rounded();
 
     let cells = vec![
@@ -233,12 +255,16 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new("Username".green()),
         TableCell::new("Password".green()),
         TableCell::new("Address".green()),
-        TableCell::new("Client name".green()),
-        //TableCell::new("Tags".green()), // Tags are not implemented by the API for some reason
     ];
 
     table.add_row(Row::new(vec![TableCell::new_with_alignment(
         &data.account.name().green(),
+        cells.len(),
+        Alignment::Center,
+    )]));
+
+    table.add_row(Row::new(vec![TableCell::new_with_alignment(
+        &data.account.client_name().unwrap_or("").green(),
         cells.len(),
         Alignment::Center,
     )]));
@@ -256,7 +282,6 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
             }
         }),
         TableCell::new(data.account.url()),
-        TableCell::new(data.account.client_name().unwrap_or("")),
     ]));
 
     table.render()

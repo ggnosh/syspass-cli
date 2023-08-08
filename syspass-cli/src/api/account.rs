@@ -1,9 +1,11 @@
+use std::cmp;
 use std::fmt::{Display, Formatter, Result};
 
 use colored::{ColoredString, Colorize};
 use serde_derive::Deserialize;
 
 use crate::api::entity::Entity;
+use crate::TERMINAL_SIZE;
 
 #[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -73,7 +75,7 @@ impl Account {
 
 impl Display for Account {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let line = format!(
+        let row = format!(
             "{}. {} - {} ({})",
             self.id().unwrap_or(&0),
             self.name(),
@@ -84,17 +86,26 @@ impl Display for Account {
             },
             self.client_name()
                 .map_or_else(|| ColoredString::from(""), Colorize::yellow)
+        )
+        .trim()
+        .split(' ')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+        let line = truncate(
+            &row,
+            TERMINAL_SIZE.lock().expect("Failed to get terminal size").0 - 5,
         );
 
-        write!(
-            f,
-            "{}",
-            line.trim()
-                .split(' ')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .join(" ")
-        )
+        write!(f, "{line}")
+    }
+}
+
+fn truncate(s: &str, max_chars: usize) -> String {
+    match s.char_indices().nth(cmp::max(max_chars, 40)) {
+        None => s.to_string(),
+        Some((idx, _)) => s[..idx].to_string() + "..." + "".white().to_string().as_str(),
     }
 }
 

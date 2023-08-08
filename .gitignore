@@ -15,3 +15,4 @@ syspass-cli/Cargo.lock
 .idea
 /test_config.json
 /test_config_v2.json
+/syspass-cli/report.json

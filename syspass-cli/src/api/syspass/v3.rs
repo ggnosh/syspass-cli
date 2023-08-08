@@ -311,7 +311,6 @@ mod tests {
     use mockito::{Mock, ServerGuard};
     use test_case::test_case;
 
-    use crate::api;
     use crate::api::account::{Account, ChangePassword};
     use crate::api::entity::Entity;
     use crate::api::syspass::v3::Syspass;
@@ -322,7 +321,7 @@ mod tests {
         response: Option<impl AsRef<Path>>,
         status: usize,
     ) -> (Mock, Syspass, ServerGuard) {
-        let response = api::syspass::tests::create_server_response(response, status);
+        let response = crate::tests::create_server_response(response, status, "POST", "/api.php");
 
         let url = response.1.url();
 

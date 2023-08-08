@@ -483,7 +483,7 @@ mod tests {
         response: Option<impl AsRef<Path>>,
         status: usize,
     ) -> (Mock, Syspass, ServerGuard) {
-        let response = api::syspass::tests::create_server_response(response, status);
+        let response = crate::tests::create_server_response(response, status, "POST", "/api.php");
 
         (response.0, get_test_client(response.1.url()), response.1)
     }

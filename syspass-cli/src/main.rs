@@ -3,6 +3,7 @@
 
 use std::process::ExitCode;
 use std::str::FromStr;
+use std::sync::Mutex;
 
 use clap::{arg, crate_description, crate_name, crate_version, Command};
 use colored::Colorize;
@@ -17,8 +18,11 @@ mod edit;
 mod prompt;
 mod remove;
 mod search;
+mod update;
 
 struct SimpleLogger;
+
+const DEFAULT_TERMINAL_SIZE: (usize, usize) = (80, 25);
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -39,6 +43,7 @@ impl log::Log for SimpleLogger {
 }
 
 static LOGGER: SimpleLogger = SimpleLogger;
+static TERMINAL_SIZE: Mutex<(usize, usize)> = Mutex::new(DEFAULT_TERMINAL_SIZE);
 
 fn main() -> ExitCode {
     let matches = Command::new(crate_name!())
@@ -74,6 +79,7 @@ fn main() -> ExitCode {
         .subcommand(edit::command_helper_edit())
         .subcommand(remove::command_helper())
         .subcommand(edit::command_helper_new())
+        .subcommand(update::command_helper())
         .get_matches();
 
     let config = Config::from(&matches);
@@ -100,11 +106,14 @@ fn main() -> ExitCode {
         .map(|()| log::set_max_level(log_level))
         .expect("Failed to set logger");
 
+    *TERMINAL_SIZE.lock().expect("Fail") = term_size::dimensions().unwrap_or(DEFAULT_TERMINAL_SIZE);
+
     match match matches.subcommand() {
         Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet),
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client, quiet),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
+        Some((update::COMMAND_NAME, matches)) => update::command(matches),
         _ => unreachable!("Clap should keep us out from here"),
     } {
         Ok(code) => ExitCode::from(code),
@@ -112,5 +121,31 @@ fn main() -> ExitCode {
             error!("{} {}", "\u{2716}".bright_red(), e);
             ExitCode::from(1)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use mockito::{Mock, Server, ServerGuard};
+
+    pub fn create_server_response(
+        response: Option<impl AsRef<Path>>,
+        status: usize,
+        method: &str,
+        path: &str,
+    ) -> (Mock, ServerGuard) {
+        let mut server = Server::new();
+        let mut mock = server.mock(method, path);
+
+        mock = match response {
+            Some(path) => mock.with_body_from_file(path),
+            None => mock.with_body(""),
+        }
+        .with_status(status)
+        .create();
+
+        (mock, server)
     }
 }

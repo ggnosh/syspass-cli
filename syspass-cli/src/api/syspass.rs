@@ -128,27 +128,3 @@ fn send_request<T: DeserializeOwned>(
         Err(error) => Err(error),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use mockito::{Mock, Server, ServerGuard};
-
-    pub fn create_server_response(
-        response: Option<impl AsRef<Path>>,
-        status: usize,
-    ) -> (Mock, ServerGuard) {
-        let mut server = Server::new();
-        let mut mock = server.mock("POST", "/api.php");
-
-        mock = match response {
-            Some(path) => mock.with_body_from_file(path),
-            None => mock.with_body(""),
-        }
-        .with_status(status)
-        .create();
-
-        (mock, server)
-    }
-}
