@@ -1,11 +1,11 @@
 # CHANGELOG
 
-## 0.2.1 - 
+## 0.3.1 - 2023-08-15 
 
 - Added `check-update` command to check for newest release on GitHub
 - Improved formatting on smaller terminals
 
-## 0.2.0 - 7.8.2023
+## 0.2.0 - 2023-08-07
 
 - Add short flags for all commands
 - Improved error handling
