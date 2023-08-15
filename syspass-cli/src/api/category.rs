@@ -19,7 +19,7 @@ pub struct Category {
 }
 
 impl Category {
-    pub fn new(id: Option<u32>, name: String, description: String) -> Self {
+    pub const fn new(id: Option<u32>, name: String, description: String) -> Self {
         Self {
             id,
             name,

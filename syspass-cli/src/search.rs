@@ -20,6 +20,7 @@ use crate::TERMINAL_SIZE;
 
 pub const COMMAND_NAME: &str = "search";
 
+#[allow(clippy::cognitive_complexity)]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Search for account password")

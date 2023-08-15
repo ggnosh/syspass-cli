@@ -23,7 +23,7 @@ pub struct Account {
 
 impl Account {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         id: Option<u32>,
         name: String,
         login: String,

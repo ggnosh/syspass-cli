@@ -5,7 +5,6 @@ use std::io::ErrorKind::NotFound;
 
 use clap::ArgMatches;
 use colored::Colorize;
-use serde::Serialize;
 use serde_derive::{Deserialize, Serialize};
 
 const CONFIG: &str = "config";
@@ -40,7 +39,7 @@ fn get_config_path(file: &str) -> OsString {
 
 fn get_config_file_or_write<T>(file: &str, value: T) -> String
 where
-    T: Sized + Serialize,
+    T: Sized + serde::Serialize,
 {
     let path = get_config_path(file);
     match fs::read_to_string(&path) {

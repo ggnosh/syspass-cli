@@ -22,7 +22,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(id: Option<u32>, name: String, description: String, is_global: usize) -> Self {
+    pub const fn new(id: Option<u32>, name: String, description: String, is_global: usize) -> Self {
         Self {
             id,
             name,

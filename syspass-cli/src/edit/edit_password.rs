@@ -42,6 +42,7 @@ impl ChangeAccountArgs {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Change account password. Requires permissions: [Edit Account Password]")

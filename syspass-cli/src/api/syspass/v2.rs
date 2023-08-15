@@ -1,4 +1,3 @@
-use core::cell::Cell;
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
@@ -8,14 +7,8 @@ use serde_json::Value;
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::syspass::{add_request_args, get_builder, send_request, sort_accounts, JsonReq};
+use crate::api::syspass::{sort_accounts, JsonReq};
 use crate::config::Config;
-
-pub struct Syspass {
-    client: reqwest::blocking::Client,
-    request_number: Cell<u8>,
-    config: Config,
-}
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
 
@@ -141,7 +134,7 @@ impl From<Account> for api::account::Account {
     }
 }
 
-const NOT_SUPPORTED: &str = "SyspassV2 does not support this";
+const NOT_SUPPORTED: &str = "Syspass does not support this";
 
 impl Syspass {
     fn forge_and_send(
@@ -150,16 +143,20 @@ impl Syspass {
         args: &Option<Vec<(&str, String)>>,
         needs_password: bool,
     ) -> Result<ApiResponseResult, api::Error> {
-        let params = add_request_args(args, &self.config, needs_password);
+        let params = self.syspass.get_params(args, needs_password);
         let req = JsonReq {
             jsonrpc: String::from("2.0"),
             method: method.to_owned(),
             params,
-            id: self.request_number.get(),
+            id: self.syspass.request_number.get(),
         };
-        let response = send_request::<ApiResponseResult>(&self.client, &self.config.host, &req);
+        let response = self
+            .syspass
+            .send_request::<ApiResponseResult>(&self.syspass.config.host, &req);
 
-        self.request_number.set(self.request_number.get() + 1);
+        self.syspass
+            .request_number
+            .set(self.syspass.request_number.get() + 1);
 
         match response {
             Ok(response) => Ok(response),
@@ -237,12 +234,14 @@ impl Syspass {
     }
 }
 
+pub struct Syspass {
+    syspass: api::syspass::Syspass,
+}
+
 impl From<Config> for Syspass {
     fn from(value: Config) -> Self {
         Self {
-            client: get_builder(&value).build().expect("Got client"),
-            request_number: Cell::new(1),
-            config: value,
+            syspass: api::syspass::Syspass::from(value),
         }
     }
 }
@@ -461,7 +460,7 @@ impl api::Client for Syspass {
     }
 
     fn get_config(&self) -> &Config {
-        &self.config
+        &self.syspass.config
     }
 }
 
@@ -483,9 +482,15 @@ mod tests {
         response: Option<impl AsRef<Path>>,
         status: usize,
     ) -> (Mock, Syspass, ServerGuard) {
-        let response = crate::tests::create_server_response(response, status, "POST", "/api.php");
+        let response = api::syspass::tests::create_server_response(response, status, "Syspass");
 
-        (response.0, get_test_client(response.1.url()), response.1)
+        (
+            response.0,
+            Syspass {
+                syspass: response.1,
+            },
+            response.2,
+        )
     }
 
     fn get_test_client(url: String) -> Syspass {
@@ -494,20 +499,21 @@ mod tests {
             token: "1234".to_owned(),
             password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Option::from("SyspassV2".to_owned()),
+            api_version: Option::from("Syspass".to_owned()),
             password_timeout: None,
         })
     }
 
+    //noinspection DuplicatedCode
     #[test_case(200)]
     #[test_case(201)]
     #[test_case(202)]
-    #[should_panic(expected = "Server response did not contain JSON")]
     fn test_ok_server(status: usize) {
         let test = create_server_response(None::<String>, status);
-        test.1.search_account(vec![], false).expect("Panic");
+        assert!(test.1.search_account(vec![], false).is_err());
     }
 
+    //noinspection DuplicatedCode
     #[test_case(400)]
     #[test_case(403)]
     #[test_case(404)]
@@ -531,7 +537,6 @@ mod tests {
     #[test_case(404)]
     #[test_case(500)]
     fn test_search_account_error_response(status: usize) {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v2/account_search_empty.json"),
             status,
@@ -552,7 +557,6 @@ mod tests {
 
     #[test]
     fn test_search_account_empty() {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v2/account_search_empty.json"),
             200,
@@ -574,7 +578,6 @@ mod tests {
 
     #[test]
     fn test_search_account_list() {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v2/accounts_search_results.json"),
             200,
@@ -591,22 +594,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_invalid_server_address() {
         let client = Syspass::from(Config {
             host: "http://localhost:1/api.php".to_owned(),
             token: "1234".to_owned(),
             password: "<PASSWORD>".to_owned(),
             verify_host: false,
-            api_version: Some("SyspassV2".to_owned()),
+            api_version: Some("Syspass".to_owned()),
             password_timeout: None,
         });
 
-        client.search_account(vec![], false).expect("Panic");
+        assert!(client.search_account(vec![], false).is_err());
     }
 
     #[test]
-    #[should_panic(expected = "SyspassV2 does not support this")]
     fn test_change_account_password() {
         let client = get_test_client(String::new());
         let change = ChangePassword {
@@ -615,7 +616,9 @@ mod tests {
             expire_date: 1_689_091_943,
         };
 
-        client.change_password(&change).expect(NOT_SUPPORTED);
+        assert!(client
+            .change_password(&change)
+            .is_err_and(|error| NOT_SUPPORTED == error.to_string()));
     }
 
     #[test]
@@ -757,7 +760,6 @@ mod tests {
 
     #[test]
     fn test_get_categories() {
-        // Request a new server from the pool
         let test =
             create_server_response(Some("tests/responses/syspass/v2/category_list.json"), 200);
 
@@ -786,17 +788,19 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "SyspassV2 does not support this")]
     fn test_get_client() {
         let client = get_test_client(String::new());
-        client.get_client(1).expect(NOT_SUPPORTED);
+        assert!(client
+            .get_client(1)
+            .is_err_and(|e| NOT_SUPPORTED == e.to_string()));
     }
 
     #[test]
-    #[should_panic(expected = "SyspassV2 does not support this")]
     fn test_get_category() {
         let client = get_test_client(String::new());
-        client.get_category(1).expect(NOT_SUPPORTED);
+        assert!(client
+            .get_category(1)
+            .is_err_and(|e| NOT_SUPPORTED == e.to_string()));
     }
 
     #[test]

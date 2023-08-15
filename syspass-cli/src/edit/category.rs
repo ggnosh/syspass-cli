@@ -11,6 +11,7 @@ use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "category";
 
+#[allow(clippy::cognitive_complexity)]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Edit category")

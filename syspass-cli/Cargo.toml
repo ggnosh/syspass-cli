@@ -1,6 +1,6 @@
 [package]
 name = "syspass-cli"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "A CLI client for Syspass"
 repository = "https://github.com/ggnosh/syspass-cli"
@@ -8,6 +8,7 @@ keywords = ["syspass", "cli"]
 license = "MIT"
 readme = "../README.md"
 authors = ["GGnosh"]
+categories = ["Command line utilities"]
 
 [dependencies]
 arboard = "3.2.0"

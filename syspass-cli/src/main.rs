@@ -1,5 +1,18 @@
 #![forbid(unsafe_code, non_ascii_idents)]
 #![deny(warnings)]
+#![warn(
+    clippy::correctness,
+    clippy::suspicious,
+    clippy::cargo,
+    clippy::style,
+    clippy::complexity,
+    clippy::perf,
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::nursery,
+    clippy::style
+)]
+#![allow(clippy::missing_const_for_fn)]
 
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -45,8 +58,9 @@ impl log::Log for SimpleLogger {
 static LOGGER: SimpleLogger = SimpleLogger;
 static TERMINAL_SIZE: Mutex<(usize, usize)> = Mutex::new(DEFAULT_TERMINAL_SIZE);
 
-fn main() -> ExitCode {
-    let matches = Command::new(crate_name!())
+#[allow(clippy::cognitive_complexity)]
+fn get_command() -> Command {
+    Command::new(crate_name!())
         .about(crate_description!())
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -80,12 +94,15 @@ fn main() -> ExitCode {
         .subcommand(remove::command_helper())
         .subcommand(edit::command_helper_new())
         .subcommand(update::command_helper())
-        .get_matches();
+}
+
+fn main() -> ExitCode {
+    let matches = get_command().get_matches();
 
     let config = Config::from(&matches);
     let api_version = config.api_version.as_ref().map_or("", |version| version);
     let api_client_box: Box<dyn Client> = Api::from_str(api_version)
-        .unwrap_or_else(|_| panic!("No such API is supported ({})", &api_version))
+        .unwrap_or_else(|()| panic!("No such API is supported ({})", &api_version))
         .get(config);
 
     let api_client = api_client_box.as_ref();

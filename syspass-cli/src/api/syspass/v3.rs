@@ -1,4 +1,3 @@
-use std::cell::Cell;
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
@@ -10,16 +9,8 @@ use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
-use crate::api::syspass::{
-    add_request_args, get_builder, send_request, sort_accounts, JsonReq, RequestArguments,
-};
+use crate::api::syspass::{sort_accounts, JsonReq, RequestArguments, Syspass as SyspassShared};
 use crate::config::Config;
-
-pub struct Syspass {
-    client: reqwest::blocking::Client,
-    request_number: Cell<u8>,
-    config: Config,
-}
 
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
@@ -52,16 +43,20 @@ impl Syspass {
         args: &RequestArguments,
         needs_password: bool,
     ) -> Result<ApiResult, api::Error> {
-        let params = add_request_args(args, &self.config, needs_password);
+        let params = self.syspass.get_params(args, needs_password);
         let req = JsonReq {
             jsonrpc: String::from("2.0"),
             method: method.to_owned(),
             params,
-            id: self.request_number.get(),
+            id: self.syspass.request_number.get(),
         };
-        let response = send_request::<ApiResponse>(&self.client, &self.config.host, &req);
+        let response = self
+            .syspass
+            .send_request::<ApiResponse>(&self.syspass.config.host, &req);
 
-        self.request_number.set(self.request_number.get() + 1);
+        self.syspass
+            .request_number
+            .set(self.syspass.request_number.get() + 1);
 
         let ApiResponse { result, error } = response?;
 
@@ -119,12 +114,14 @@ impl Syspass {
     }
 }
 
+pub struct Syspass {
+    syspass: SyspassShared,
+}
+
 impl From<Config> for Syspass {
     fn from(value: Config) -> Self {
         Self {
-            client: get_builder(&value).build().expect("Got client"),
-            request_number: Cell::new(1),
-            config: value,
+            syspass: SyspassShared::from(value),
         }
     }
 }
@@ -300,7 +297,7 @@ impl api::Client for Syspass {
     }
 
     fn get_config(&self) -> &Config {
-        &self.config
+        &self.syspass.config
     }
 }
 
@@ -321,31 +318,28 @@ mod tests {
         response: Option<impl AsRef<Path>>,
         status: usize,
     ) -> (Mock, Syspass, ServerGuard) {
-        let response = crate::tests::create_server_response(response, status, "POST", "/api.php");
+        let response =
+            crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
 
-        let url = response.1.url();
-
-        let client = Syspass::from(Config {
-            host: url + "/api.php",
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Option::from("SyspassV3".to_owned()),
-            password_timeout: None,
-        });
-
-        (response.0, client, response.1)
+        (
+            response.0,
+            Syspass {
+                syspass: response.1,
+            },
+            response.2,
+        )
     }
 
+    //noinspection DuplicatedCode
     #[test_case(200)]
     #[test_case(201)]
     #[test_case(202)]
-    #[should_panic(expected = "Server response did not contain JSON")]
     fn test_ok_server(status: usize) {
         let test = create_server_response(None::<String>, status);
-        test.1.search_account(vec![], false).expect("Panic");
+        assert!(test.1.search_account(vec![], false).is_err());
     }
 
+    //noinspection DuplicatedCode
     #[test_case(400)]
     #[test_case(403)]
     #[test_case(404)]
@@ -369,7 +363,6 @@ mod tests {
     #[test_case(404)]
     #[test_case(500)]
     fn test_search_account_error_response(status: usize) {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v3/account_search_empty.json"),
             status,
@@ -390,7 +383,6 @@ mod tests {
 
     #[test]
     fn test_search_account_empty() {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v3/account_search_empty.json"),
             200,
@@ -408,7 +400,6 @@ mod tests {
 
     #[test]
     fn test_search_account_list() {
-        // Request a new server from the pool
         let test = create_server_response(
             Some("tests/responses/syspass/v3/accounts_search_results.json"),
             200,
@@ -425,7 +416,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_invalid_server_address() {
         let client = Syspass::from(Config {
             host: "http://localhost:1/api.php".to_owned(),
@@ -436,7 +426,7 @@ mod tests {
             password_timeout: None,
         });
 
-        client.search_account(vec![], false).expect("Panic");
+        assert!(client.search_account(vec![], false).is_err());
     }
 
     #[test]
@@ -526,7 +516,6 @@ mod tests {
 
     #[test]
     fn test_get_categories() {
-        // Request a new server from the pool
         let test =
             create_server_response(Some("tests/responses/syspass/v3/category_list.json"), 200);
 
@@ -542,7 +531,6 @@ mod tests {
 
     #[test]
     fn test_get_clients() {
-        // Request a new server from the pool
         let test = create_server_response(Some("tests/responses/syspass/v3/client_list.json"), 200);
 
         let clients = test.1.get_clients();
