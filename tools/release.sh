@@ -15,9 +15,9 @@ sed -i "s/^# CHANGELOG/# CHANGELOG\n\n## ${version} - $(date +'%Y-%m-%d')/" ../C
 ./build.sh
 
 echo "Commit changes..."
-#git commit -a -m "Version bump"
+git commit -a -m "Version bump"
 
 echo "Tagging version..."
-#git tag v${version}
+git tag v${version}
 
 echo "All done. Push and go"
