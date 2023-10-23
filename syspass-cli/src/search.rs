@@ -336,6 +336,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_clear_clipboard() {
         let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
         clipboard

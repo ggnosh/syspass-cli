@@ -241,22 +241,26 @@ mod tests {
     fn test_display_password() {
         assert_eq!(
             "pass                      (str)",
-            PasswordData {
-                password: "pass".to_string(),
-                strength: "str".to_string(),
-                strength_value: 0.0,
-            }
-            .to_string()
+            strip_ansi_escapes::strip_str(
+                PasswordData {
+                    password: "pass".to_string(),
+                    strength: "str".to_string(),
+                    strength_value: 0.0,
+                }
+                .to_string()
+            )
         );
 
         assert_eq!(
             "very long pass.....that.....just.....keeps.....going (str)",
-            PasswordData {
-                password: "very long pass.....that.....just.....keeps.....going".to_string(),
-                strength: "str".to_string(),
-                strength_value: 0.0,
-            }
-            .to_string()
+            strip_ansi_escapes::strip_str(
+                PasswordData {
+                    password: "very long pass.....that.....just.....keeps.....going".to_string(),
+                    strength: "str".to_string(),
+                    strength_value: 0.0,
+                }
+                .to_string()
+            )
         );
     }
 }

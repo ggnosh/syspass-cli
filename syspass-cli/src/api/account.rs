@@ -139,43 +139,56 @@ mod tests {
         let return_text = "add some filler test data that's 40 char...".to_string();
         let test_string = return_text.clone() + " testing long string";
 
-        assert_eq!(return_text, truncate(&test_string, 40));
-        assert_eq!(return_text, truncate(&test_string, 1)); // Minimum length is 40
-        assert_ne!(return_text, truncate(&test_string, 50));
+        assert_eq!(
+            return_text,
+            strip_ansi_escapes::strip_str(truncate(&test_string, 40))
+        );
+        assert_eq!(
+            return_text,
+            strip_ansi_escapes::strip_str(truncate(&test_string, 1))
+        ); // Minimum length is 40
+        assert_ne!(
+            return_text,
+            strip_ansi_escapes::strip_str(truncate(&test_string, 50))
+        );
     }
 
     #[test]
     fn test_display_account() {
         assert_eq!(
             "0. name - (client_name)",
-            Account {
-                id: None,
-                name: "name".to_string(),
-                login: "login".to_string(),
-                url: String::new(),
-                notes: String::new(),
-                category_id: 0,
-                client_id: 0,
-                pass: None,
-                client_name: Some("client_name".to_string()),
-            }
-            .to_string()
+            strip_ansi_escapes::strip_str(
+                Account {
+                    id: None,
+                    name: "name".to_string(),
+                    login: "login".to_string(),
+                    url: String::new(),
+                    notes: String::new(),
+                    category_id: 0,
+                    client_id: 0,
+                    pass: None,
+                    client_name: Some("client_name".to_string()),
+                }
+                .to_string()
+            )
         );
 
         assert_eq!(
             "10. name - example.org ()",
-            Account {
-                id: Some(10),
-                name: "name".to_string(),
-                login: "login".to_string(),
-                url: "ssh://example.org".to_string(),
-                notes: "no notes".to_string(),
-                category_id: 0,
-                client_id: 0,
-                pass: None,
-                client_name: None,
-            }
-            .to_string()
+            strip_ansi_escapes::strip_str(
+                Account {
+                    id: Some(10),
+                    name: "name".to_string(),
+                    login: "login".to_string(),
+                    url: "ssh://example.org".to_string(),
+                    notes: "no notes".to_string(),
+                    category_id: 0,
+                    client_id: 0,
+                    pass: None,
+                    client_name: None,
+                }
+                .to_string()
+            )
         );
     }
 }
