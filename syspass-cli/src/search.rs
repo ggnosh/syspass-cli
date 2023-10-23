@@ -72,9 +72,12 @@ fn get_accounts_list(
     }
 }
 
-fn clear_clipboard(timeout: u64) -> Result<u8, Box<dyn Error>> {
+fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> {
     if timeout > 0 {
-        thread::sleep(Duration::from_secs(timeout));
+        if !immediate {
+            thread::sleep(Duration::from_secs(timeout));
+        }
+
         if let Ok(mut clipboard) = Clipboard::new() {
             clipboard.clear().expect("Failed to clear clipboard");
         } else {
@@ -103,7 +106,7 @@ pub fn command(
     let config = api_client.get_config();
 
     if matches.get_flag("clear") {
-        return clear_clipboard(config.password_timeout.unwrap_or(10));
+        return clear_clipboard(config.password_timeout.unwrap_or(10), false);
     }
 
     let accounts: Vec<Account>;
@@ -149,9 +152,9 @@ pub fn command(
             }
         } else {
             let Some(account) = accounts.first() else {
-                    warn!("{} No account found", "\u{2716}".bright_red());
-                    process::exit(1);
-                };
+                warn!("{} No account found", "\u{2716}".bright_red());
+                process::exit(1);
+            };
 
             match api_client.get_password(account) {
                 Ok(password) => password,
@@ -290,8 +293,10 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
 
 #[cfg(test)]
 mod tests {
+    use arboard::Clipboard;
+
     use crate::api::account::{Account, ViewPassword};
-    use crate::search::print_table_for_account;
+    use crate::search::{clear_clipboard, print_table_for_account};
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
@@ -328,5 +333,22 @@ mod tests {
         assert!(!output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
         assert!(output.contains(account.account.url()));
+    }
+
+    #[test]
+    fn test_clear_clipboard() {
+        let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
+        clipboard
+            .set_text("testing")
+            .expect("Failed to set clipboard value");
+        assert_eq!(
+            "testing",
+            clipboard.get_text().expect("Failed to get clipboard data")
+        );
+        clear_clipboard(1, true).expect("Failed to clear clipboard");
+        assert_eq!(
+            "",
+            clipboard.get_text().expect("Failed to get clipboard data")
+        );
     }
 }

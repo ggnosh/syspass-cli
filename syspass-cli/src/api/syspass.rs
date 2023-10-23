@@ -160,7 +160,7 @@ mod tests {
     use passwords::PasswordGenerator;
     use reqwest::blocking::ClientBuilder;
 
-    use crate::api::syspass::{RequestArguments, Syspass};
+    use crate::api::syspass::{get_cached_password, RequestArguments, Syspass, PASSWORD};
     use crate::config::Config;
 
     pub fn create_server_response(
@@ -195,6 +195,16 @@ mod tests {
         });
 
         (response.0, client, response.1)
+    }
+
+    #[test]
+    fn test_get_cached_password() {
+        PASSWORD.with(|f| {
+            let mut password = f.borrow_mut();
+            *password = "test password".to_owned();
+        });
+
+        assert_eq!("test password", get_cached_password());
     }
 
     #[test]

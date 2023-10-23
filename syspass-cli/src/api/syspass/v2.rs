@@ -40,7 +40,7 @@ struct ApiErrorResponse {
 }
 
 #[derive(Deserialize, Clone)]
-#[allow(non_snake_case)]
+#[allow(non_snake_case, clippy::struct_field_names)]
 struct Client {
     customer_description: String,
     customer_id: String,
@@ -71,7 +71,7 @@ enum ApiResponseResult {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(non_snake_case)]
+#[allow(non_snake_case, clippy::struct_field_names)]
 struct Account {
     account_categoryId: String,
     account_countView: String,
@@ -86,6 +86,7 @@ struct Account {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(clippy::struct_field_names)]
 struct Category {
     category_description: String,
     category_id: String,
@@ -439,10 +440,15 @@ impl api::Client for Syspass {
     fn view_account(&self, id: u32) -> Result<api::account::Account, api::Error> {
         match self.forge_and_send("getAccountData", &Some(vec![("id", id.to_string())]), true) {
             Ok(response) => match response {
-                ApiResponseResult::Entity(result) => Ok(api::account::Account::from(
-                    serde_json::from_value::<Account>(result.result)
-                        .expect("Failed to convert account"),
-                )),
+                ApiResponseResult::Entity(result) => Ok(api::account::Account::from({
+                    let result = serde_json::from_value::<Account>(result.result);
+                    match result {
+                        Ok(account) => account,
+                        Err(error) => {
+                            return Err(api::Error(format!("{error}: Could not get account data")))
+                        }
+                    }
+                })),
                 ApiResponseResult::Code(_) => {
                     Err(api::Error(format!("Invalid response: {response:?}")))
                 }
@@ -643,17 +649,33 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_account() {
+    fn test_delete_account() {
         let test =
             create_server_response(Some("tests/responses/syspass/v2/account_delete.json"), 200);
         let response = test.1.delete_account(1);
 
-        response.map_or_else(
-            |_| panic!("Request should not have failed"),
-            |response| {
-                assert!(response);
-            },
-        );
+        assert!(response.is_ok());
+        assert!(response.expect("Should not have failed").to_owned());
+    }
+
+    #[test]
+    fn test_delete_category() {
+        let test =
+            create_server_response(Some("tests/responses/syspass/v2/category_delete.json"), 200);
+        let response = test.1.delete_category(1);
+
+        assert!(response.is_ok());
+        assert!(response.expect("Should not have failed").to_owned());
+    }
+
+    #[test]
+    fn test_delete_client() {
+        let test =
+            create_server_response(Some("tests/responses/syspass/v2/client_delete.json"), 200);
+        let response = test.1.delete_client(1);
+
+        assert!(response.is_ok());
+        assert!(response.expect("Should not have failed").to_owned());
     }
 
     #[test]
@@ -823,5 +845,44 @@ mod tests {
         );
 
         test.0.assert();
+    }
+
+    #[test]
+    fn test_add_account() {
+        let test = create_server_response(Some("tests/responses/syspass/v2/account_add.json"), 200);
+
+        let account = get_test_account();
+        let result = test.1.save_account(&account);
+
+        assert!(result
+            .is_err_and(|x| x.to_string()
+                == "missing field `account_categoryId`: Could not get account data"));
+    }
+
+    #[test]
+    fn test_add_account_failed() {
+        let test = create_server_response(
+            Some("tests/responses/syspass/v2/account_add_failed.json"),
+            200,
+        );
+
+        let account = get_test_account();
+        let result = test.1.save_account(&account);
+
+        assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
+    }
+
+    fn get_test_account() -> api::account::Account {
+        api::account::Account::new(
+            None,
+            "test-name".to_owned(),
+            "test-login".to_owned(),
+            "example.org".to_owned(),
+            "nothing".to_owned(),
+            1,
+            1,
+            Some("test-password".to_owned()),
+            Some("test-client".to_owned()),
+        )
     }
 }

@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_new_release() {
+    fn test_has_new_release() {
         let mut release = get_test_release();
         let test_version = Version::from("v0.2.0").expect("Failed to get current version");
 

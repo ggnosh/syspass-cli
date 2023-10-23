@@ -67,7 +67,6 @@ impl From<Error> for AppError {
     }
 }
 
-#[derive(Debug)]
 pub enum Api {
     SyspassV3,
     SyspassV2,

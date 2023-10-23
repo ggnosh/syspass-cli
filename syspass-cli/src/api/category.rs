@@ -42,12 +42,7 @@ impl Category {
 
 impl Display for Category {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}. {}",
-            self.id().expect("Id should not be empty"),
-            self.name()
-        )
+        write!(f, "{}. {}", self.id().unwrap_or(&0_u32), self.name())
     }
 }
 
@@ -98,4 +93,42 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
                 |category| *category.id().expect(ID_EMPTY),
             ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::category::Category;
+
+    #[test]
+    fn test_display_category() {
+        assert_eq!(
+            "1. name",
+            Category {
+                id: Some(1),
+                name: "name".to_string(),
+                description: "desc".to_string(),
+            }
+            .to_string()
+        );
+
+        assert_eq!(
+            "1. looooooooooooooooooooooooooooooooooooooooong name",
+            Category {
+                id: Some(1),
+                name: "looooooooooooooooooooooooooooooooooooooooong name".to_string(),
+                description: "desc".to_string(),
+            }
+            .to_string()
+        );
+
+        assert_eq!(
+            "0. name",
+            Category {
+                id: None,
+                name: "name".to_string(),
+                description: "desc".to_string(),
+            }
+            .to_string()
+        );
+    }
 }

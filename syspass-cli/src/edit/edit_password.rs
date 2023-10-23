@@ -137,7 +137,7 @@ impl Display for PasswordData {
 struct GeneratorParams(usize, bool, bool);
 
 fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
-    let mut suggest: Vec<String> = vec![];
+    let mut suggest: Vec<String> = Vec::new();
 
     let params = [
         GeneratorParams(25, true, true),
@@ -150,7 +150,7 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
         GeneratorParams(8, false, false),
     ];
 
-    let mut generators: Vec<PasswordGenerator> = vec![];
+    let mut generators: Vec<PasswordGenerator> = Vec::new();
     for flags in params {
         generators.push(
             PasswordGenerator::new()
@@ -213,5 +213,50 @@ pub fn get_password(prompt: &str) -> String {
     } else {
         error!("Cancelled");
         process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::edit::edit_password::{generate_passwords, PasswordData};
+
+    #[test]
+    fn test_generate_passwords() {
+        let passwords = generate_passwords(5);
+
+        assert_eq!((5 * 8) + 1, passwords.len());
+
+        let own = passwords.first().expect("Use own");
+        assert_eq!("", own.password);
+        assert_eq!("use own", own.strength);
+        assert!(
+            (own.strength_value - 0.0).abs() < f64::EPSILON,
+            "left: {:?} not equal right: {:?}",
+            0.0,
+            own.strength_value
+        );
+    }
+
+    #[test]
+    fn test_display_password() {
+        assert_eq!(
+            "pass                      (str)",
+            PasswordData {
+                password: "pass".to_string(),
+                strength: "str".to_string(),
+                strength_value: 0.0,
+            }
+            .to_string()
+        );
+
+        assert_eq!(
+            "very long pass.....that.....just.....keeps.....going (str)",
+            PasswordData {
+                password: "very long pass.....that.....just.....keeps.....going".to_string(),
+                strength: "str".to_string(),
+                strength_value: 0.0,
+            }
+            .to_string()
+        );
     }
 }
