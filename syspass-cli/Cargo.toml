@@ -8,7 +8,7 @@ keywords = ["syspass", "cli"]
 license = "MIT"
 readme = "../README.md"
 authors = ["GGnosh"]
-categories = ["Command line utilities"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 arboard = { version = "3.2.0", default-features = false }
