@@ -103,3 +103,83 @@ impl Config {
         .expect("Unable to write file");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+
+    use tempfile::tempdir;
+
+    use crate::config::{get_config_file_or_write, get_config_path, Config};
+
+    fn create_temp_dir() -> (Option<OsString>, PathBuf) {
+        let old_home = env::var_os("HOME");
+        let temp_path = tempdir()
+            .expect("Failed to create temp dir")
+            .path()
+            .to_owned();
+
+        std::fs::create_dir_all(temp_path.join(".syspass")).expect("Failed to create dir");
+        env::set_var("HOME", temp_path.as_os_str());
+
+        (old_home, temp_path)
+    }
+
+    fn cleanup_temp_dir(temp: (Option<OsString>, PathBuf)) {
+        if let Some(home) = temp.0 {
+            env::set_var("HOME", home);
+        } else {
+            env::remove_var("HOME");
+        }
+
+        std::fs::remove_dir_all(temp.1).expect("Failed to remove dir");
+    }
+
+    #[test]
+    fn test_get_config_path() {
+        let temp = create_temp_dir();
+        let path = get_config_path("config.json");
+        assert_eq!(
+            temp.1.as_os_str().to_str().expect("String").to_string() + "/.syspass/config.json",
+            path.as_os_str().to_str().expect("String")
+        );
+
+        cleanup_temp_dir(temp);
+    }
+
+    #[test]
+    fn test_get_config_file_or_write() {
+        let temp = create_temp_dir();
+
+        assert_eq!(
+            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null}",
+            get_config_file_or_write("config.json", Config::default()),
+        );
+
+        cleanup_temp_dir(temp);
+    }
+
+    #[test]
+    fn test_record_usage() {
+        let temp = create_temp_dir();
+
+        let usage = Config::get_usage_data();
+        assert_eq!(usage.get(&31337), None);
+
+        Config::record_usage(31337);
+        let usage = Config::get_usage_data();
+        assert_eq!(usage.get(&31337), Some(&1));
+
+        Config::record_usage(31337);
+        let usage = Config::get_usage_data();
+        assert_eq!(usage.get(&31337), Some(&2));
+
+        let usage = Config::get_usage_data();
+        assert_eq!(usage.get(&31337), Some(&2));
+        assert_eq!(usage.get(&31337), Some(&2));
+
+        cleanup_temp_dir(temp);
+    }
+}

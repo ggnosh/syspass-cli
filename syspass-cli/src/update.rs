@@ -157,4 +157,19 @@ mod tests {
             release.html_url
         );
     }
+
+    #[test]
+    fn test_get_github_release_bad() {
+        let test = crate::tests::create_server_response(
+            Some("tests/responses/github-release-bad.json"),
+            200,
+            "GET",
+            "/repos/ggnosh/syspass-cli/releases/latest",
+        );
+        let url = test.1.url() + "/repos/ggnosh/syspass-cli/releases/latest";
+
+        let response = get_github_release(&url);
+
+        assert!(response.is_err());
+    }
 }

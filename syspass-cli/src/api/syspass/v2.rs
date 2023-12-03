@@ -70,7 +70,7 @@ enum ApiResponseResult {
     Entity(ApiResponseEntity),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[allow(non_snake_case, clippy::struct_field_names)]
 struct Account {
     account_categoryId: String,
@@ -85,7 +85,7 @@ struct Account {
     customer_name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[allow(clippy::struct_field_names)]
 struct Category {
     category_description: String,

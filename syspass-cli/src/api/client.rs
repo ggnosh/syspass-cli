@@ -124,3 +124,37 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
             |client| *client.id().expect(ID_EMPTY),
         )
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::api::client::Client;
+
+    #[test]
+    fn test_display_account() {
+        assert_eq!(
+            "0. name (*)",
+            strip_ansi_escapes::strip_str(
+                Client {
+                    id: Some(0),
+                    name: "name".to_string(),
+                    description: "description".to_string(),
+                    is_global: 1
+                }
+                .to_string()
+            )
+        );
+
+        assert_eq!(
+            "0. name",
+            strip_ansi_escapes::strip_str(
+                Client {
+                    id: Some(0),
+                    name: "name".to_string(),
+                    description: "description".to_string(),
+                    is_global: 0
+                }
+                .to_string()
+            )
+        );
+    }
+}

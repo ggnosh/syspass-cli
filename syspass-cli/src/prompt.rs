@@ -117,19 +117,21 @@ pub fn password_strength(strength: f64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use test_case::test_case;
+
     use crate::prompt::password_strength;
 
-    #[test]
-    pub fn test_password_strength() {
-        assert_eq!("Very dangerous", password_strength(0.0));
-        assert_eq!("Very dangerous", password_strength(19.0));
-        assert_eq!("Dangerous", password_strength(39.0));
-        assert_eq!("Very weak", password_strength(59.0));
-        assert_eq!("Weak", password_strength(79.0));
-        assert_eq!("Good", password_strength(89.0));
-        assert_eq!("Strong", password_strength(94.0));
-        assert_eq!("Very strong", password_strength(98.0));
-        assert_eq!("Heat death", password_strength(100.0));
-        assert_eq!("Heat death", password_strength(10000.0));
+    #[test_case("Very dangerous", 0.0)]
+    #[test_case("Very dangerous", 19.0)]
+    #[test_case("Dangerous", 39.0)]
+    #[test_case("Very weak", 59.0)]
+    #[test_case("Weak", 70.0)]
+    #[test_case("Good", 89.0)]
+    #[test_case("Strong", 94.0)]
+    #[test_case("Very strong", 98.0)]
+    #[test_case("Heat death", 100.0)]
+    #[test_case("Heat death", 1000.0)]
+    pub fn test_password_strength(text: &str, strength: f64) {
+        assert_eq!(text, password_strength(strength));
     }
 }

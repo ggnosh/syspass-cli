@@ -14,7 +14,7 @@ use crate::config::Config;
 
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ApiResult {
     item_id: Option<u32>,
@@ -22,13 +22,13 @@ struct ApiResult {
     result_code: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ApiResponse {
     result: Option<ApiResult>,
     error: Option<ApiErrorResponse>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ApiErrorResponse {
     message: String,
 }

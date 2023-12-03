@@ -92,3 +92,33 @@ impl FromStr for Api {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use test_case::test_case;
+
+    use crate::api::{Api, AppError};
+
+    #[test_case("SyspassV3", true)]
+    #[test_case("SyspassV2", true)]
+    #[test_case("", true)]
+    #[test_case("Invalid-version", false)]
+    fn test_from_str(version: &str, expected: bool) {
+        let api = Api::from_str(version);
+        assert!(
+            !((expected && api.is_err()) || (!expected && api.is_ok())),
+            "Expected {version} to be {expected}"
+        );
+    }
+
+    #[test]
+    fn test_display() {
+        let error = AppError("test this error".to_owned());
+        assert_eq!(
+            "✖ Error: test this error",
+            strip_ansi_escapes::strip_str(error.to_string())
+        );
+    }
+}
