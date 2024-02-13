@@ -12,7 +12,7 @@
     clippy::nursery,
     clippy::style
 )]
-#![allow(clippy::missing_const_for_fn)]
+#![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
 
 use std::process::ExitCode;
 use std::str::FromStr;
