@@ -42,18 +42,15 @@ where
     T: Sized + serde::Serialize,
 {
     let path = get_config_path(file);
-    match fs::read_to_string(&path) {
-        Ok(file) => file,
-        Err(error) => {
-            if error.kind() == NotFound {
-                let data = serde_json::to_string(&value).expect("Saved");
-                fs::write(&path, &data).expect("Failed to write data");
-                data
-            } else {
-                panic!("{} Couldn't read config file", "\u{2716}".bright_red())
-            }
+    fs::read_to_string(&path).unwrap_or_else(|error| {
+        if error.kind() == NotFound {
+            let data = serde_json::to_string(&value).expect("Saved");
+            fs::write(&path, &data).expect("Failed to write data");
+            data
+        } else {
+            panic!("{} Couldn't read config file", "\u{2716}".bright_red())
         }
-    }
+    })
 }
 
 impl From<&ArgMatches> for Config {

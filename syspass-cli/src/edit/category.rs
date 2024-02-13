@@ -7,6 +7,7 @@ use log::{info, warn};
 use crate::api;
 use crate::api::category::{ask_for, Category};
 use crate::api::entity::Entity;
+use crate::helper;
 use crate::prompt::get_match_string;
 
 pub const COMMAND_NAME: &str = "category";
@@ -31,19 +32,13 @@ pub fn command(
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = matches
-        .get_one::<u32>("id")
-        .map(std::borrow::ToOwned::to_owned)
-        .map_or_else(
-            || {
-                if new {
-                    0
-                } else {
-                    ask_for(api_client).unwrap_or(0)
-                }
-            },
-            |id| id,
-        );
+    let id = helper::get_numeric_input(
+        "id",
+        matches,
+        new,
+        Some(|| ask_for(api_client).unwrap_or(0)),
+        quiet,
+    );
 
     edit_category(matches, api_client, id, quiet)
 }

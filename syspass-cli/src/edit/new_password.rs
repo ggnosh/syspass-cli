@@ -5,11 +5,11 @@ use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{error, warn};
 
-use crate::api;
 use crate::api::account::Account;
 use crate::api::entity::Entity;
 use crate::edit::edit_password::get_password;
 use crate::prompt::get_match_string;
+use crate::{api, helper};
 
 pub const COMMAND_NAME: &str = "password";
 
@@ -53,28 +53,24 @@ pub fn command(
         get_match_string(matches, quiet, "login", "Username: ", "", false),
         get_match_string(matches, quiet, "url", "Url: ", "", false),
         get_match_string(matches, quiet, "note", "Notes: ", "", false),
-        matches.get_one::<u32>("category").map_or_else(
-            || {
-                if quiet {
-                    warn!("Could not ask for client");
-                    process::exit(1);
-                }
+        helper::get_numeric_input(
+            "category",
+            matches,
+            false,
+            Some(|| {
                 api::category::ask_for(api_client).unwrap_or_else(|error| {
                     error!("{} {}", "\u{2716}".bright_red(), error.to_string());
                     process::exit(1);
                 })
-            },
-            std::borrow::ToOwned::to_owned,
+            }),
+            quiet,
         ),
-        matches.get_one::<u32>("client").map_or_else(
-            || {
-                if quiet {
-                    warn!("Could not ask for client");
-                    process::exit(1);
-                }
-                api::client::ask_for(api_client, matches)
-            },
-            std::borrow::ToOwned::to_owned,
+        helper::get_numeric_input(
+            "client",
+            matches,
+            false,
+            Some(|| api::client::ask_for(api_client, matches)),
+            quiet,
         ),
         Some(matches.get_one::<String>("password").map_or_else(
             || {
@@ -100,10 +96,6 @@ pub fn command(
             );
             Ok(0)
         }
-        Err(error) => Err(format!(
-            "{} Could not save client: {}",
-            error,
-            "\u{2716}".bright_red()
-        ))?,
+        Err(error) => Err(format!("Could not save client: {error}"))?,
     }
 }

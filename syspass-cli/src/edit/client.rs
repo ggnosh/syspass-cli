@@ -1,14 +1,13 @@
 use std::error::Error;
-use std::process;
 
 use clap::{arg, ArgMatches, Command};
 use colored::Colorize;
 use log::{info, warn};
 
-use crate::api;
 use crate::api::client::{ask_for, Client};
 use crate::api::entity::Entity;
 use crate::prompt::get_match_string;
+use crate::{api, helper};
 
 pub const COMMAND_NAME: &str = "client";
 
@@ -31,23 +30,13 @@ pub fn command(
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = matches
-        .get_one::<u32>("id")
-        .map_or_else(|| None, |s| Some(s.to_owned()))
-        .map_or_else(
-            || {
-                if new {
-                    0
-                } else if quiet {
-                    warn!("Could not ask for client");
-                    process::exit(1);
-                } else {
-                    ask_for(api_client, matches)
-                }
-            },
-            |id| id,
-        );
-
+    let id = helper::get_numeric_input(
+        "id",
+        matches,
+        new,
+        Some(|| ask_for(api_client, matches)),
+        quiet,
+    );
     edit_client(matches, api_client, id, quiet)
 }
 

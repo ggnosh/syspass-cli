@@ -18,12 +18,9 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
         prompt = prompt.with_default(default);
     }
 
-    prompt.prompt().map_or_else(
-        |_| {
-            process::exit(1);
-        },
-        |name| name,
-    )
+    prompt.prompt().unwrap_or_else(|_| {
+        process::exit(1);
+    })
 }
 
 pub fn get_match_string(
@@ -83,13 +80,10 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
             .with_validator(ValueRequiredValidator::default());
     }
 
-    password.prompt().map_or_else(
-        |_| {
-            error!("Cancelled");
-            process::exit(1);
-        },
-        |pass| pass,
-    )
+    password.prompt().unwrap_or_else(|_| {
+        error!("Cancelled");
+        process::exit(1);
+    })
 }
 
 pub fn password_strength(strength: f64) -> String {

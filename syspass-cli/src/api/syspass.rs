@@ -17,7 +17,7 @@ pub mod v2;
 pub mod v3;
 
 thread_local! {
-    static PASSWORD: RefCell<String> = RefCell::new(String::new());
+    static PASSWORD: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
 fn get_cached_password() -> String {

@@ -274,3 +274,11 @@ fn run_new_delete_password(version: &str, success: bool) {
 
     assert.success().code(0);
 }
+
+#[test]
+#[ignore]
+fn run_check_update() {
+    let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
+    let assert = cmd.args(["check-update"]).assert();
+    assert.success().code(0);
+}

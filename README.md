@@ -7,7 +7,7 @@ A simple command line tool to interact with sysPass databases.
 [sysPass](https://www.syspass.org/) Intuitive, secure and multiuser password manager
 
 ## Features
-- Supports sysPass 2.1 and 3.1
+- Supports sysPass 2.1 and 3.2
   - 2.1 has limited functionality because the API doesn't support all the features such as but not limited to:
     - Changing passwords
 - Search for accounts and view their passwords

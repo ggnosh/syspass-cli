@@ -28,6 +28,7 @@ use crate::config::Config;
 mod api;
 mod config;
 mod edit;
+mod helper;
 mod prompt;
 mod remove;
 mod search;
@@ -128,7 +129,7 @@ fn main() -> ExitCode {
     match match matches.subcommand() {
         Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet),
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client, quiet),
-        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client),
+        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
         Some((update::COMMAND_NAME, matches)) => update::command(matches),
         _ => unreachable!("Clap should keep us out from here"),
