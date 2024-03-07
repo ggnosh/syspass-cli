@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.4.0 - 2024-03-08
+
 - Add better filtering
 - Update libraries
 
