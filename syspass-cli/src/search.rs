@@ -6,6 +6,7 @@ use std::{cmp, env, process, thread};
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
 use colored::Colorize;
+use inquire::type_aliases::Scorer;
 use inquire::{InquireError, Select};
 use log::{error, warn};
 use term_table::row::Row;
@@ -212,9 +213,19 @@ fn select_account(
     disable_usage: bool,
 ) -> Result<ViewPassword, AppError> {
     let count: usize = accounts.len();
+    let filter: Scorer<Account> = &|input, _option, string_value, _idx| -> Option<i64> {
+        let filter = input.to_lowercase();
+        if string_value.to_lowercase().contains(&filter) {
+            Some(0)
+        } else {
+            None
+        }
+    };
+
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
         .with_help_message(format!("Number for accounts found: {count}").as_str())
         .with_page_size(10)
+        .with_scorer(filter)
         .with_formatter(&|i| i.value.name().to_string())
         .prompt();
 

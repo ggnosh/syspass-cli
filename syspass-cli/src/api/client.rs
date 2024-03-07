@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter, Result};
 
 use clap::ArgMatches;
 use colored::{ColoredString, Colorize};
+use inquire::type_aliases::Scorer;
 use inquire::{Confirm, Select};
 use log::error;
 use serde_derive::Deserialize;
@@ -80,6 +81,14 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
         vec![]
     });
     let count = clients.len();
+    let filter: Scorer<Client> = &|input, _option, string_value, _idx| -> Option<i64> {
+        let filter = input.to_lowercase();
+        if string_value.to_lowercase().contains(&filter) {
+            Some(0)
+        } else {
+            None
+        }
+    };
 
     Select::new("Select the right client (ESC for new):", clients)
         .with_help_message(
@@ -92,6 +101,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
             .as_str(),
         )
         .with_page_size(10)
+        .with_scorer(filter)
         .prompt()
         .map_or_else(
             |_| {

@@ -56,6 +56,7 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
     match amount {
         Ok(None) => String::new(),
         Ok(Some(date)) => NaiveDateTime::new(date, NaiveTime::default())
+            .and_utc()
             .timestamp()
             .to_string(),
         Err(_) => {

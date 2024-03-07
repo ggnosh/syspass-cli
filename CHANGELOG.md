@@ -1,12 +1,15 @@
 # CHANGELOG
 
+- Add better filtering
+- Update libraries
+
 ## 0.3.4 - 2024-02-13
 
 ## 0.3.3 - 2023-10-23
 
 ## 0.3.2 - 2023-08-23
 
-## 0.3.1 - 2023-08-15 
+## 0.3.1 - 2023-08-15
 
 - Added `check-update` command to check for newest release on GitHub
 - Improved formatting on smaller terminals

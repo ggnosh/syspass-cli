@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
+use inquire::type_aliases::Scorer;
 use inquire::Select;
 use serde_derive::Deserialize;
 
@@ -65,11 +66,20 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
     };
 
     let count = categories.len();
+    let filter: Scorer<Category> = &|input, _option, string_value, _idx| -> Option<i64> {
+        let filter = input.to_lowercase();
+        if string_value.to_lowercase().contains(&filter) {
+            Some(0)
+        } else {
+            None
+        }
+    };
 
     Ok(
         Select::new("Select the right category (ESC for new):", categories)
             .with_help_message(format!("Number for accounts found: {count}").as_str())
             .with_page_size(10)
+            .with_scorer(filter)
             .prompt()
             .map_or_else(
                 |_| {

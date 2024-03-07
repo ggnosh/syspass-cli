@@ -109,6 +109,7 @@ fn get_args(matches: &ArgMatches, quiet: bool) -> ChangeAccountArgs {
         let expiration = args.expiration_date + "23:59:59";
         args.expiration_date = NaiveDateTime::parse_from_str(&expiration, "%Y-%m-%d %H:%M:%S")
             .expect("Failed to parse expiration date")
+            .and_utc()
             .timestamp()
             .to_string();
     }

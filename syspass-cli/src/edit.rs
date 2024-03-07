@@ -48,6 +48,7 @@ pub fn command_helper_new() -> Command {
         .short_flag('n')
         .short_flag_alias('a')
         .about("Add a new entity")
+        .subcommand_required(true)
         .subcommand(new_password::command_helper())
         .subcommand(category::command_helper())
         .subcommand(client::command_helper())

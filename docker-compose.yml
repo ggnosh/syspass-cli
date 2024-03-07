@@ -14,8 +14,7 @@ services:
     environment:
       - USE_SSL=yes
     networks:
-      syspassv3:
-        ipv4_address: 172.18.0.3
+      - syspassv3
   db:
     container_name: syspass-db
     restart: always
@@ -42,8 +41,7 @@ services:
     environment:
       - USE_SSL=yes
     networks:
-      syspassv2:
-        ipv4_address: 172.22.0.3
+      - syspassv2
   dbv2:
     container_name: syspass-dbv2
     restart: always
@@ -58,21 +56,15 @@ services:
     networks:
       - syspassv2
 volumes:
-  syspass-config: {}
-  syspass-backup: {}
-  syspass-db: {}
-  syspassv2-config: {}
-  syspassv2-backup: {}
-  syspassv2-db: {}
+  syspass-config: { }
+  syspass-backup: { }
+  syspass-db: { }
+  syspassv2-config: { }
+  syspassv2-backup: { }
+  syspassv2-db: { }
 
 networks:
-    syspassv3:
-      name: syspass-v3
-      ipam:
-        config:
-          - subnet: 172.18.0.0/16
-    syspassv2:
-      name: syspass-v2
-      ipam:
-        config:
-          - subnet: 172.22.0.0/16
+  syspassv3:
+    name: syspass-v3
+  syspassv2:
+    name: syspass-v2
