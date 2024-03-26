@@ -42,10 +42,10 @@ impl Client {
         &self.is_global
     }
     pub fn set_name(&mut self, name: &str) {
-        self.name = name.to_owned();
+        name.clone_into(&mut self.name);
     }
     pub fn set_description(&mut self, description: &str) {
-        self.description = description.to_owned();
+        description.clone_into(&mut self.description);
     }
 }
 

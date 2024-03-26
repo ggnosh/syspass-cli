@@ -201,7 +201,7 @@ mod tests {
     fn test_get_cached_password() {
         PASSWORD.with(|f| {
             let mut password = f.borrow_mut();
-            *password = "test password".to_owned();
+            "test password".clone_into(&mut password);
         });
 
         assert_eq!("test password", get_cached_password());
