@@ -14,14 +14,8 @@ newline_style = "Unix"
 # Use trailing commas for multiline lists and match arms
 trailing_comma = "Vertical"
 
-# Put the opening brace of a function on the next line
-fn_brace_style = "SameLineWhere"
-
 # Put the opening brace of a control flow expression on the next line
 control_brace_style = "AlwaysSameLine"
-
-# Align struct fields
-struct_field_align_threshold = 20
 
 # Reorder imports
 reorder_imports = true
