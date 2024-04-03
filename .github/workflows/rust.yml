@@ -37,11 +37,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
+          toolchain: nightly
 
       - name: Run fmt check
         uses: actions-rs/cargo@v1
         with:
           command: fmt
+          toolchain: nightly
           args: --check
 
   test:
