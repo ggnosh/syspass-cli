@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
-use inquire::type_aliases::Scorer;
 use inquire::Select;
 use serde_derive::Deserialize;
 
 use crate::api;
 use crate::api::entity::Entity;
+use crate::filter::filter;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -21,11 +21,7 @@ pub struct Category {
 
 impl Category {
     pub const fn new(id: Option<u32>, name: String, description: String) -> Self {
-        Self {
-            id,
-            name,
-            description,
-        }
+        Self { id, name, description }
     }
     pub fn name(&self) -> &str {
         self.name.as_str()
@@ -66,43 +62,29 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
     };
 
     let count = categories.len();
-    let filter: Scorer<Category> = &|input, _option, string_value, _idx| -> Option<i64> {
-        let filter = input.to_lowercase();
-        if string_value.to_lowercase().contains(&filter) {
-            Some(0)
-        } else {
-            None
-        }
-    };
 
-    Ok(
-        Select::new("Select the right category (ESC for new):", categories)
-            .with_help_message(format!("Number for accounts found: {count}").as_str())
-            .with_page_size(10)
-            .with_scorer(filter)
-            .prompt()
-            .map_or_else(
-                |_| {
-                    let new_category = Category {
-                        id: None,
-                        name: ask_prompt("Name", true, ""),
-                        description: ask_prompt("Description", false, ""),
-                    };
+    Ok(Select::new("Select the right category (ESC for new):", categories)
+        .with_help_message(format!("Number for accounts found: {count}").as_str())
+        .with_page_size(10)
+        .with_scorer(&filter)
+        .prompt()
+        .map_or_else(
+            |_| {
+                let new_category = Category {
+                    id: None,
+                    name: ask_prompt("Name", true, ""),
+                    description: ask_prompt("Description", false, ""),
+                };
 
-                    match api_client.save_category(&new_category) {
-                        Ok(client) => client.id.expect(ID_EMPTY),
-                        Err(error) => {
-                            panic!(
-                                "{} Failed to save client: {}",
-                                "\u{2716}".bright_red(),
-                                error
-                            );
-                        }
+                match api_client.save_category(&new_category) {
+                    Ok(client) => client.id.expect(ID_EMPTY),
+                    Err(error) => {
+                        panic!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
                     }
-                },
-                |category| *category.id().expect(ID_EMPTY),
-            ),
-    )
+                }
+            },
+            |category| *category.id().expect(ID_EMPTY),
+        ))
 }
 
 #[cfg(test)]

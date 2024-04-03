@@ -3,6 +3,7 @@ use std::error::Error;
 use clap::{ArgMatches, Command};
 
 use crate::api::Client;
+use crate::CommandError;
 
 mod category;
 mod client;
@@ -25,20 +26,13 @@ pub fn command_helper_edit() -> Command {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub fn command_edit(
-    matches: &ArgMatches,
-    api_client: &dyn Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
-    match matches.subcommand() {
-        Some((edit_password::COMMAND_NAME, matches)) => {
-            edit_password::command(matches, api_client, quiet)
-        }
-        Some((category::COMMAND_NAME, matches)) => {
-            category::command(matches, api_client, quiet, false)
-        }
-        Some((client::COMMAND_NAME, matches)) => client::command(matches, api_client, quiet, false),
-        _ => unreachable!("Clap should keep us out from here"),
+pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
+    let subcommand = matches.subcommand().ok_or(CommandError::NotFound)?;
+    match subcommand.0 {
+        edit_password::COMMAND_NAME => edit_password::command(subcommand.1, api_client, quiet),
+        category::COMMAND_NAME => category::command(subcommand.1, api_client, quiet, false),
+        client::COMMAND_NAME => client::command(subcommand.1, api_client, quiet, false),
+        _ => Err(Box::new(CommandError::NotFound)),
     }
 }
 
@@ -54,19 +48,12 @@ pub fn command_helper_new() -> Command {
         .subcommand(client::command_helper())
 }
 
-pub fn command_new(
-    matches: &ArgMatches,
-    api_client: &dyn Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
-    match matches.subcommand() {
-        Some((new_password::COMMAND_NAME, matches)) => {
-            new_password::command(matches, api_client, quiet)
-        }
-        Some((category::COMMAND_NAME, matches)) => {
-            category::command(matches, api_client, quiet, true)
-        }
-        Some((client::COMMAND_NAME, matches)) => client::command(matches, api_client, quiet, true),
-        _ => unreachable!("Clap should keep us out from here"),
+pub fn command_new(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
+    let subcommand = matches.subcommand().ok_or(CommandError::NotFound)?;
+    match subcommand.0 {
+        new_password::COMMAND_NAME => new_password::command(subcommand.1, api_client, quiet),
+        category::COMMAND_NAME => category::command(subcommand.1, api_client, quiet, true),
+        client::COMMAND_NAME => client::command(subcommand.1, api_client, quiet, true),
+        _ => Err(Box::new(CommandError::NotFound)),
     }
 }

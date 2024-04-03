@@ -14,6 +14,7 @@
 )]
 #![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
 
+use std::error::Error;
 use std::process::ExitCode;
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -28,6 +29,7 @@ use crate::config::Config;
 mod api;
 mod config;
 mod edit;
+mod filter;
 mod helper;
 mod prompt;
 mod remove;
@@ -37,6 +39,7 @@ mod update;
 struct SimpleLogger;
 
 const DEFAULT_TERMINAL_SIZE: (usize, usize) = (80, 25);
+const COMMAND_NOT_FOUND: &str = "Command not found";
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -132,7 +135,7 @@ fn main() -> ExitCode {
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
         Some((update::COMMAND_NAME, matches)) => update::command(matches),
-        _ => unreachable!("Clap should keep us out from here"),
+        _ => Err(Box::new(CommandError::NotFound) as Box<dyn Error>),
     } {
         Ok(code) => ExitCode::from(code),
         Err(e) => {
@@ -142,10 +145,26 @@ fn main() -> ExitCode {
     }
 }
 
+#[derive(Debug)]
+enum CommandError {
+    NotFound,
+}
+
+impl std::fmt::Display for CommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::NotFound => write!(f, "{COMMAND_NOT_FOUND}"),
+        }
+    }
+}
+
+impl Error for CommandError {}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
+    use assert_cmd::Command;
     use mockito::{Mock, Server, ServerGuard};
 
     pub fn create_server_response(
@@ -165,5 +184,12 @@ mod tests {
         .create();
 
         (mock, server)
+    }
+
+    #[test]
+    fn test_main_help() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).expect("Failed to build binary");
+        cmd.arg("--help");
+        cmd.assert().success();
     }
 }

@@ -42,11 +42,7 @@ pub fn command_helper() -> Command {
         .arg(arg!(-p --password <PASSWORD> "Password").required(false))
 }
 
-pub fn command(
-    matches: &ArgMatches,
-    api_client: &dyn api::Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
     let account: Account = Account::new(
         Some(0),
         get_match_string(matches, quiet, "name", "Name: ", "", true),

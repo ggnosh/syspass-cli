@@ -18,11 +18,7 @@ pub mod entity;
 mod syspass;
 
 pub trait Client {
-    fn search_account(
-        &self,
-        search: Vec<(&str, String)>,
-        usage: bool,
-    ) -> Result<Vec<Account>, Error>;
+    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, Error>;
     fn get_password(&self, account: &Account) -> Result<ViewPassword, Error>;
     fn get_clients(&self) -> Result<Vec<SyspassClient>, Error>;
     fn get_categories(&self) -> Result<Vec<Category>, Error>;

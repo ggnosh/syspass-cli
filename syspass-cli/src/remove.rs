@@ -27,11 +27,7 @@ pub fn command_helper() -> Command {
         .subcommand(account::command_helper())
 }
 
-pub fn command(
-    matches: &ArgMatches,
-    api_client: &dyn Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
     let id: u32 = helper::get_numeric_input("id", matches, false, None::<fn() -> u32>, quiet);
     if id == 0 {
         Err(AppError("Invalid id given".to_owned()))?;

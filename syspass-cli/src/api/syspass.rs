@@ -61,20 +61,13 @@ fn get_builder(config: &Config) -> ClientBuilder {
     ClientBuilder::new().danger_accept_invalid_certs(!config.verify_host)
 }
 
-fn get_response(
-    client: &reqwest::blocking::Client,
-    request_url: &str,
-    req: &JsonReq,
-) -> Result<Response, api::Error> {
+fn get_response(client: &reqwest::blocking::Client, request_url: &str, req: &JsonReq) -> Result<Response, api::Error> {
     match client.post(request_url).json(&req).send() {
         Ok(r) => {
             if r.status().is_success() {
                 Ok(r)
             } else {
-                Err(api::Error(format!(
-                    "Server responded with code {}",
-                    r.status()
-                )))
+                Err(api::Error(format!("Server responded with code {}", r.status())))
             }
         }
         Err(e) => Err(api::Error(e.to_string())),
@@ -89,8 +82,7 @@ pub struct Syspass {
 
 impl Syspass {
     fn get_params(&self, args: &RequestArguments, needs_password: bool) -> HashMap<String, String> {
-        let mut params: HashMap<String, String> =
-            HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
+        let mut params: HashMap<String, String> = HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
 
         if needs_password {
             let mut password = self.config.password.clone();
@@ -111,22 +103,14 @@ impl Syspass {
         params
     }
 
-    fn send_request<T: DeserializeOwned>(
-        &self,
-        request_url: &str,
-        req: &JsonReq,
-    ) -> Result<T, api::Error> {
+    fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> Result<T, api::Error> {
         debug!("Sending request to {}:\n{:#?}\n", request_url, req);
 
         match get_response(&self.client, request_url, req) {
             Ok(result) => {
                 let json: Value = match result.json() {
                     Ok(value) => value,
-                    Err(_) => {
-                        return Err(api::Error(
-                            "Server response did not contain JSON".to_string(),
-                        ))
-                    }
+                    Err(_) => return Err(api::Error("Server response did not contain JSON".to_string())),
                 };
 
                 debug!("Received response:\n{:#?}\n", json);
@@ -210,9 +194,7 @@ mod tests {
     #[test]
     pub fn test_get_params() {
         let syspass = Syspass {
-            client: ClientBuilder::new()
-                .build()
-                .expect("Failed to create client"),
+            client: ClientBuilder::new().build().expect("Failed to create client"),
             request_number: Cell::new(0),
             config: Config {
                 password: "test_password".to_owned(),
@@ -225,42 +207,27 @@ mod tests {
 
         let params = syspass.get_params(&arguments, false);
 
-        assert_eq!(
-            "some id",
-            params.get("id").expect("Failed to find id").as_str()
-        );
+        assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 
         assert_eq!(
             "test_token",
-            params
-                .get("authToken")
-                .expect("Failed to find token")
-                .as_str()
+            params.get("authToken").expect("Failed to find token").as_str()
         );
 
         assert_eq!(None, params.get("tokenPass"));
 
         let params = syspass.get_params(&arguments, true);
 
-        assert_eq!(
-            "some id",
-            params.get("id").expect("Failed to find id").as_str()
-        );
+        assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 
         assert_eq!(
             "test_token",
-            params
-                .get("authToken")
-                .expect("Failed to find token")
-                .as_str()
+            params.get("authToken").expect("Failed to find token").as_str()
         );
 
         assert_eq!(
             "test_password",
-            params
-                .get("tokenPass")
-                .expect("Failed to find password")
-                .as_str()
+            params.get("tokenPass").expect("Failed to find password").as_str()
         );
     }
 }

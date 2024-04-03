@@ -57,11 +57,7 @@ pub fn command_helper() -> Command {
         .arg(arg!(-e --expiration <EXPIRATION> "Expiration YYYY-mm-dd").required(false))
 }
 
-pub fn command(
-    matches: &ArgMatches,
-    api_client: &dyn crate::api::Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
     let args: ChangeAccountArgs = get_args(matches, quiet);
 
     if args.password.is_empty() {
@@ -167,11 +163,7 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
     }
 
     for generator in generators {
-        suggest.append(
-            &mut generator
-                .generate(random_count)
-                .expect("Password generator failed"),
-        );
+        suggest.append(&mut generator.generate(random_count).expect("Password generator failed"));
     }
 
     let mut pairs: Vec<PasswordData> = vec![PasswordData {

@@ -32,13 +32,7 @@ pub fn command(
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = helper::get_numeric_input(
-        "id",
-        matches,
-        new,
-        Some(|| ask_for(api_client).unwrap_or(0)),
-        quiet,
-    );
+    let id = helper::get_numeric_input("id", matches, new, Some(|| ask_for(api_client).unwrap_or(0)), quiet);
 
     edit_category(matches, api_client, id, quiet)
 }
@@ -56,9 +50,7 @@ fn edit_category(
         api_client.get_category(id)?
     };
 
-    category.set_name(
-        get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref(),
-    );
+    category.set_name(get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref());
     category.set_description(
         get_match_string(
             matches,

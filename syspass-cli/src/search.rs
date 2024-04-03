@@ -6,7 +6,6 @@ use std::{cmp, env, process, thread};
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command};
 use colored::Colorize;
-use inquire::type_aliases::Scorer;
 use inquire::{InquireError, Select};
 use log::{error, warn};
 use term_table::row::Row;
@@ -17,6 +16,7 @@ use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AppError, Client};
 use crate::config::Config;
+use crate::filter::filter;
 use crate::TERMINAL_SIZE;
 
 pub const COMMAND_NAME: &str = "search";
@@ -63,11 +63,7 @@ fn get_accounts_list(
     match api_client.search_account(search_string, usage_disabled) {
         Ok(accounts) => accounts,
         Err(error) => {
-            error!(
-                "{} Error while searching: {}",
-                "\u{2716}".bright_red(),
-                error
-            );
+            error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
             process::exit(1);
         }
     }
@@ -89,17 +85,11 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> 
     Ok(0)
 }
 
-pub fn command(
-    matches: &ArgMatches,
-    api_client: &dyn Client,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
     let name = matches
         .get_one::<String>("name")
         .map_or_else(String::new, std::borrow::ToOwned::to_owned);
-    let id: u32 = matches
-        .get_one::<u32>("id")
-        .map_or(0, std::borrow::ToOwned::to_owned);
+    let id: u32 = matches.get_one::<u32>("id").map_or(0, std::borrow::ToOwned::to_owned);
     let category: u32 = matches
         .get_one::<u32>("category")
         .map_or(0, std::borrow::ToOwned::to_owned);
@@ -115,11 +105,7 @@ pub fn command(
     if id > 0 {
         accounts = vec![api_client.view_account(id).expect("Invalid account id")];
     } else if name.is_empty() {
-        warn!(
-            "{} {}",
-            "\u{2716}".bright_red(),
-            "Name or id is required".red()
-        );
+        warn!("{} {}", "\u{2716}".bright_red(), "Name or id is required".red());
         process::exit(1);
     } else {
         let mut search_string = vec![("text", name)];
@@ -127,11 +113,7 @@ pub fn command(
             search_string.push(("categoryId", category.to_string()));
         }
 
-        accounts = get_accounts_list(
-            api_client,
-            search_string,
-            !matches.get_flag("disable-usage"),
-        );
+        accounts = get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"));
     }
 
     if accounts.len() > 1 && quiet {
@@ -143,11 +125,7 @@ pub fn command(
             match select_account(accounts, api_client, matches.get_flag("disable-usage")) {
                 Ok(account) => account,
                 Err(error) => {
-                    error!(
-                        "{} Error while searching: {}",
-                        "\u{2716}".bright_red(),
-                        error
-                    );
+                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
                     process::exit(1);
                 }
             }
@@ -160,11 +138,7 @@ pub fn command(
             match api_client.get_password(account) {
                 Ok(password) => password,
                 Err(error) => {
-                    error!(
-                        "{} Error while searching: {}",
-                        "\u{2716}".bright_red(),
-                        error
-                    );
+                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
                     process::exit(1);
                 }
             }
@@ -173,9 +147,7 @@ pub fn command(
 
     if !show {
         if let Ok(mut clipboard) = Clipboard::new() {
-            clipboard
-                .set_text(&account.password)
-                .expect("Couldn't set password");
+            clipboard.set_text(&account.password).expect("Couldn't set password");
         }
 
         if config.password_timeout.unwrap_or(10) > 0 {
@@ -213,19 +185,10 @@ fn select_account(
     disable_usage: bool,
 ) -> Result<ViewPassword, AppError> {
     let count: usize = accounts.len();
-    let filter: Scorer<Account> = &|input, _option, string_value, _idx| -> Option<i64> {
-        let filter = input.to_lowercase();
-        if string_value.to_lowercase().contains(&filter) {
-            Some(0)
-        } else {
-            None
-        }
-    };
-
     let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
         .with_help_message(format!("Number for accounts found: {count}").as_str())
         .with_page_size(10)
-        .with_scorer(filter)
+        .with_scorer(&filter)
         .with_formatter(&|i| i.value.name().to_string())
         .prompt();
 
@@ -254,10 +217,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         (1, width[1]),
         (
             2,
-            cmp::max(
-                terminal_width * 30 / 100,
-                terminal_width - width.iter().sum::<usize>(),
-            ),
+            cmp::max(terminal_width * 30 / 100, terminal_width - width.iter().sum::<usize>()),
         ),
         (3, width[2]),
     ]);
@@ -350,17 +310,9 @@ mod tests {
     #[ignore]
     fn test_clear_clipboard() {
         let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
-        clipboard
-            .set_text("testing")
-            .expect("Failed to set clipboard value");
-        assert_eq!(
-            "testing",
-            clipboard.get_text().expect("Failed to get clipboard data")
-        );
+        clipboard.set_text("testing").expect("Failed to set clipboard value");
+        assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
         clear_clipboard(1, true).expect("Failed to clear clipboard");
-        assert_eq!(
-            "",
-            clipboard.get_text().expect("Failed to get clipboard data")
-        );
+        assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
     }
 }

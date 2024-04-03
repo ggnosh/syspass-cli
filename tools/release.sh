@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 set -e
 
-cd $(dirname $0)
+cd "$(dirname $0)"
 
 echo "New version number?"
-read version
+read -r version
 
 echo "Changing version number in Cargo.toml..."
 sed -i "3s/.*/version = \"${version}\"/" ../syspass-cli/Cargo.toml
@@ -18,6 +18,6 @@ echo "Commit changes..."
 git commit -a -m "Version bump"
 
 echo "Tagging version..."
-git tag v${version}
+git tag "v${version}"
 
 echo "All done. Push and go"

@@ -3,13 +3,7 @@ use std::process;
 use clap::ArgMatches;
 use log::warn;
 
-pub fn get_numeric_input<F>(
-    field: &str,
-    matches: &ArgMatches,
-    new: bool,
-    callback: Option<F>,
-    quiet: bool,
-) -> u32
+pub fn get_numeric_input<F>(field: &str, matches: &ArgMatches, new: bool, callback: Option<F>, quiet: bool) -> u32
 where
     F: FnOnce() -> u32,
 {
@@ -46,11 +40,7 @@ mod tests {
     #[test_case("", true, 0; "new")]
     #[test_case("", false, 1337; "with callback")]
     fn test_get_numeric_input(id: &str, new: bool, result: u32) {
-        let command = Command::new("test").arg(
-            Arg::new("id")
-                .long("id")
-                .value_parser(clap::value_parser!(u32)),
-        );
+        let command = Command::new("test").arg(Arg::new("id").long("id").value_parser(clap::value_parser!(u32)));
 
         let callback: Option<fn() -> u32> = if result == 1337 {
             Some(|| 1337)

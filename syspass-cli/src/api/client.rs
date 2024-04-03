@@ -2,13 +2,13 @@ use std::fmt::{Display, Formatter, Result};
 
 use clap::ArgMatches;
 use colored::{ColoredString, Colorize};
-use inquire::type_aliases::Scorer;
 use inquire::{Confirm, Select};
 use log::error;
 use serde_derive::Deserialize;
 
 use crate::api;
 use crate::api::entity::Entity;
+use crate::filter::filter;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -81,14 +81,6 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
         vec![]
     });
     let count = clients.len();
-    let filter: Scorer<Client> = &|input, _option, string_value, _idx| -> Option<i64> {
-        let filter = input.to_lowercase();
-        if string_value.to_lowercase().contains(&filter) {
-            Some(0)
-        } else {
-            None
-        }
-    };
 
     Select::new("Select the right client (ESC for new):", clients)
         .with_help_message(
@@ -101,7 +93,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
             .as_str(),
         )
         .with_page_size(10)
-        .with_scorer(filter)
+        .with_scorer(&filter)
         .prompt()
         .map_or_else(
             |_| {
@@ -123,11 +115,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
                 match api_client.save_client(&new_client) {
                     Ok(client) => *client.id().expect(ID_EMPTY),
                     Err(error) => {
-                        panic!(
-                            "{} Failed to save client: {}",
-                            "\u{2716}".bright_red(),
-                            error
-                        );
+                        panic!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
                     }
                 }
             },

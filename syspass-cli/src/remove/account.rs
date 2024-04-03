@@ -13,11 +13,7 @@ pub fn command_helper() -> Command {
         .about("Remove account")
 }
 
-pub fn command(
-    _matches: &ArgMatches,
-    api_client: &dyn crate::api::Client,
-    id: u32,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<u8, Box<dyn Error>> {
     match api_client.delete_account(id) {
         Ok(status) => {
             if status {

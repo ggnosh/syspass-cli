@@ -26,14 +26,7 @@ fn run_help_without_arguments() {
 fn run_search_with_no_results(version: &str) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
-        .args([
-            "-q",
-            "-d",
-            "-c",
-            version,
-            "search",
-            "search_for_non_existent_account",
-        ])
+        .args(["-q", "-d", "-c", version, "search", "search_for_non_existent_account"])
         .assert();
 
     assert
@@ -50,9 +43,7 @@ fn run_search_with_no_results(version: &str) {
 fn run_search_with_results(version: &str) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
-        .args([
-            "-q", "-d", "-c", version, "search", "-i", "2", "-u", "-s", "-p",
-        ])
+        .args(["-q", "-d", "-c", version, "search", "-i", "2", "-u", "-s", "-p"])
         .assert();
 
     assert
@@ -184,8 +175,7 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
 
     let success = assert.success();
     let reg = Regex::new(r" (:?Client|Category) .+? \((\d+)\) saved!\n$").expect("Regex failed");
-    let data: String =
-        String::from_utf8(success.get_output().clone().stdout).expect("Failed to read data");
+    let data: String = String::from_utf8(success.get_output().clone().stdout).expect("Failed to read data");
 
     success.code(0);
 
@@ -238,10 +228,8 @@ fn run_new_delete_password(version: &str, success: bool) {
         assert.failure().code(1)
     };
 
-    let reg = Regex::new(r" Account new_password_test \((\d+)\) saved!\n$")
-        .expect("Failed to create regex");
-    let data: String =
-        String::from_utf8(status.get_output().clone().stdout).expect("Failed to get output");
+    let reg = Regex::new(r" Account new_password_test \((\d+)\) saved!\n$").expect("Failed to create regex");
+    let data: String = String::from_utf8(status.get_output().clone().stdout).expect("Failed to get output");
 
     let id = reg
         .captures(data.as_str())
@@ -260,16 +248,7 @@ fn run_new_delete_password(version: &str, success: bool) {
 
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
-        .args([
-            "-q",
-            "-d",
-            "-c",
-            version,
-            "remove",
-            "account",
-            "-i",
-            id.as_str(),
-        ])
+        .args(["-q", "-d", "-c", version, "remove", "account", "-i", id.as_str()])
         .assert();
 
     assert.success().code(0);

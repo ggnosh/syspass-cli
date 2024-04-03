@@ -77,7 +77,7 @@ impl Display for Account {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let row = format!(
             "{}. {} - {} ({})",
-            self.id().unwrap_or(&0),
+            self.id.unwrap_or(0),
             self.name(),
             if self.url().is_empty() {
                 ColoredString::from("")
@@ -93,19 +93,17 @@ impl Display for Account {
         .collect::<Vec<_>>()
         .join(" ");
 
-        let line = truncate(
-            &row,
-            TERMINAL_SIZE.lock().expect("Failed to get terminal size").0 - 5,
-        );
+        let line = truncate(&row, TERMINAL_SIZE.lock().expect("Failed to get terminal size").0 - 5);
 
         write!(f, "{line}")
     }
 }
 
 fn truncate(s: &str, max_chars: usize) -> String {
-    match s.char_indices().nth(cmp::max(max_chars, 40)) {
+    let max_chars = cmp::max(max_chars, 40);
+    match s.char_indices().nth(max_chars) {
         None => s.to_string(),
-        Some((idx, _)) => s[..idx].to_string() + "..." + "".white().to_string().as_str(),
+        Some((idx, _)) => format!("{}...{}", &s[..idx], "".white()),
     }
 }
 
@@ -139,18 +137,9 @@ mod tests {
         let return_text = "add some filler test data that's 40 char...".to_string();
         let test_string = return_text.clone() + " testing long string";
 
-        assert_eq!(
-            return_text,
-            strip_ansi_escapes::strip_str(truncate(&test_string, 40))
-        );
-        assert_eq!(
-            return_text,
-            strip_ansi_escapes::strip_str(truncate(&test_string, 1))
-        ); // Minimum length is 40
-        assert_ne!(
-            return_text,
-            strip_ansi_escapes::strip_str(truncate(&test_string, 50))
-        );
+        assert_eq!(return_text, strip_ansi_escapes::strip_str(truncate(&test_string, 40)));
+        assert_eq!(return_text, strip_ansi_escapes::strip_str(truncate(&test_string, 1))); // Minimum length is 40
+        assert_ne!(return_text, strip_ansi_escapes::strip_str(truncate(&test_string, 50)));
     }
 
     #[test]

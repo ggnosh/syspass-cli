@@ -54,26 +54,15 @@ impl Syspass {
             .syspass
             .send_request::<ApiResponse>(&self.syspass.config.host, &req);
 
-        self.syspass
-            .request_number
-            .set(self.syspass.request_number.get() + 1);
+        self.syspass.request_number.set(self.syspass.request_number.get() + 1);
 
         let ApiResponse { result, error } = response?;
 
-        result.map_or_else(
-            || Err(api::Error(error.expect("Invalid response").message)),
-            Ok,
-        )
+        result.map_or_else(|| Err(api::Error(error.expect("Invalid response").message)), Ok)
     }
 
     fn create_or_edit(id: Option<&u32>) -> &str {
-        id.map_or(Self::CREATE, |id| {
-            if *id == 0 {
-                Self::CREATE
-            } else {
-                Self::EDIT
-            }
-        })
+        id.map_or(Self::CREATE, |id| if *id == 0 { Self::CREATE } else { Self::EDIT })
     }
 
     fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::Error> {
@@ -93,18 +82,14 @@ impl Syspass {
         let method = path.to_owned() + "/" + create_or_edit;
         if create_or_edit == Self::EDIT {
             args = args.map(|mut args| {
-                args.push((
-                    "id",
-                    id.expect("Already checked with create or edit").to_string(),
-                ));
+                args.push(("id", id.expect("Already checked with create or edit").to_string()));
                 args
             });
         }
 
         match self.forge_and_send(&method, &args, true) {
             Ok(result) => {
-                let mut entity = serde_json::from_value::<T>(result.result)
-                    .expect("Failed to convert to entity");
+                let mut entity = serde_json::from_value::<T>(result.result).expect("Failed to convert to entity");
                 entity.set_id(result.item_id.expect("Id should be set"));
 
                 Ok(entity)
@@ -127,15 +112,10 @@ impl From<Config> for Syspass {
 }
 
 impl api::Client for Syspass {
-    fn search_account(
-        &self,
-        search: Vec<(&str, String)>,
-        usage: bool,
-    ) -> Result<Vec<Account>, api::Error> {
+    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::Error> {
         match self.forge_and_send("account/search", &Some(search), false) {
             Ok(result) => {
-                let mut list: Vec<Account> =
-                    serde_json::from_value(result.result).expect("Invalid response");
+                let mut list: Vec<Account> = serde_json::from_value(result.result).expect("Invalid response");
                 let usage_data: HashMap<u32, u32> = if usage {
                     Config::get_usage_data()
                 } else {
@@ -153,10 +133,7 @@ impl api::Client for Syspass {
     fn get_password(&self, account: &Account) -> Result<ViewPassword, api::Error> {
         match self.forge_and_send(
             "account/viewPass",
-            &Some(vec![(
-                "id",
-                account.id().expect("Should not be empty").to_string(),
-            )]),
+            &Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
             true,
         ) {
             Ok(result) => Ok(ViewPassword {
@@ -228,10 +205,7 @@ impl api::Client for Syspass {
                 ("name", account.name().to_owned()),
                 ("categoryId", account.category_id().to_string()),
                 ("clientId", account.client_id().to_string()),
-                (
-                    "pass",
-                    account.pass().expect("Password is required").to_owned(),
-                ),
+                ("pass", account.pass().expect("Password is required").to_owned()),
                 ("login", account.login().to_owned()),
                 ("url", account.url().to_owned()),
                 ("notes", account.notes().to_owned()),
@@ -249,10 +223,7 @@ impl api::Client for Syspass {
             ]),
             true,
         ) {
-            Ok(result) => {
-                Ok(serde_json::from_value::<Account>(result.result)
-                    .expect("Failed convert account"))
-            }
+            Ok(result) => Ok(serde_json::from_value::<Account>(result.result).expect("Failed convert account")),
             Err(error) => Err(error),
         }
     }
@@ -271,27 +242,21 @@ impl api::Client for Syspass {
 
     fn view_account(&self, id: u32) -> Result<Account, api::Error> {
         match self.forge_and_send("account/view", &Some(vec![("id", id.to_string())]), true) {
-            Ok(result) => {
-                Ok(serde_json::from_value(result.result).expect("Failed to convert account"))
-            }
+            Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert account")),
             Err(error) => Err(error),
         }
     }
 
     fn get_category(&self, id: u32) -> Result<Category, api::Error> {
         match self.forge_and_send("category/view", &Some(vec![("id", id.to_string())]), true) {
-            Ok(result) => {
-                Ok(serde_json::from_value(result.result).expect("Failed to convert category"))
-            }
+            Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert category")),
             Err(error) => Err(error),
         }
     }
 
     fn get_client(&self, id: u32) -> Result<Client, api::Error> {
         match self.forge_and_send("client/view", &Some(vec![("id", id.to_string())]), true) {
-            Ok(result) => {
-                Ok(serde_json::from_value(result.result).expect("Failed to convert client"))
-            }
+            Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert client")),
             Err(error) => Err(error),
         }
     }
@@ -314,20 +279,10 @@ mod tests {
     use crate::api::Client;
     use crate::config::Config;
 
-    fn create_server_response(
-        response: Option<impl AsRef<Path>>,
-        status: usize,
-    ) -> (Mock, Syspass, ServerGuard) {
-        let response =
-            crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
+    fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> (Mock, Syspass, ServerGuard) {
+        let response = crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
 
-        (
-            response.0,
-            Syspass {
-                syspass: response.1,
-            },
-            response.2,
-        )
+        (response.0, Syspass { syspass: response.1 }, response.2)
     }
 
     //noinspection DuplicatedCode
@@ -349,11 +304,7 @@ mod tests {
         let response = test.1.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(response
-            .err()
-            .expect("Err was not set")
-            .0
-            .contains(search.as_str()));
+        assert!(response.err().expect("Err was not set").0.contains(search.as_str()));
 
         test.0.assert();
     }
@@ -363,30 +314,20 @@ mod tests {
     #[test_case(404)]
     #[test_case(500)]
     fn test_search_account_error_response(status: usize) {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/account_search_empty.json"),
-            status,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), status);
 
         let accounts = test.1.search_account(vec![], false);
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(accounts
-            .err()
-            .expect("Err should be set")
-            .0
-            .contains(search.as_str()));
+        assert!(accounts.err().expect("Err should be set").0.contains(search.as_str()));
 
         test.0.assert();
     }
 
     #[test]
     fn test_search_account_empty() {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/account_search_empty.json"),
-            200,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), 200);
 
         let accounts = test.1.search_account(vec![], false);
 
@@ -400,10 +341,7 @@ mod tests {
 
     #[test]
     fn test_search_account_list() {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/accounts_search_results.json"),
-            200,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/accounts_search_results.json"), 200);
 
         let accounts = test.1.search_account(vec![], false);
 
@@ -431,10 +369,7 @@ mod tests {
 
     #[test]
     fn test_change_account_password() {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/account_change_password.json"),
-            200,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_change_password.json"), 200);
         let change = ChangePassword {
             id: 1,
             pass: "<NEW PASSWORD>".to_owned(),
@@ -451,10 +386,7 @@ mod tests {
 
     #[test]
     fn test_get_password() {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/account_view_password.json"),
-            200,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_view_password.json"), 200);
         let mut account = Account::default();
         account.set_id(1);
 
@@ -472,8 +404,7 @@ mod tests {
 
     #[test]
     fn test_remove_account() {
-        let test =
-            create_server_response(Some("tests/responses/syspass/v3/account_delete.json"), 200);
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_delete.json"), 200);
         let response = test.1.delete_account(1);
 
         response.map_or_else(
@@ -486,10 +417,7 @@ mod tests {
 
     #[test]
     fn test_remove_account_not_found() {
-        let test = create_server_response(
-            Some("tests/responses/syspass/v3/account_delete_not_found.json"),
-            200,
-        );
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_delete_not_found.json"), 200);
         let response = test.1.delete_account(1);
 
         match response {
@@ -516,8 +444,7 @@ mod tests {
 
     #[test]
     fn test_get_categories() {
-        let test =
-            create_server_response(Some("tests/responses/syspass/v3/category_list.json"), 200);
+        let test = create_server_response(Some("tests/responses/syspass/v3/category_list.json"), 200);
 
         let categories = test.1.get_categories();
 
@@ -545,18 +472,14 @@ mod tests {
 
     #[test]
     fn test_view_account() {
-        let test =
-            create_server_response(Some("tests/responses/syspass/v3/view_account.json"), 200);
+        let test = create_server_response(Some("tests/responses/syspass/v3/view_account.json"), 200);
 
         let account = test.1.view_account(1);
 
         account.map_or_else(
             |_| panic!("Account should not have failed"),
             |account| {
-                assert_eq!(
-                    "",
-                    account.pass().expect("Password should be set and empty")
-                );
+                assert_eq!("", account.pass().expect("Password should be set and empty"));
                 assert_eq!("test", account.name());
                 assert_eq!("localhost", account.url());
                 assert_eq!("test", account.name());

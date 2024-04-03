@@ -23,12 +23,7 @@ pub struct Config {
 
 fn get_config_path(file: &str) -> OsString {
     home::home_dir().map_or_else(
-        || {
-            panic!(
-                "{} Impossible to get your home dir!",
-                "\u{2716}".bright_red()
-            )
-        },
+        || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
         |path| {
             let mut p = path.into_os_string();
             p.push(DEFAULT_CONFIG_DIR.to_owned() + file);
@@ -63,8 +58,7 @@ impl From<&ArgMatches> for Config {
         let data = if config_file.is_empty() {
             get_config_file_or_write("config.json", Self::default())
         } else {
-            fs::read_to_string(shellexpand::tilde(&config_file).to_string())
-                .expect("Unable to read file")
+            fs::read_to_string(shellexpand::tilde(&config_file).to_string()).expect("Unable to read file")
         };
 
         serde_json::from_str(&data).expect("JSON does not have correct format.")
@@ -75,8 +69,7 @@ impl Config {
     pub fn get_usage_data() -> HashMap<u32, u32> {
         let data = get_config_file_or_write("usage.json", HashMap::from([(0, 0)]));
 
-        serde_json::from_str::<HashMap<u32, u32>>(&data)
-            .expect("JSON does not have correct format.")
+        serde_json::from_str::<HashMap<u32, u32>>(&data).expect("JSON does not have correct format.")
     }
 
     pub fn record_usage(id: u32) {
@@ -94,8 +87,7 @@ impl Config {
 
         fs::write(
             get_config_path("usage.json"),
-            serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed")
-                + "\n",
+            serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed") + "\n",
         )
         .expect("Unable to write file");
     }
@@ -113,10 +105,7 @@ mod tests {
 
     fn create_temp_dir() -> (Option<OsString>, PathBuf) {
         let old_home = env::var_os("HOME");
-        let temp_path = tempdir()
-            .expect("Failed to create temp dir")
-            .path()
-            .to_owned();
+        let temp_path = tempdir().expect("Failed to create temp dir").path().to_owned();
 
         std::fs::create_dir_all(temp_path.join(".syspass")).expect("Failed to create dir");
         env::set_var("HOME", temp_path.as_os_str());

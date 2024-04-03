@@ -30,22 +30,11 @@ pub fn command(
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = helper::get_numeric_input(
-        "id",
-        matches,
-        new,
-        Some(|| ask_for(api_client, matches)),
-        quiet,
-    );
+    let id = helper::get_numeric_input("id", matches, new, Some(|| ask_for(api_client, matches)), quiet);
     edit_client(matches, api_client, id, quiet)
 }
 
-fn edit_client(
-    matches: &ArgMatches,
-    api_client: &dyn api::Client,
-    id: u32,
-    quiet: bool,
-) -> Result<u8, Box<dyn Error>> {
+fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quiet: bool) -> Result<u8, Box<dyn Error>> {
     let mut client: Client = if id == 0 {
         warn!("Creating a new client");
         Client::default()
@@ -53,8 +42,7 @@ fn edit_client(
         api_client.get_client(id)?
     };
 
-    client
-        .set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
+    client.set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
     client.set_description(
         get_match_string(
             matches,
