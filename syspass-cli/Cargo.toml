@@ -10,6 +10,10 @@ license = "MIT"
 readme = "../README.md"
 authors = ["GGnosh"]
 categories = ["command-line-utilities"]
+exclude = [
+    "tests",
+    "report.json"
+]
 
 [dependencies]
 arboard = { version = "3.2", default-features = false }
