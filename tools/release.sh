@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -e
 
-cd "$(dirname $0)"
+cd "$(dirname "$0")"
 
 echo "New version number?"
 read -r version

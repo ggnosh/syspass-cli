@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::collections::HashMap;
 
 use log::debug;
@@ -24,7 +24,7 @@ fn get_cached_password() -> String {
     let password = PASSWORD.with(|f| f.borrow().clone());
     if password.is_empty() {
         PASSWORD.with(|f| {
-            let mut password = f.borrow_mut();
+            let mut password: RefMut<String> = f.borrow_mut();
             if password.as_str() == "" {
                 *password = ask_for_password("API password: ", false);
             }

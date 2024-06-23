@@ -148,6 +148,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
     if !show {
         if let Ok(mut clipboard) = Clipboard::new() {
             clipboard.set_text(&account.password).expect("Couldn't set password");
+            thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         }
 
         if config.password_timeout.unwrap_or(10) > 0 {
@@ -233,13 +234,13 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     ];
 
     table.add_row(Row::new(vec![TableCell::new_with_alignment(
-        &data.account.name().green(),
+        data.account.name().green(),
         cells.len(),
         Alignment::Center,
     )]));
 
     table.add_row(Row::new(vec![TableCell::new_with_alignment(
-        &data.account.client_name().unwrap_or("").green(),
+        data.account.client_name().unwrap_or("").green(),
         cells.len(),
         Alignment::Center,
     )]));
@@ -264,6 +265,9 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::time::Duration;
+
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
@@ -311,6 +315,7 @@ mod tests {
     fn test_clear_clipboard() {
         let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
         clipboard.set_text("testing").expect("Failed to set clipboard value");
+        thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
         clear_clipboard(1, true).expect("Failed to clear clipboard");
         assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
