@@ -1,9 +1,5 @@
 # CHANGELOG
 
-## 0.5.1 - 2024-08-19
-
-## 0.5.1 - 2024-08-19
-
 - Fix copy problem on KDE. Waiting for arboard to completely fix it.
 - Cargo package published
 
