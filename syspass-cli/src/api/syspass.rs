@@ -1,7 +1,8 @@
-use std::cell::{Cell, RefCell, RefMut};
+use std::cell::Cell;
 use std::collections::HashMap;
 
 use log::debug;
+use once_cell::sync::Lazy;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde_derive::Serialize;
@@ -16,23 +17,7 @@ use crate::prompt::ask_for_password;
 pub mod v2;
 pub mod v3;
 
-thread_local! {
-    static PASSWORD: RefCell<String> = const { RefCell::new(String::new()) };
-}
-
-fn get_cached_password() -> String {
-    let password = PASSWORD.with(|f| f.borrow().clone());
-    if password.is_empty() {
-        PASSWORD.with(|f| {
-            let mut password: RefMut<String> = f.borrow_mut();
-            if password.as_str() == "" {
-                *password = ask_for_password("API password: ", false);
-            }
-        });
-    }
-
-    PASSWORD.with(|f| f.borrow().clone())
-}
+static PASSWORD: Lazy<String> = Lazy::new(|| ask_for_password("API password: ", false));
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
 
@@ -85,11 +70,11 @@ impl Syspass {
         let mut params: HashMap<String, String> = HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
 
         if needs_password {
-            let mut password = self.config.password.clone();
-            if password.is_empty() {
-                password = get_cached_password();
+            if self.config.password.is_empty() {
+                params.insert("tokenPass".to_owned(), PASSWORD.to_string());
+            } else {
+                params.insert("tokenPass".to_owned(), self.config.password.clone());
             }
-            params.insert("tokenPass".to_owned(), password);
         }
 
         if let Some(args) = args {
@@ -144,7 +129,7 @@ mod tests {
     use passwords::PasswordGenerator;
     use reqwest::blocking::ClientBuilder;
 
-    use crate::api::syspass::{get_cached_password, RequestArguments, Syspass, PASSWORD};
+    use crate::api::syspass::{RequestArguments, Syspass};
     use crate::config::Config;
 
     pub fn create_server_response(
@@ -179,16 +164,6 @@ mod tests {
         });
 
         (response.0, client, response.1)
-    }
-
-    #[test]
-    fn test_get_cached_password() {
-        PASSWORD.with(|f| {
-            let mut password = f.borrow_mut();
-            "test password".clone_into(&mut password);
-        });
-
-        assert_eq!("test password", get_cached_password());
     }
 
     #[test]

@@ -25,7 +25,7 @@ struct ChangeAccountArgs {
 
 impl ChangeAccountArgs {
     fn new(matches: &ArgMatches) -> Self {
-        return Self {
+        Self {
             id: matches
                 .get_one::<u32>("id")
                 .map(std::borrow::ToOwned::to_owned)
@@ -38,7 +38,7 @@ impl ChangeAccountArgs {
                 .get_one::<String>("expiration")
                 .map_or("", |s| s.as_str())
                 .to_owned(),
-        };
+        }
     }
 }
 

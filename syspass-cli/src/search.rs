@@ -233,17 +233,17 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new("Address".green()),
     ];
 
-    table.add_row(Row::new(vec![TableCell::new_with_alignment(
-        data.account.name().green(),
-        cells.len(),
-        Alignment::Center,
-    )]));
+    table.add_row(Row::new(vec![TableCell::builder(data.account.name().green())
+        .alignment(Alignment::Center)
+        .col_span(cells.len())
+        .build()]));
 
-    table.add_row(Row::new(vec![TableCell::new_with_alignment(
+    table.add_row(Row::new(vec![TableCell::builder(
         data.account.client_name().unwrap_or("").green(),
-        cells.len(),
-        Alignment::Center,
-    )]));
+    )
+    .alignment(Alignment::Center)
+    .col_span(cells.len())
+    .build()]));
 
     table.add_row(Row::new(cells));
 

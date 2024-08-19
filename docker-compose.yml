@@ -1,4 +1,3 @@
-version: '3.5'
 services:
   app:
     container_name: syspass-app
@@ -6,8 +5,6 @@ services:
     restart: always
     ports:
       - "5000:443"
-    links:
-      - db
     volumes:
       - syspass-config:/var/www/html/sysPass/app/config
       - syspass-backup:/var/www/html/sysPass/app/backup
@@ -15,6 +12,8 @@ services:
       - USE_SSL=yes
     networks:
       - syspassv3
+    depends_on:
+      - db
   db:
     container_name: syspass-db
     restart: always
@@ -33,8 +32,6 @@ services:
     restart: always
     ports:
       - "5001:443"
-    links:
-      - dbv2
     volumes:
       - syspassv2-config:/var/www/html/sysPass/config
       - syspassv2-backup:/var/www/html/sysPass/backup
@@ -42,6 +39,8 @@ services:
       - USE_SSL=yes
     networks:
       - syspassv2
+    depends_on:
+      - dbv2
   dbv2:
     container_name: syspass-dbv2
     restart: always

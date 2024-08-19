@@ -7,9 +7,10 @@ A simple command line tool to interact with sysPass databases.
 [sysPass](https://www.syspass.org/) Intuitive, secure and multiuser password manager
 
 ## Features
+
 - Supports sysPass 2.1 and 3.2
-  - 2.1 has limited functionality because the API doesn't support all the features such as but not limited to:
-    - Changing passwords
+    - 2.1 has limited functionality because the API doesn't support all the features such as but not limited to:
+        - Changing passwords
 - Search for accounts and view their passwords
 - Add new entries and change passwords from the commandline
 - Add new categories from the commandline
@@ -17,16 +18,25 @@ A simple command line tool to interact with sysPass databases.
 
 ## Installation
 
-**From source:**
+### From source
 
-```
+```sh
 git clone https://github.com/ggnosh/syspass-cli.git
 cd syspass-cli
 cargo build --release
 # cp target/release/syspass-cli somewhere
 ```
 
-**From release:**
+### Cargo
+
+If you already have a Rust environment set up, you can use the `cargo install` command:
+
+```sh
+cargo install syspass-cli
+```
+
+### From release
+
 Download binary from https://github.com/ggnosh/syspass-cli/releases
 
 ## Configuration
@@ -40,6 +50,7 @@ If no `SYSPASS_PASSWORD` is found, **syspass-cli** will prompt for it.
 ### Config file
 
 Create a config file at `$(HOME)/.syspass/config.json`
+
 ```json
 {
   "host": "https://example.org/api.php",
