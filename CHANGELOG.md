@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.5.2 - 2024-09-27
+
 - Add shell completion support
 
 ## 0.5.1 - 2024-08-19
