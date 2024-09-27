@@ -165,10 +165,12 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
 
         if config.password_timeout.unwrap_or(10) > 0 {
             if let Some(path) = env::current_exe()?.as_path().to_str() {
-                process::Command::new(path)
+                let mut child = process::Command::new(path)
                     .args(["search", "--clear"])
                     .spawn()
                     .expect("Failed to start child");
+
+                child.wait().expect("Failed to wait for child");
             }
         }
     }
