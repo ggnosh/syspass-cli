@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::process;
 
 use chrono::{NaiveDateTime, Utc};
-use clap::{arg, ArgMatches, Command};
+use clap::{arg, ArgMatches, Command, ValueHint};
 use colored::Colorize;
 use inquire::Select;
 use log::{error, info, warn};
@@ -51,10 +51,19 @@ pub fn command_helper() -> Command {
         .arg(
             arg!(-i --id <ID> "Account ID")
                 .required(true)
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
+                .value_hint(ValueHint::Other),
         )
-        .arg(arg!(-p --password <PASSWORD> "Show passwords as plain text").required(false))
-        .arg(arg!(-e --expiration <EXPIRATION> "Expiration YYYY-mm-dd").required(false))
+        .arg(
+            arg!(-p --password <PASSWORD> "Show passwords as plain text")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
+        .arg(
+            arg!(-e --expiration <EXPIRATION> "Expiration YYYY-mm-dd")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
 }
 
 pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {

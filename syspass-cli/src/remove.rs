@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use clap::{arg, ArgMatches, Command};
+use clap::{arg, ArgMatches, Command, ValueHint};
 
 use crate::api::{AppError, Client};
 use crate::helper;
@@ -18,7 +18,8 @@ pub fn command_helper() -> Command {
         .arg(
             arg!(-i --id <ID> "id")
                 .global(true)
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
+                .value_hint(ValueHint::Other),
         )
         .about("Remove entity")
         .subcommand_required(true)

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::process;
 
-use clap::{arg, ArgMatches, Command};
+use clap::{arg, ArgMatches, Command, ValueHint};
 use colored::Colorize;
 use log::{error, warn};
 
@@ -20,26 +20,49 @@ pub fn command_helper() -> Command {
         .visible_alias("pass")
         .short_flag('p')
         .about("Add a new account")
-        .arg(arg!(-n --name <NAME> "Account name").required(false))
-        .arg(arg!(-u --url <URL> "Url for site").required(false))
-        .arg(arg!(-l --login <LOGIN> "Username").required(false))
-        .arg(arg!(-o --note <NOTES> "Notes text").required(false))
+        .arg(
+            arg!(-n --name <NAME> "Account name")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
+        .arg(
+            arg!(-u --url <URL> "Url for site")
+                .required(false)
+                .value_hint(ValueHint::Url),
+        )
+        .arg(
+            arg!(-l --login <LOGIN> "Username")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
+        .arg(
+            arg!(-o --note <NOTES> "Notes text")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
         .arg(
             arg!(-i --client <CLIENTID> "Client id")
                 .required(false)
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
+                .value_hint(ValueHint::Other),
         )
         .arg(
             arg!(-a --category <CATEGORYID> "Category id")
                 .required(false)
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
+                .value_hint(ValueHint::Other),
         )
         .arg(
             arg!(-g --global <INT> "Should the client be global or not")
                 .required(false)
-                .value_parser(clap::value_parser!(usize)),
+                .value_parser(clap::value_parser!(usize))
+                .value_hint(ValueHint::Other),
         )
-        .arg(arg!(-p --password <PASSWORD> "Password").required(false))
+        .arg(
+            arg!(-p --password <PASSWORD> "Password")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
 }
 
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {

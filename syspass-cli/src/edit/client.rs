@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use clap::{arg, ArgMatches, Command};
+use clap::{arg, ArgMatches, Command, ValueHint};
 use colored::Colorize;
 use log::{info, warn};
 
@@ -18,10 +18,19 @@ pub fn command_helper() -> Command {
         .arg(
             arg!(-i --id <ID> "Client ID")
                 .required(false)
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
+                .value_hint(ValueHint::Other),
         )
-        .arg(arg!(-n --name <NAME> "New name").required(false))
-        .arg(arg!(-e --description <DESCRIPTION> "New description").required(false))
+        .arg(
+            arg!(-n --name <NAME> "New name")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
+        .arg(
+            arg!(-e --description <DESCRIPTION> "New description")
+                .required(false)
+                .value_hint(ValueHint::Other),
+        )
 }
 
 pub fn command(

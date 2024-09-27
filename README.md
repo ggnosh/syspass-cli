@@ -80,7 +80,7 @@ The behaviour can be disabled by using `-u` or `--disableusage` during account s
 ## Usage:
 
 ```text
-Usage: syspass-cli [OPTIONS] <COMMAND>
+Usage: syspass-cli [OPTIONS] [COMMAND]
 
 Commands:
   search, -s    Search for account password [aliases: find]
@@ -91,10 +91,19 @@ Commands:
   help          Print this message or the help of the given subcommand(s)
 
 Options:
-  -c, --config <FILE>  Sets a custom config file
-  -d, --debug          Output debug information
-  -q, --quiet          Do not output any message
-  -v, --verbose        Output more information
-  -h, --help           Print help
-  -V, --version        Print version
+  -c, --config <FILE>              Sets a custom config file
+  -d, --debug                      Output debug information
+  -q, --quiet                      Do not output any message
+  -v, --verbose                    Output more information
+      --completions <completions>  Output debug information [possible values: bash, elvish, fish, powershell, zsh]
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
+## Completions
+
+* Shell completions for relevant shells, by invoking `syspass-cli --completions` after building, e.g.
+
+```sh
+syspass-cli --completions zsh | sudo tee /usr/share/zsh/site-functions/_syspass-cli > /dev/null
 ```

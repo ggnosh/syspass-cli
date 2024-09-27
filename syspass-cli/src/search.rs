@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::{cmp, env, process, thread};
 
 use arboard::Clipboard;
-use clap::{arg, Arg, ArgAction, ArgMatches, Command};
+use clap::{arg, Arg, ArgAction, ArgMatches, Command, ValueHint};
 use colored::Colorize;
 use inquire::{InquireError, Select};
 use log::{error, warn};
@@ -43,8 +43,16 @@ pub fn command_helper() -> Command {
                 .long("show-password")
                 .help("Show passwords as plain text. Do not copy to clipboard"),
         )
-        .arg(arg!(-i --id <ACCOUNTID> "Account id").value_parser(clap::value_parser!(u32)))
-        .arg(arg!(-a --category <CATEGORYID> "Category id").value_parser(clap::value_parser!(u32)))
+        .arg(
+            arg!(-i --id <ACCOUNTID> "Account id")
+                .value_hint(ValueHint::Other)
+                .value_parser(clap::value_parser!(u32)),
+        )
+        .arg(
+            arg!(-a --category <CATEGORYID> "Category id")
+                .value_hint(ValueHint::Other)
+                .value_parser(clap::value_parser!(u32)),
+        )
         .arg(
             Arg::new("disable-usage")
                 .short('u')
@@ -52,7 +60,11 @@ pub fn command_helper() -> Command {
                 .long("disable-usage")
                 .help("Do not sort account list by usage and do not track usage history"),
         )
-        .arg(arg!(--clear "Clear clipboard").hide(true))
+        .arg(
+            arg!(--clear "Clear clipboard")
+                .hide(true)
+                .value_hint(ValueHint::Unknown),
+        )
 }
 
 fn get_accounts_list(

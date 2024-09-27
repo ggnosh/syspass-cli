@@ -15,11 +15,13 @@
 #![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
 
 use std::error::Error;
+use std::io;
 use std::process::ExitCode;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use clap::{arg, crate_description, crate_name, crate_version, Command};
+use clap::{arg, crate_description, crate_name, crate_version, value_parser, ArgAction, Command, ValueHint};
+use clap_complete::aot::{generate, Generator, Shell};
 use colored::Colorize;
 use log::{error, Level, LevelFilter, Metadata, Record};
 
@@ -66,14 +68,15 @@ static TERMINAL_SIZE: Mutex<(usize, usize)> = Mutex::new(DEFAULT_TERMINAL_SIZE);
 fn get_command() -> Command {
     Command::new(crate_name!())
         .about(crate_description!())
-        .subcommand_required(true)
+        .subcommand_required(false)
         .arg_required_else_help(true)
         .version(crate_version!())
         .arg(
             arg!(-c --config <FILE> "Sets a custom config file")
                 .global(true)
                 .required(false)
-                .display_order(100),
+                .display_order(100)
+                .value_hint(ValueHint::FilePath),
         )
         .arg(
             arg!(-q --quiet "Do not output any message")
@@ -93,6 +96,12 @@ fn get_command() -> Command {
                 .required(false)
                 .display_order(100),
         )
+        .arg(
+            arg!(--completions "Output debug information")
+                .action(ArgAction::Set)
+                .display_order(200)
+                .value_parser(value_parser!(Shell)),
+        )
         .subcommand(search::command_helper())
         .subcommand(edit::command_helper_edit())
         .subcommand(remove::command_helper())
@@ -100,8 +109,18 @@ fn get_command() -> Command {
         .subcommand(update::command_helper())
 }
 
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
+
 fn main() -> ExitCode {
     let matches = get_command().get_matches();
+
+    if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
+        let mut commands = get_command();
+        print_completions(generator, &mut commands);
+        return ExitCode::from(0);
+    }
 
     let config = Config::from(&matches);
     let api_version = config.api_version.as_ref().map_or("", |version| version);
