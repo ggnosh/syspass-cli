@@ -5,9 +5,18 @@ on:
         branches: [ main, development ]
     pull_request:
         branches: [ main, development ]
+        paths:
+            - '.github/workflows/rust.yml'
+            - 'syspass-cli/**'
+            - 'Cargo.*'
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+    cancel-in-progress: true
 
 env:
     CARGO_TERM_COLOR: always
+    RUSTFLAGS: --deny warnings
 
 jobs:
     unit-tests:

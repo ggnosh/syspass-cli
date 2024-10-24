@@ -19,7 +19,7 @@
     trivial_numeric_casts,
     unused
 )]
-#![allow(clippy::missing_const_for_fn)]
+#![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
 
 use std::error::Error;
 use std::io;
