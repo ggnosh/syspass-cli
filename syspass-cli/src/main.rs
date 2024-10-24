@@ -1,6 +1,7 @@
 #![forbid(unsafe_code, non_ascii_idents)]
-#![deny(warnings)]
 #![warn(
+    clippy::all,
+    clippy::pedantic,
     clippy::correctness,
     clippy::suspicious,
     clippy::cargo,
@@ -10,9 +11,15 @@
     clippy::pedantic,
     clippy::unwrap_used,
     clippy::nursery,
-    clippy::style
+    clippy::style,
+    deprecated_in_future,
+    future_incompatible,
+    nonstandard_style,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused
 )]
-#![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
+#![allow(clippy::missing_const_for_fn)]
 
 use std::error::Error;
 use std::io;
@@ -154,7 +161,10 @@ fn main() -> ExitCode {
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
         Some((update::COMMAND_NAME, matches)) => update::command(matches),
-        _ => Err(Box::new(CommandError::NotFound) as Box<dyn Error>),
+        _ => {
+            let error: Box<dyn Error> = Box::new(CommandError::NotFound);
+            Err(error)
+        }
     } {
         Ok(code) => ExitCode::from(code),
         Err(e) => {
