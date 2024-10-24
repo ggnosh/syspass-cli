@@ -4,15 +4,18 @@
   "result": {
     "count": 2,
     "itemId": 0,
-    "result": [{
+    "result": [
+      {
         "description": "test_description_1",
         "id": 1,
         "name": "test_1"
-      }, {
+      },
+      {
         "description": "test_description_2",
         "id": 2,
         "name": "test_2"
-    }],
+      }
+    ],
     "resultCode": 0,
     "resultMessage": null
   }

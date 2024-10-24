@@ -12,10 +12,10 @@ tab_spaces = 4
 newline_style = "Unix"
 
 # Use trailing commas for multiline lists and match arms
-trailing_comma = "Vertical"
+#trailing_comma = "Vertical"
 
 # Put the opening brace of a control flow expression on the next line
-control_brace_style = "AlwaysSameLine"
+#control_brace_style = "AlwaysSameLine"
 
 # Reorder imports
 reorder_imports = true

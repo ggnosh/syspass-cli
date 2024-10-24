@@ -34,11 +34,16 @@ mod tests {
 
     use crate::helper::get_numeric_input;
 
-    #[test_case("42", false, 42; "with id")]
-    #[test_case("", false, 0; "without id")]
-    #[test_case("0", false, 0; "zero id")]
-    #[test_case("", true, 0; "new")]
-    #[test_case("", false, 1337; "with callback")]
+    #[test_case("42", false, 42; "with id"
+    )]
+    #[test_case("", false, 0; "without id"
+    )]
+    #[test_case("0", false, 0; "zero id"
+    )]
+    #[test_case("", true, 0; "new"
+    )]
+    #[test_case("", false, 1337; "with callback"
+    )]
     fn test_get_numeric_input(id: &str, new: bool, result: u32) {
         let command = Command::new("test").arg(Arg::new("id").long("id").value_parser(clap::value_parser!(u32)));
 

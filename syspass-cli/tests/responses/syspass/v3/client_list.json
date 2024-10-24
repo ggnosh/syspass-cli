@@ -4,19 +4,22 @@
   "result": {
     "count": 6,
     "itemId": 0,
-    "result": [{
-      "description": "wat",
-      "hash": "",
-      "id": 2,
-      "isGlobal": 0,
-      "name": "ehh?"
-    }, {
-      "description": "nothing",
-      "hash": "",
-      "id": 3,
-      "isGlobal": 0,
-      "name": "FmP6eHfd"
-    }],
+    "result": [
+      {
+        "description": "wat",
+        "hash": "",
+        "id": 2,
+        "isGlobal": 0,
+        "name": "ehh?"
+      },
+      {
+        "description": "nothing",
+        "hash": "",
+        "id": 3,
+        "isGlobal": 0,
+        "name": "FmP6eHfd"
+      }
+    ],
     "resultCode": 0,
     "resultMessage": null
   }
