@@ -40,7 +40,7 @@ impl Syspass {
     fn forge_and_send(
         &self,
         method: &str,
-        args: &RequestArguments,
+        args: RequestArguments,
         needs_password: bool,
     ) -> Result<ApiResult, api::Error> {
         let params = self.syspass.get_params(args, needs_password);
@@ -66,7 +66,7 @@ impl Syspass {
     }
 
     fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::Error> {
-        match self.forge_and_send(method, &Some(vec![("id", id.to_string())]), false) {
+        match self.forge_and_send(method, Some(vec![("id", id.to_string())]), false) {
             Ok(result) => Ok(result.result_code == 0),
             Err(error) => Err(error),
         }
@@ -87,7 +87,7 @@ impl Syspass {
             });
         }
 
-        match self.forge_and_send(&method, &args, true) {
+        match self.forge_and_send(&method, args, true) {
             Ok(result) => {
                 let mut entity = serde_json::from_value::<T>(result.result).expect("Failed to convert to entity");
                 entity.set_id(result.item_id.expect("Id should be set"));
@@ -113,7 +113,7 @@ impl From<Config> for Syspass {
 
 impl api::Client for Syspass {
     fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::Error> {
-        match self.forge_and_send("account/search", &Some(search), false) {
+        match self.forge_and_send("account/search", Some(search), false) {
             Ok(result) => {
                 let mut list: Vec<Account> = serde_json::from_value(result.result).expect("Invalid response");
                 let usage_data: HashMap<u32, u32> = if usage {
@@ -133,7 +133,7 @@ impl api::Client for Syspass {
     fn get_password(&self, account: &Account) -> Result<ViewPassword, api::Error> {
         match self.forge_and_send(
             "account/viewPass",
-            &Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
+            Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
             true,
         ) {
             Ok(result) => Ok(ViewPassword {
@@ -151,7 +151,7 @@ impl api::Client for Syspass {
     }
 
     fn get_clients(&self) -> Result<Vec<Client>, api::Error> {
-        match self.forge_and_send("client/search", &None, false) {
+        match self.forge_and_send("client/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Client> =
                     serde_json::from_value(result.result).expect("Failed to convert client list");
@@ -163,7 +163,7 @@ impl api::Client for Syspass {
     }
 
     fn get_categories(&self) -> Result<Vec<Category>, api::Error> {
-        match self.forge_and_send("category/search", &None, false) {
+        match self.forge_and_send("category/search", None, false) {
             Ok(result) => {
                 let mut list: Vec<Category> =
                     serde_json::from_value(result.result).expect("Failed to convert category list");
@@ -180,7 +180,7 @@ impl api::Client for Syspass {
             client.id(),
             Some(vec![
                 ("name", client.name().to_owned()),
-                ("description", client.description().to_owned()),
+                ("description", client.description().expect("").to_owned()),
                 ("global", client.is_global().clone().to_string()),
             ]),
         )
@@ -192,7 +192,7 @@ impl api::Client for Syspass {
             category.id(),
             Some(vec![
                 ("name", category.name().to_owned()),
-                ("description", category.description().to_owned()),
+                ("description", category.description().expect("").to_owned()),
             ]),
         )
     }
@@ -207,8 +207,8 @@ impl api::Client for Syspass {
                 ("clientId", account.client_id().to_string()),
                 ("pass", account.pass().expect("Password is required").to_owned()),
                 ("login", account.login().to_owned()),
-                ("url", account.url().to_owned()),
-                ("notes", account.notes().to_owned()),
+                ("url", account.url().unwrap_or_default().to_owned()),
+                ("notes", account.notes().unwrap_or_default().to_owned()),
             ]),
         )
     }
@@ -216,7 +216,7 @@ impl api::Client for Syspass {
     fn change_password(&self, password: &ChangePassword) -> Result<Account, api::Error> {
         match self.forge_and_send(
             "account/editPass",
-            &Some(vec![
+            Some(vec![
                 ("expireDate", password.expire_date.to_string()),
                 ("pass", password.pass.clone()),
                 ("id", password.id.to_string()),
@@ -241,21 +241,21 @@ impl api::Client for Syspass {
     }
 
     fn view_account(&self, id: u32) -> Result<Account, api::Error> {
-        match self.forge_and_send("account/view", &Some(vec![("id", id.to_string())]), true) {
+        match self.forge_and_send("account/view", Some(vec![("id", id.to_string())]), true) {
             Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert account")),
             Err(error) => Err(error),
         }
     }
 
     fn get_category(&self, id: u32) -> Result<Category, api::Error> {
-        match self.forge_and_send("category/view", &Some(vec![("id", id.to_string())]), true) {
+        match self.forge_and_send("category/view", Some(vec![("id", id.to_string())]), true) {
             Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert category")),
             Err(error) => Err(error),
         }
     }
 
     fn get_client(&self, id: u32) -> Result<Client, api::Error> {
-        match self.forge_and_send("client/view", &Some(vec![("id", id.to_string())]), true) {
+        match self.forge_and_send("client/view", Some(vec![("id", id.to_string())]), true) {
             Ok(result) => Ok(serde_json::from_value(result.result).expect("Failed to convert client")),
             Err(error) => Err(error),
         }
@@ -362,6 +362,8 @@ mod tests {
             verify_host: false,
             api_version: Some("SyspassV3".to_owned()),
             password_timeout: None,
+            no_clipboard: false,
+            no_shell: false,
         });
 
         assert!(client.search_account(vec![], false).is_err());
@@ -481,7 +483,7 @@ mod tests {
             |account| {
                 assert_eq!("", account.pass().expect("Password should be set and empty"));
                 assert_eq!("test", account.name());
-                assert_eq!("localhost", account.url());
+                assert_eq!("localhost", account.url().unwrap_or_default());
                 assert_eq!("test", account.name());
                 assert_eq!(&1, account.category_id());
             },

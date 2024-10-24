@@ -60,17 +60,14 @@ fn edit_category(
     };
 
     category.set_name(get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref());
-    category.set_description(
-        get_match_string(
-            matches,
-            quiet,
-            "description",
-            "Description: ",
-            category.description(),
-            false,
-        )
-        .as_ref(),
-    );
+    category.set_description(Some(get_match_string(
+        matches,
+        quiet,
+        "description",
+        "Description: ",
+        category.description().unwrap_or_default(),
+        false,
+    )));
 
     info!("Trying to edit category");
 

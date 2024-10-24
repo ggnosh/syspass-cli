@@ -15,10 +15,17 @@ const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 pub struct Config {
     pub host: String,
     pub token: String,
+    #[serde(default)]
     pub password: String,
+    #[serde(default)]
     pub verify_host: bool,
     pub api_version: Option<String>,
+    #[serde(default)]
     pub password_timeout: Option<u64>,
+    #[serde(default)]
+    pub no_shell: bool,
+    #[serde(default)]
+    pub no_clipboard: bool,
 }
 
 fn get_config_path(file: &str) -> OsString {
@@ -140,7 +147,7 @@ mod tests {
         let temp = create_temp_dir();
 
         assert_eq!(
-            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null}",
+            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
             get_config_file_or_write("config.json", Config::default()),
         );
 

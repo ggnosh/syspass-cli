@@ -16,24 +16,28 @@ const ID_EMPTY: &str = "Id should not be empty";
 pub struct Category {
     id: Option<u32>,
     name: String,
-    description: String,
+    description: Option<String>,
 }
 
 impl Category {
-    pub const fn new(id: Option<u32>, name: String, description: String) -> Self {
+    pub const fn new(id: Option<u32>, name: String, description: Option<String>) -> Self {
         Self { id, name, description }
     }
+
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
-    pub fn description(&self) -> &str {
-        self.description.as_str()
+
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
     }
+
     pub fn set_name(&mut self, name: &str) {
         name.clone_into(&mut self.name);
     }
-    pub fn set_description(&mut self, description: &str) {
-        description.clone_into(&mut self.description);
+
+    pub fn set_description(&mut self, description: Option<String>) {
+        self.description = description;
     }
 }
 
@@ -72,8 +76,8 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
             |_| {
                 let new_category = Category {
                     id: None,
-                    name: ask_prompt("Name", true, ""),
-                    description: ask_prompt("Description", false, ""),
+                    name: ask_prompt("Category name", true, ""),
+                    description: Some(ask_prompt("Category description", false, "")),
                 };
 
                 match api_client.save_category(&new_category) {
@@ -98,7 +102,7 @@ mod tests {
             Category {
                 id: Some(1),
                 name: "name".to_string(),
-                description: "desc".to_string(),
+                description: Some("desc".to_string()),
             }
             .to_string()
         );
@@ -108,7 +112,7 @@ mod tests {
             Category {
                 id: Some(1),
                 name: "looooooooooooooooooooooooooooooooooooooooong name".to_string(),
-                description: "desc".to_string(),
+                description: Some("desc".to_string()),
             }
             .to_string()
         );
@@ -118,7 +122,7 @@ mod tests {
             Category {
                 id: None,
                 name: "name".to_string(),
-                description: "desc".to_string(),
+                description: Some("desc".to_string()),
             }
             .to_string()
         );

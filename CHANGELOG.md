@@ -1,5 +1,11 @@
 # CHANGELOG
 
+- Add `noClipboard` config flag to disable clipboard usage
+- Add `noShell` config flag to disable automatic ssh connections
+- Update libraries
+- Allow partial config file and use defaults for the rest if not present
+- Fix a bunch of problems with null values on v2 of the API
+
 ## 0.5.3 - 2024-09-27
 
 ## 0.5.2 - 2024-09-27

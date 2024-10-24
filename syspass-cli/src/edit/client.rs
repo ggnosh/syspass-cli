@@ -52,17 +52,14 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
     };
 
     client.set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
-    client.set_description(
-        get_match_string(
-            matches,
-            quiet,
-            "description",
-            "Description: ",
-            client.description(),
-            false,
-        )
-        .as_ref(),
-    );
+    client.set_description(Some(get_match_string(
+        matches,
+        quiet,
+        "description",
+        "Description: ",
+        client.description().unwrap_or_default(),
+        false,
+    )));
 
     info!("Trying to edit client");
 

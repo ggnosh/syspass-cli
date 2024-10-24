@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::syspass::{sort_accounts, JsonReq};
+use crate::api::syspass::{sort_accounts, JsonReq, RequestArguments};
 use crate::config::Config;
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
@@ -42,7 +42,7 @@ struct ApiErrorResponse {
 #[derive(Deserialize, Clone)]
 #[allow(non_snake_case, clippy::struct_field_names)]
 struct Client {
-    customer_description: String,
+    customer_description: Option<String>,
     customer_id: String,
     customer_name: String,
 }
@@ -74,7 +74,7 @@ struct Account {
     account_id: String,
     account_login: String,
     account_name: String,
-    account_notes: String,
+    account_notes: Option<String>,
     account_pass: String,
     account_url: Option<String>,
     customer_name: String,
@@ -83,7 +83,7 @@ struct Account {
 #[derive(Serialize, Deserialize, Clone)]
 #[allow(clippy::struct_field_names)]
 struct Category {
-    category_description: String,
+    category_description: Option<String>,
     category_id: String,
     category_name: String,
 }
@@ -104,7 +104,7 @@ impl From<Account> for api::account::Account {
             Some(value.account_id.parse::<u32>().expect("Account id is required")),
             value.account_name.clone(),
             value.account_login.clone(),
-            value.account_url.clone().unwrap_or_default(),
+            value.account_url.clone(),
             value.account_notes.clone(),
             value.account_categoryId.parse().expect("Category id is required"),
             value.account_customerId.parse().expect("Customer id id is required"),
@@ -120,7 +120,7 @@ impl Syspass {
     fn forge_and_send(
         &self,
         method: &str,
-        args: &Option<Vec<(&str, String)>>,
+        args: RequestArguments,
         needs_password: bool,
     ) -> Result<ApiResponseResult, api::Error> {
         let params = self.syspass.get_params(args, needs_password);
@@ -143,7 +143,7 @@ impl Syspass {
     }
 
     fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::Error> {
-        match self.forge_and_send(method, &Some(vec![("id", id.to_string())]), false) {
+        match self.forge_and_send(method, Some(vec![("id", id.to_string())]), false) {
             Ok(result) => {
                 if let ApiResponseResult::Code(result) = result {
                     match result.error {
@@ -158,7 +158,7 @@ impl Syspass {
         }
     }
 
-    fn save(&self, path: &str, id: Option<&u32>, args: &Option<Vec<(&str, String)>>) -> Result<u32, api::Error> {
+    fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::Error> {
         if let Some(new_id) = id {
             if *new_id > 0 {
                 return Err(api::Error(NOT_SUPPORTED.to_owned()));
@@ -219,7 +219,7 @@ impl api::Client for Syspass {
         search: Vec<(&str, String)>,
         usage: bool,
     ) -> Result<Vec<api::account::Account>, api::Error> {
-        match self.forge_and_send("getAccountSearch", &Some(search), false) {
+        match self.forge_and_send("getAccountSearch", Some(search), false) {
             Ok(response) => match response {
                 ApiResponseResult::Entity(result) => {
                     let mut list: Vec<api::account::Account> = vec![];
@@ -247,7 +247,7 @@ impl api::Client for Syspass {
     fn get_password(&self, account: &api::account::Account) -> Result<ViewPassword, api::Error> {
         match self.forge_and_send(
             "getAccountPassword",
-            &Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
+            Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
             true,
         ) {
             Ok(response) => {
@@ -271,7 +271,7 @@ impl api::Client for Syspass {
     }
 
     fn get_clients(&self) -> Result<Vec<api::client::Client>, api::Error> {
-        match self.forge_and_send("getCustomers", &None, false) {
+        match self.forge_and_send("getCustomers", None, false) {
             Ok(response) => {
                 let mut list: Vec<api::client::Client> = vec![];
                 if let ApiResponseResult::Entity(result) = response {
@@ -290,7 +290,7 @@ impl api::Client for Syspass {
     }
 
     fn get_categories(&self) -> Result<Vec<api::category::Category>, api::Error> {
-        match self.forge_and_send("getCategories", &None, false) {
+        match self.forge_and_send("getCategories", None, false) {
             Ok(response) => {
                 let mut list: Vec<api::category::Category> = vec![];
                 if let ApiResponseResult::Entity(result) = response {
@@ -312,9 +312,9 @@ impl api::Client for Syspass {
         let id = self.save(
             "addCustomer",
             client.id(),
-            &Some(vec![
+            Some(vec![
                 ("name", client.name().to_owned()),
-                ("description", client.description().to_owned()),
+                ("description", client.description().unwrap_or_default().to_owned()),
             ]),
         );
 
@@ -322,7 +322,7 @@ impl api::Client for Syspass {
             Ok(id) => Ok(api::client::Client::new(
                 Some(id),
                 client.name().to_owned(),
-                client.description().to_owned(),
+                Some(client.description().unwrap_or_default().to_owned()),
                 0,
             )),
             Err(e) => Err(e),
@@ -333,9 +333,9 @@ impl api::Client for Syspass {
         let id = self.save(
             "addCategory",
             category.id(),
-            &Some(vec![
+            Some(vec![
                 ("name", category.name().to_owned()),
-                ("description", category.description().to_owned()),
+                ("description", category.description().unwrap_or_default().to_owned()),
             ]),
         );
 
@@ -343,7 +343,7 @@ impl api::Client for Syspass {
             Ok(id) => Ok(api::category::Category::new(
                 Some(id),
                 category.name().to_owned(),
-                category.description().to_owned(),
+                Some(category.description().unwrap_or_default().to_owned()),
             )),
             Err(e) => Err(e),
         }
@@ -353,14 +353,14 @@ impl api::Client for Syspass {
         let id = self.save(
             "addAccount",
             account.id(),
-            &Some(vec![
+            Some(vec![
                 ("name", account.name().to_owned()),
                 ("categoryId", account.category_id().to_string()),
                 ("customerId", account.client_id().to_string()),
                 ("pass", account.pass().expect("Password given").to_owned()),
                 ("login", account.login().to_owned()),
-                ("url", account.url().to_owned()),
-                ("notes", account.notes().to_owned()),
+                ("url", account.url().unwrap_or_default().to_owned()),
+                ("notes", account.notes().unwrap_or_default().to_owned()),
             ]),
         );
 
@@ -387,7 +387,7 @@ impl api::Client for Syspass {
     }
 
     fn view_account(&self, id: u32) -> Result<api::account::Account, api::Error> {
-        match self.forge_and_send("getAccountData", &Some(vec![("id", id.to_string())]), true) {
+        match self.forge_and_send("getAccountData", Some(vec![("id", id.to_string())]), true) {
             Ok(response) => match response {
                 ApiResponseResult::Entity(result) => Ok(api::account::Account::from({
                     let result = serde_json::from_value::<Account>(result.result);
@@ -443,6 +443,8 @@ mod tests {
             verify_host: false,
             api_version: Option::from("Syspass".to_owned()),
             password_timeout: None,
+            no_clipboard: false,
+            no_shell: false,
         })
     }
 
@@ -527,6 +529,8 @@ mod tests {
             verify_host: false,
             api_version: Some("Syspass".to_owned()),
             password_timeout: None,
+            no_clipboard: false,
+            no_shell: false,
         });
 
         assert!(client.search_account(vec![], false).is_err());
@@ -594,14 +598,17 @@ mod tests {
     #[test]
     fn test_client_conversion() {
         let client = Client {
-            customer_description: "Customer description".to_owned(),
+            customer_description: Some("Customer description".to_owned()),
             customer_id: "1337".to_owned(),
             customer_name: "Customer name".to_owned(),
         };
 
         let converted = api::client::Client::from(client.clone());
 
-        assert_eq!(client.customer_description, converted.description());
+        assert_eq!(
+            client.customer_description.unwrap_or_default(),
+            converted.description().unwrap_or_default()
+        );
         assert_eq!(
             client.customer_id.parse::<u32>().expect("Failed to read id").to_owned(),
             converted.id().expect("Failed to read id").to_owned()
@@ -612,14 +619,17 @@ mod tests {
     #[test]
     fn test_category_conversion() {
         let category = Category {
-            category_description: "Category description".to_owned(),
+            category_description: Some("Category description".to_owned()),
             category_id: "1337".to_owned(),
             category_name: "Category name".to_owned(),
         };
 
         let converted = api::category::Category::from(category.clone());
 
-        assert_eq!(category.category_description, converted.description());
+        assert_eq!(
+            category.category_description.unwrap_or_default(),
+            converted.description().unwrap_or_default()
+        );
         assert_eq!(
             category
                 .category_id
@@ -640,7 +650,7 @@ mod tests {
             account_id: "4".to_owned(),
             account_login: "username".to_owned(),
             account_name: "account".to_owned(),
-            account_notes: "notes".to_owned(),
+            account_notes: Some("notes".to_owned()),
             account_pass: "pass".to_owned(),
             account_url: Some("example.org".to_owned()),
             customer_name: "customer".to_owned(),
@@ -663,9 +673,15 @@ mod tests {
 
         assert_eq!(account.account_login, converted.login());
         assert_eq!(account.account_name, converted.name());
-        assert_eq!(account.account_notes, converted.notes());
+        assert_eq!(
+            account.account_notes.unwrap_or_default(),
+            converted.notes().unwrap_or_default()
+        );
         assert_eq!(account.account_pass, converted.pass().expect("Failed to read password"));
-        assert_eq!(account.account_url.expect("Failed to read id"), converted.url());
+        assert_eq!(
+            account.account_url.expect("Failed to read id"),
+            converted.url().unwrap_or_default()
+        );
         assert_eq!(
             account.customer_name,
             converted.client_name().expect("Failed to read account name")
@@ -757,8 +773,8 @@ mod tests {
             None,
             "test-name".to_owned(),
             "test-login".to_owned(),
-            "example.org".to_owned(),
-            "nothing".to_owned(),
+            Some("example.org".to_owned()),
+            Some("nothing".to_owned()),
             1,
             1,
             Some("test-password".to_owned()),

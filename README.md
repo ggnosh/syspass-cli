@@ -58,9 +58,14 @@ Create a config file at `$(HOME)/.syspass/config.json`
   "password": "PASSWORD",
   "verifyHost": true,
   "passwordTimeout": 15,
-  "apiVersion": "SyspassV3"
+  "apiVersion": "SyspassV3",
+  "noShell": false,
+  "noClipboard": false
 }
 ```
+
+`noShell` implies `--no-shell` when searching
+`noClipboard` implies `--show-password` when searching and doesn't try to copy things to the clipboard.
 
 If `password` is empty it will be prompted when needed.
 
@@ -107,3 +112,5 @@ Options:
 ```sh
 syspass-cli --completions zsh | sudo tee /usr/share/zsh/site-functions/_syspass-cli > /dev/null
 ```
+
+For development see [DEVELOPMENT.md](DEVELOPMENT.md)

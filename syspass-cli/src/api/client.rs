@@ -18,12 +18,12 @@ const ID_EMPTY: &str = "Id should not be empty";
 pub struct Client {
     id: Option<u32>,
     name: String,
-    description: String,
+    description: Option<String>,
     is_global: usize,
 }
 
 impl Client {
-    pub const fn new(id: Option<u32>, name: String, description: String, is_global: usize) -> Self {
+    pub const fn new(id: Option<u32>, name: String, description: Option<String>, is_global: usize) -> Self {
         Self {
             id,
             name,
@@ -35,8 +35,8 @@ impl Client {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
-    pub fn description(&self) -> &str {
-        self.description.as_str()
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
     }
     pub fn is_global(&self) -> &usize {
         &self.is_global
@@ -44,8 +44,8 @@ impl Client {
     pub fn set_name(&mut self, name: &str) {
         name.clone_into(&mut self.name);
     }
-    pub fn set_description(&mut self, description: &str) {
-        description.clone_into(&mut self.description);
+    pub fn set_description(&mut self, description: Option<String>) {
+        self.description = description;
     }
 }
 
@@ -100,7 +100,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
                 let new_client = Client {
                     id: None,
                     name: ask_prompt("Name:", true, ""),
-                    description: ask_prompt("Description:", false, ""),
+                    description: Some(ask_prompt("Description:", false, "")),
                     is_global: matches.get_one::<usize>("global").map_or_else(
                         || {
                             Confirm::new("Global:")
@@ -135,7 +135,7 @@ mod tests {
                 Client {
                     id: Some(0),
                     name: "name".to_string(),
-                    description: "description".to_string(),
+                    description: Some("description".to_string()),
                     is_global: 1
                 }
                 .to_string()
@@ -148,7 +148,7 @@ mod tests {
                 Client {
                     id: Some(0),
                     name: "name".to_string(),
-                    description: "description".to_string(),
+                    description: Some("description".to_string()),
                     is_global: 0
                 }
                 .to_string()

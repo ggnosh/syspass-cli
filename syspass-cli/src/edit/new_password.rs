@@ -70,8 +70,8 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) 
         Some(0),
         get_match_string(matches, quiet, "name", "Name: ", "", true),
         get_match_string(matches, quiet, "login", "Username: ", "", false),
-        get_match_string(matches, quiet, "url", "Url: ", "", false),
-        get_match_string(matches, quiet, "note", "Notes: ", "", false),
+        Some(get_match_string(matches, quiet, "url", "Url: ", "", false)),
+        Some(get_match_string(matches, quiet, "note", "Notes: ", "", false)),
         helper::get_numeric_input(
             "category",
             matches,

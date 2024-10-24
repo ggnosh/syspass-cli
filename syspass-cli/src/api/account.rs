@@ -13,8 +13,8 @@ pub struct Account {
     id: Option<u32>,
     name: String,
     login: String,
-    url: String,
-    notes: String,
+    url: Option<String>,
+    notes: Option<String>,
     category_id: u32,
     client_id: u32,
     pass: Option<String>,
@@ -27,8 +27,8 @@ impl Account {
         id: Option<u32>,
         name: String,
         login: String,
-        url: String,
-        notes: String,
+        url: Option<String>,
+        notes: Option<String>,
         category_id: u32,
         client_id: u32,
         pass: Option<String>,
@@ -53,11 +53,11 @@ impl Account {
     pub fn login(&self) -> &str {
         self.login.as_str()
     }
-    pub fn url(&self) -> &str {
-        self.url.as_str()
+    pub fn url(&self) -> Option<&str> {
+        self.url.as_deref()
     }
-    pub fn notes(&self) -> &str {
-        self.notes.as_str()
+    pub fn notes(&self) -> Option<&str> {
+        self.notes.as_deref()
     }
     pub fn category_id(&self) -> &u32 {
         &self.category_id
@@ -79,10 +79,10 @@ impl Display for Account {
             "{}. {} - {} ({})",
             self.id.unwrap_or(0),
             self.name(),
-            if self.url().is_empty() {
+            if self.url().is_none() {
                 ColoredString::from("")
             } else {
-                self.url().replace("ssh://", "").green()
+                self.url().unwrap_or_default().replace("ssh://", "").green()
             },
             self.client_name()
                 .map_or_else(|| ColoredString::from(""), Colorize::yellow)
@@ -151,8 +151,8 @@ mod tests {
                     id: None,
                     name: "name".to_string(),
                     login: "login".to_string(),
-                    url: String::new(),
-                    notes: String::new(),
+                    url: None,
+                    notes: None,
                     category_id: 0,
                     client_id: 0,
                     pass: None,
@@ -169,8 +169,8 @@ mod tests {
                     id: Some(10),
                     name: "name".to_string(),
                     login: "login".to_string(),
-                    url: "ssh://example.org".to_string(),
-                    notes: "no notes".to_string(),
+                    url: Some("ssh://example.org".to_string()),
+                    notes: Some("no notes".to_string()),
                     category_id: 0,
                     client_id: 0,
                     pass: None,

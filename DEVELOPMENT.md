@@ -32,8 +32,8 @@ After installing, you can log in using the same address and add API authorizatio
 
 Update [test_config.json](test_config.json) with the new authorization token.
 
-
 Test authorization by running:
+
 ```sh
 cargo run -- --config test_config.json new client -n test -e notes
 cargo run -- --config test_config.json new category -n test -e notes
@@ -60,11 +60,13 @@ After installing, you can log in using the same address and add API authorizatio
 Update [test_config_v2.json](test_config_v2.json) with the new authorization token.
 
 If asked to upgrade:
+
 ```sh
 docker exec syspass-appv2 cat sysPass/config/config.xml | grep upgrade
 ```
 
 Test authorization by running:
+
 ```sh
 cargo run -- --config test_config_v2.json new client -n test -e notes
 cargo run -- --config test_config_v2.json new category -n test -e notes

@@ -66,7 +66,7 @@ pub struct Syspass {
 }
 
 impl Syspass {
-    fn get_params(&self, args: &RequestArguments, needs_password: bool) -> HashMap<String, String> {
+    fn get_params(&self, args: RequestArguments, needs_password: bool) -> HashMap<String, String> {
         let mut params: HashMap<String, String> = HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
 
         if needs_password {
@@ -129,7 +129,7 @@ mod tests {
     use passwords::PasswordGenerator;
     use reqwest::blocking::ClientBuilder;
 
-    use crate::api::syspass::{RequestArguments, Syspass};
+    use crate::api::syspass::Syspass;
     use crate::config::Config;
 
     pub fn create_server_response(
@@ -161,6 +161,8 @@ mod tests {
             verify_host: false,
             api_version: Option::from(api_version.to_owned()),
             password_timeout: None,
+            no_clipboard: false,
+            no_shell: false,
         });
 
         (response.0, client, response.1)
@@ -178,9 +180,7 @@ mod tests {
             },
         };
 
-        let arguments: RequestArguments = Some(vec![("id", "some id".to_owned())]);
-
-        let params = syspass.get_params(&arguments, false);
+        let params = syspass.get_params(Some(vec![("id", "some id".to_owned())]), false);
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 
@@ -191,7 +191,7 @@ mod tests {
 
         assert_eq!(None, params.get("tokenPass"));
 
-        let params = syspass.get_params(&arguments, true);
+        let params = syspass.get_params(Some(vec![("id", "some id".to_owned())]), true);
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 

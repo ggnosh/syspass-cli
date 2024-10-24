@@ -105,8 +105,8 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
     let category: u32 = matches
         .get_one::<u32>("category")
         .map_or(0, std::borrow::ToOwned::to_owned);
-    let show = matches.get_flag("show-password");
     let config = api_client.get_config();
+    let show = matches.get_flag("show-password") || config.no_clipboard;
 
     if matches.get_flag("clear") {
         return clear_clipboard(config.password_timeout.unwrap_or(10), false);
@@ -177,7 +177,8 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
 
     warn!("{}", print_table_for_account(&account, show));
 
-    if !matches.get_flag("no-shell") && account.account.url().contains("ssh://") {
+    if !config.no_shell && !matches.get_flag("no-shell") && account.account.url().unwrap_or_default().contains("ssh://")
+    {
         open_shell(&account.account);
     }
 
@@ -185,7 +186,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
 }
 
 fn open_shell(account: &Account) {
-    let host = account.login().to_owned() + "@" + account.url().replace("ssh://", "").as_str();
+    let host = account.login().to_owned() + "@" + account.url().unwrap_or_default().replace("ssh://", "").as_str();
     process::Command::new("ssh")
         .arg(host)
         .spawn()
@@ -271,7 +272,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
                 "\u{2714} Copied to clipboard \u{2714}".bright_green()
             }
         }),
-        TableCell::new(data.account.url()),
+        TableCell::new(data.account.url().unwrap_or_default()),
     ]));
 
     table.render()
@@ -293,8 +294,8 @@ mod tests {
                 Some(1),
                 "Test".to_owned(),
                 "test".to_owned(),
-                "https://example.org".to_owned(),
-                "notes".to_owned(),
+                Some("https://example.org".to_owned()),
+                Some("notes".to_owned()),
                 4,
                 5,
                 None,
@@ -311,7 +312,7 @@ mod tests {
 
         assert!(output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
-        assert!(output.contains(account.account.url()));
+        assert!(output.contains(account.account.url().unwrap_or_default()));
     }
 
     #[test]
@@ -321,7 +322,7 @@ mod tests {
 
         assert!(!output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
-        assert!(output.contains(account.account.url()));
+        assert!(output.contains(account.account.url().unwrap_or_default()));
     }
 
     #[test]
