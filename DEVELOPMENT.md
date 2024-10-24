@@ -11,7 +11,7 @@ git clone https://github.com/ggnosh/syspass-cli.git
 cd syspass-cli
 cp resources/test_config.json test_config.json
 cp resources/test_config_v2.json test_config_v2.json
-docker-compose -p syspass up -d
+docker compose up -d
 ```
 
 ### Syspass v3 setup
