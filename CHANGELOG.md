@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.6.0 - 2024-10-25
+
 - Add `noClipboard` config flag to disable clipboard usage
 - Add `noShell` config flag to disable automatic ssh connections
 - Update libraries
