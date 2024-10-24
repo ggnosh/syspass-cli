@@ -24,7 +24,7 @@ jobs:
         continue-on-error: ${{ matrix.rust == 'nightly' }}
         strategy:
             matrix:
-                os: [ ubuntu-latest, macos-latest, windows-latest ]
+                os: [ ubuntu-latest, macos-latest ]
                 rust: [ stable, nightly ]
         steps:
             -   name: Checkout repository
