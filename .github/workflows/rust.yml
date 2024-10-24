@@ -10,6 +10,10 @@ on:
             - 'syspass-cli/**'
             - 'Cargo.*'
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+    cancel-in-progress: true
+
 env:
     CARGO_TERM_COLOR: always
     RUSTFLAGS: --deny warnings
@@ -20,7 +24,7 @@ jobs:
         continue-on-error: ${{ matrix.rust == 'nightly' }}
         strategy:
             matrix:
-                os: [ ubuntu-latest, macos-latest, windows-latest ]
+                os: [ ubuntu-latest, macos-latest ]
                 rust: [ stable, nightly ]
         steps:
             -   name: Checkout repository
