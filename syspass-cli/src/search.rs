@@ -17,7 +17,7 @@ use crate::api::entity::Entity;
 use crate::api::{AppError, Client};
 use crate::config::Config;
 use crate::filter::filter;
-use crate::TERMINAL_SIZE;
+use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE};
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -221,7 +221,7 @@ fn select_account(
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     let mut table = Table::new();
-    let terminal_width = TERMINAL_SIZE.try_lock().expect("Failed").0;
+    let terminal_width = TERMINAL_SIZE.try_lock().map_or(DEFAULT_TERMINAL_SIZE.0, |size| size.0);
     let width = [
         terminal_width * 7 / 100,
         terminal_width * 29 / 100,
