@@ -31,6 +31,7 @@ use clap::{arg, crate_description, crate_name, crate_version, value_parser, ArgA
 use clap_complete::aot::{generate, Generator, Shell};
 use colored::Colorize;
 use log::{error, Level, LevelFilter, Metadata, Record};
+use terminal_size::{terminal_size, Height, Width};
 
 use crate::api::{Api, Client};
 use crate::config::Config;
@@ -153,7 +154,9 @@ fn main() -> ExitCode {
         .map(|()| log::set_max_level(log_level))
         .expect("Failed to set logger");
 
-    *TERMINAL_SIZE.lock().expect("Fail") = term_size::dimensions().unwrap_or(DEFAULT_TERMINAL_SIZE);
+    *TERMINAL_SIZE.lock().expect("Fail") = terminal_size()
+        .map(|(Width(w), Height(h))| (w as usize, h as usize))
+        .unwrap_or(DEFAULT_TERMINAL_SIZE);
 
     match match matches.subcommand() {
         Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet),

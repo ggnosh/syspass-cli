@@ -1704,7 +1704,7 @@ dependencies = [
  "strip-ansi-escapes",
  "tempfile",
  "term-table",
- "term_size",
+ "terminal_size",
  "test-case",
  "version-compare",
 ]
@@ -1752,16 +1752,6 @@ dependencies = [
  "lazy_static",
  "regex",
  "unicode-width",
-]
-
-[[package]]
-name = "term_size"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
