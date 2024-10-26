@@ -38,7 +38,7 @@ impl Client {
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
-    pub fn is_global(&self) -> &usize {
+    pub const fn is_global(&self) -> &usize {
         &self.is_global
     }
     pub fn set_name(&mut self, name: &str) {

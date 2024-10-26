@@ -59,10 +59,10 @@ impl Account {
     pub fn notes(&self) -> Option<&str> {
         self.notes.as_deref()
     }
-    pub fn category_id(&self) -> &u32 {
+    pub const fn category_id(&self) -> &u32 {
         &self.category_id
     }
-    pub fn client_id(&self) -> &u32 {
+    pub const fn client_id(&self) -> &u32 {
         &self.client_id
     }
     pub fn pass(&self) -> Option<&str> {
