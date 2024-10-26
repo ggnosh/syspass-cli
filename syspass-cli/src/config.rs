@@ -5,7 +5,7 @@ use std::io::ErrorKind::NotFound;
 
 use clap::ArgMatches;
 use colored::Colorize;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";

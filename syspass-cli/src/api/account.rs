@@ -2,7 +2,7 @@ use std::cmp;
 use std::fmt::{Display, Formatter, Result};
 
 use colored::Colorize;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 use crate::api::entity::Entity;
 use crate::TERMINAL_SIZE;

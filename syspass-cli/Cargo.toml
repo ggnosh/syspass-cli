@@ -25,8 +25,7 @@ home = "0.5"
 log = { version = "0.4" }
 passwords = { version = "3.1" }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
-serde = { version = "1.0" }
-serde_derive = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 shellexpand = "3.1"
 term-table = "1.3"

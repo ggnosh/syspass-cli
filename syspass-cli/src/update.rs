@@ -6,7 +6,7 @@ use colored::Colorize;
 use log::warn;
 use reqwest::blocking::{Client, ClientBuilder};
 use reqwest::header::{ACCEPT, USER_AGENT};
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use version_compare::Version;
 
 const FAILED_TO_GET_VERSION: &str = "Failed to get version number";

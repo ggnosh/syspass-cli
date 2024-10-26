@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::api;

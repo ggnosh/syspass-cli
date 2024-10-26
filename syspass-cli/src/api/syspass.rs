@@ -5,7 +5,7 @@ use log::debug;
 use once_cell::sync::Lazy;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::de::DeserializeOwned;
-use serde_derive::Serialize;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::api;

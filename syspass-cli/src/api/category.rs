@@ -4,7 +4,7 @@ use colored::Colorize;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::FuzzySelect;
 use log::error;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 use crate::api;
 use crate::api::entity::Entity;
