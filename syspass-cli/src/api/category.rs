@@ -58,7 +58,7 @@ impl Entity for Category {
     }
 }
 
-pub fn ask_for(api_client: &dyn api::Client) -> std::result::Result<u32, api::Error> {
+pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
     let categories = match api_client.get_categories() {
         Ok(categories) => categories,
         Err(error) => {
@@ -69,7 +69,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> std::result::Result<u32, api::Er
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right category (ESC for new):")
         .max_length(10)
-        .items(&categories[..])
+        .items(&categories)
         .interact_opt()
         .expect("Failed to select category")
         .map_or_else(

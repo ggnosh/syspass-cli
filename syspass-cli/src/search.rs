@@ -203,7 +203,7 @@ fn select_account(
         .with_prompt("Select the right account:")
         .default(0)
         .max_length(10)
-        .items(&accounts[..])
+        .items(accounts)
         .interact();
 
     match selection {

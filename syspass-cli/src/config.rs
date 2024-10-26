@@ -108,7 +108,7 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use crate::config::{get_config_path, Config};
+    use crate::config::{get_config_file_or_write, get_config_path, Config};
 
     fn create_temp_dir() -> (Option<OsString>, PathBuf) {
         let old_home = env::var_os("HOME");
@@ -118,6 +118,19 @@ mod tests {
         env::set_var("HOME", temp_path.as_os_str());
 
         (old_home, temp_path)
+    }
+
+    #[test]
+    #[ignore]
+    fn test_get_config_file_or_write() {
+        let temp = create_temp_dir();
+
+        assert_eq!(
+            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
+            get_config_file_or_write("config.json", Config::default()),
+        );
+
+        cleanup_temp_dir(temp);
     }
 
     fn cleanup_temp_dir(temp: (Option<OsString>, PathBuf)) {

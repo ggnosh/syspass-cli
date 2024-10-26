@@ -152,9 +152,8 @@ fn main() -> ExitCode {
         .map(|()| log::set_max_level(log_level))
         .expect("Failed to set logger");
 
-    *TERMINAL_SIZE.lock().expect("Fail") = terminal_size()
-        .map(|(Width(w), Height(h))| (w as usize, h as usize))
-        .unwrap_or(DEFAULT_TERMINAL_SIZE);
+    *TERMINAL_SIZE.lock().expect("Fail") =
+        terminal_size().map_or(DEFAULT_TERMINAL_SIZE, |(Width(w), Height(h))| (w as usize, h as usize));
 
     match match matches.subcommand() {
         Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet),

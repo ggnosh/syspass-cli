@@ -88,11 +88,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) 
             "client",
             matches,
             false,
-            Some(|| {
-                api::client::ask_for(api_client, matches)
-                    .ok()
-                    .expect("Failed to get client")
-            }),
+            Some(|| api::client::ask_for(api_client, matches).expect("Failed to get client")),
             quiet,
         ),
         Some(matches.get_one::<String>("password").map_or_else(

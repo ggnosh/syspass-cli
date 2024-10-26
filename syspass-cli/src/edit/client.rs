@@ -43,7 +43,7 @@ pub fn command(
         "id",
         matches,
         new,
-        Some(|| ask_for(api_client, matches).ok().expect("Failed to get client")),
+        Some(|| ask_for(api_client, matches).expect("Failed to get client")),
         quiet,
     );
     edit_client(matches, api_client, id, quiet)

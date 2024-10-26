@@ -205,7 +205,7 @@ pub fn get_password(prompt: &str) -> String {
     let answer = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose password")
         .default(0)
-        .items(&pairs[..])
+        .items(&pairs)
         .max_length(10)
         .interact()
         .unwrap_or_else(|_| {

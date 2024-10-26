@@ -59,7 +59,7 @@ impl Display for Client {
             if *self.is_global() > 0 {
                 " (*)".to_string()
             } else {
-                "".to_string()
+                String::new()
             }
         )
     }
@@ -86,7 +86,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::resul
     let wat: std::result::Result<u32, api::Error> = FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right client (ESC for new):")
         .max_length(10)
-        .items(&clients[..])
+        .items(&clients)
         .interact_opt()
         .expect("Failed to select client")
         .map_or_else(
