@@ -1,24 +1,21 @@
 use std::process;
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime};
 use clap::ArgMatches;
-use inquire::validator::ValueRequiredValidator;
-use inquire::{required, DateSelect, Password, PasswordDisplayMode, Text};
-use log::error;
+use dialoguer::{theme::ColorfulTheme, Input, Password};
+use log::warn;
 use passwords::{analyzer, scorer};
 
 #[allow(clippy::module_name_repetitions)]
 pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
-    let mut prompt = Text::new(text);
-    if required {
-        prompt = prompt.with_validator(required!());
-    }
+    let theme = ColorfulTheme::default();
+    let mut prompt = Input::with_theme(&theme).with_prompt(text).allow_empty(!required);
 
     if !default.is_empty() {
-        prompt = prompt.with_default(default);
+        prompt = prompt.with_initial_text(default);
     }
 
-    prompt.prompt().unwrap_or_else(|_| {
+    prompt.interact_text().unwrap_or_else(|_| {
         process::exit(1);
     })
 }
@@ -47,44 +44,46 @@ pub fn get_match_string(
 }
 
 pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
-    let amount = DateSelect::new(prompt)
-        .with_week_start(chrono::Weekday::Mon)
-        .with_starting_date(date)
-        .with_formatter(&|val| val.format("%Y-%m-%d").to_string())
-        .prompt_skippable();
+    let date = Input::with_theme(&ColorfulTheme::default())
+        .with_initial_text(date.format("%Y-%m-%d").to_string())
+        .with_prompt(prompt)
+        .validate_with(|input: &String| -> Result<(), &str> {
+            if input.is_empty() || NaiveDateTime::parse_from_str(input, "%Y-%m-%d").is_ok() {
+                Ok(())
+            } else {
+                Err("Please enter a valid date in YYYY-mm-dd format or leave it empty.")
+            }
+        })
+        .interact_text()
+        .unwrap_or_else(|_| String::new());
 
-    match amount {
-        Ok(None) => String::new(),
-        Ok(Some(date)) => NaiveDateTime::new(date, NaiveTime::default())
+    if !date.is_empty() {
+        return NaiveDateTime::parse_from_str(date.as_str(), "%Y-%m-%d")
+            .expect("Invalid date")
             .and_utc()
             .timestamp()
-            .to_string(),
-        Err(_) => {
-            error!("Cancelled");
-            process::exit(1);
-        }
+            .to_string();
     }
+
+    String::new()
 }
 
 pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
-    let mut password = Password::new(prompt)
-        .with_display_toggle_enabled()
-        .with_display_mode(PasswordDisplayMode::Masked);
+    let theme = ColorfulTheme::default();
+    let mut password =
+        Password::with_theme(&theme)
+            .with_prompt(prompt)
+            .validate_with(|input: &String| -> Result<(), &str> {
+                let strength = password_strength(scorer::score(&analyzer::analyze(input)));
+                warn!("Password strength: {}", strength);
+                Ok(())
+            });
 
     if confirm {
-        password = password
-            .with_custom_confirmation_error_message("The passwords don't match.")
-            .with_formatter(&|input| password_strength(scorer::score(&analyzer::analyze(input))));
-    } else {
-        password = password
-            .without_confirmation()
-            .with_validator(ValueRequiredValidator::default());
+        password = password.with_confirmation("Repeat password", "Error: the passwords don't match.");
     }
 
-    password.prompt().unwrap_or_else(|_| {
-        error!("Cancelled");
-        process::exit(1);
-    })
+    password.interact().expect("Failed to get password")
 }
 
 pub fn password_strength(strength: f64) -> String {

@@ -6,7 +6,7 @@ use std::process;
 use chrono::{NaiveDateTime, Utc};
 use clap::{arg, ArgMatches, Command, ValueHint};
 use colored::Colorize;
-use inquire::Select;
+use dialoguer::{theme::ColorfulTheme, Select};
 use log::{error, info, warn};
 use passwords::analyzer;
 use passwords::scorer;
@@ -202,20 +202,21 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
 
 pub fn get_password(prompt: &str) -> String {
     let pairs: Vec<PasswordData> = generate_passwords(5);
-    let answer_prompt = Select::new("Choose password", pairs)
-        .with_help_message("[PASSWORD] (strength)")
-        .with_page_size(10)
-        .prompt();
+    let answer = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose password")
+        .default(0)
+        .items(&pairs[..])
+        .max_length(10)
+        .interact()
+        .unwrap_or_else(|_| {
+            error!("Cancelled");
+            process::exit(1);
+        });
 
-    if let Ok(result) = answer_prompt {
-        if result.strength_value == 0.0 {
-            return ask_for_password(prompt, true);
-        }
-        result.password
-    } else {
-        error!("Cancelled");
-        process::exit(1);
+    if answer == 0 {
+        return ask_for_password(prompt, true);
     }
+    pairs[answer].password.clone()
 }
 
 #[cfg(test)]

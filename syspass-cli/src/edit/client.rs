@@ -39,7 +39,13 @@ pub fn command(
     quiet: bool,
     new: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let id = helper::get_numeric_input("id", matches, new, Some(|| ask_for(api_client, matches)), quiet);
+    let id = helper::get_numeric_input(
+        "id",
+        matches,
+        new,
+        Some(|| ask_for(api_client, matches).ok().expect("Failed to get client")),
+        quiet,
+    );
     edit_client(matches, api_client, id, quiet)
 }
 

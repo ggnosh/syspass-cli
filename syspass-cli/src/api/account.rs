@@ -1,7 +1,7 @@
 use std::cmp;
 use std::fmt::{Display, Formatter, Result};
 
-use colored::{ColoredString, Colorize};
+use colored::Colorize;
 use serde_derive::Deserialize;
 
 use crate::api::entity::Entity;
@@ -80,12 +80,11 @@ impl Display for Account {
             self.id.unwrap_or(0),
             self.name(),
             if self.url().is_none() {
-                ColoredString::from("")
+                String::new()
             } else {
-                self.url().unwrap_or_default().replace("ssh://", "").green()
+                self.url().unwrap_or_default().replace("ssh://", "")
             },
-            self.client_name()
-                .map_or_else(|| ColoredString::from(""), Colorize::yellow)
+            self.client_name().unwrap_or("")
         )
         .trim()
         .split(' ')

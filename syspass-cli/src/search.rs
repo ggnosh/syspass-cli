@@ -6,7 +6,7 @@ use std::{cmp, env, process, thread};
 use arboard::Clipboard;
 use clap::{arg, Arg, ArgAction, ArgMatches, Command, ValueHint};
 use colored::Colorize;
-use inquire::{InquireError, Select};
+use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use log::{error, warn};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
@@ -16,7 +16,6 @@ use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AppError, Client};
 use crate::config::Config;
-use crate::filter::filter;
 use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE};
 
 pub const COMMAND_NAME: &str = "search";
@@ -134,7 +133,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
 
     let account: ViewPassword = {
         if accounts.len() > 1 {
-            match select_account(accounts, api_client, matches.get_flag("disable-usage")) {
+            match select_account(&accounts, api_client, matches.get_flag("disable-usage")) {
                 Ok(account) => account,
                 Err(error) => {
                     error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
@@ -196,24 +195,23 @@ fn open_shell(account: &Account) {
 }
 
 fn select_account(
-    accounts: Vec<Account>,
+    accounts: &[Account],
     api_client: &dyn Client,
     disable_usage: bool,
 ) -> Result<ViewPassword, AppError> {
-    let count: usize = accounts.len();
-    let answer: Result<Account, InquireError> = Select::new("Select the right account:", accounts)
-        .with_help_message(format!("Number for accounts found: {count}").as_str())
-        .with_page_size(10)
-        .with_scorer(&filter)
-        .with_formatter(&|i| i.value.name().to_string())
-        .prompt();
+    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select the right account:")
+        .default(0)
+        .max_length(10)
+        .items(&accounts[..])
+        .interact();
 
-    match answer {
+    match selection {
         Ok(choice) => {
             if !disable_usage {
-                Config::record_usage(*choice.id().expect("Id should be set"));
+                Config::record_usage(*accounts[choice].id().expect("Id should be set"));
             }
-            Ok(api_client.get_password(&choice)?)
+            Ok(api_client.get_password(&accounts[choice])?)
         }
         Err(err) => Err(AppError(err.to_string())),
     }
@@ -248,13 +246,13 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new("Address".green()),
     ];
 
-    table.add_row(Row::new(vec![TableCell::builder(data.account.name().green())
+    table.add_row(Row::new(vec![TableCell::builder(data.account.name())
         .alignment(Alignment::Center)
         .col_span(cells.len())
         .build()]));
 
     table.add_row(Row::new(vec![TableCell::builder(
-        data.account.client_name().unwrap_or("").green(),
+        data.account.client_name().unwrap_or(""),
     )
     .alignment(Alignment::Center)
     .col_span(cells.len())
@@ -267,9 +265,9 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new(data.account.login()),
         TableCell::new({
             if show {
-                data.password.bright_green()
+                data.password.clone()
             } else {
-                "\u{2714} Copied to clipboard \u{2714}".bright_green()
+                "\u{2714} Copied to clipboard \u{2714}".to_string()
             }
         }),
         TableCell::new(data.account.url().unwrap_or_default()),

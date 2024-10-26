@@ -16,8 +16,7 @@
     future_incompatible,
     nonstandard_style,
     trivial_casts,
-    trivial_numeric_casts,
-    unused
+    trivial_numeric_casts
 )]
 #![allow(clippy::missing_const_for_fn, clippy::multiple_crate_versions)]
 
@@ -39,7 +38,6 @@ use crate::config::Config;
 mod api;
 mod config;
 mod edit;
-mod filter;
 mod helper;
 mod prompt;
 mod remove;

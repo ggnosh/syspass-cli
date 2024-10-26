@@ -1,12 +1,13 @@
 use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
-use inquire::Select;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::FuzzySelect;
+use log::error;
 use serde_derive::Deserialize;
 
 use crate::api;
 use crate::api::entity::Entity;
-use crate::filter::filter;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -57,7 +58,7 @@ impl Entity for Category {
     }
 }
 
-pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
+pub fn ask_for(api_client: &dyn api::Client) -> std::result::Result<u32, api::Error> {
     let categories = match api_client.get_categories() {
         Ok(categories) => categories,
         Err(error) => {
@@ -65,15 +66,14 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
         }
     };
 
-    let count = categories.len();
-
-    Ok(Select::new("Select the right category (ESC for new):", categories)
-        .with_help_message(format!("Number for accounts found: {count}").as_str())
-        .with_page_size(10)
-        .with_scorer(&filter)
-        .prompt()
+    FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select the right category (ESC for new):")
+        .max_length(10)
+        .items(&categories[..])
+        .interact_opt()
+        .expect("Failed to select category")
         .map_or_else(
-            |_| {
+            || loop {
                 let new_category = Category {
                     id: None,
                     name: ask_prompt("Category name", true, ""),
@@ -81,14 +81,14 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
                 };
 
                 match api_client.save_category(&new_category) {
-                    Ok(client) => client.id.expect(ID_EMPTY),
+                    Ok(client) => break Ok(client.id.expect(ID_EMPTY)),
                     Err(error) => {
-                        panic!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
+                        error!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
                     }
                 }
             },
-            |category| *category.id().expect(ID_EMPTY),
-        ))
+            |choice| Ok(*categories[choice].id().expect(ID_EMPTY)),
+        )
 }
 
 #[cfg(test)]

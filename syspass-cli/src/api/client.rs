@@ -1,14 +1,14 @@
 use std::fmt::{Display, Formatter, Result};
 
 use clap::ArgMatches;
-use colored::{ColoredString, Colorize};
-use inquire::{Confirm, Select};
+use colored::Colorize;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::{Confirm, FuzzySelect};
 use log::error;
 use serde_derive::Deserialize;
 
 use crate::api;
 use crate::api::entity::Entity;
-use crate::filter::filter;
 use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
@@ -57,9 +57,9 @@ impl Display for Client {
             self.id().expect("Id should not be empty"),
             self.name(),
             if *self.is_global() > 0 {
-                " (*)".yellow()
+                " (*)".to_string()
             } else {
-                ColoredString::from("")
+                "".to_string()
             }
         )
     }
@@ -75,52 +75,43 @@ impl Entity for Client {
     }
 }
 
-pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> u32 {
-    let clients = api_client.get_clients().unwrap_or_else(|e| {
-        error!("{} while trying to list clients", e);
-        vec![]
-    });
-    let count = clients.len();
+pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::result::Result<u32, api::Error> {
+    let clients = match api_client.get_clients() {
+        Ok(clients) => clients,
+        Err(error) => {
+            return Err(api::Error(format!("{error}: Could not list clients")));
+        }
+    };
 
-    Select::new("Select the right client (ESC for new):", clients)
-        .with_help_message(
-            format!(
-                "Number of clients found: {}, {}{}",
-                count,
-                "* ".yellow(),
-                "is for global clients".bright_cyan()
-            )
-            .as_str(),
-        )
-        .with_page_size(10)
-        .with_scorer(&filter)
-        .prompt()
+    let wat: std::result::Result<u32, api::Error> = FuzzySelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select the right client (ESC for new):")
+        .max_length(10)
+        .items(&clients[..])
+        .interact_opt()
+        .expect("Failed to select client")
         .map_or_else(
-            |_| {
+            || loop {
                 let new_client = Client {
                     id: None,
                     name: ask_prompt("Name:", true, ""),
                     description: Some(ask_prompt("Description:", false, "")),
                     is_global: matches.get_one::<usize>("global").map_or_else(
-                        || {
-                            Confirm::new("Global:")
-                                .with_default(false)
-                                .prompt()
-                                .map_or(0, usize::from)
-                        },
+                        || usize::from(Confirm::new().with_prompt("Global:").interact().unwrap_or(false)),
                         std::borrow::ToOwned::to_owned,
                     ),
                 };
 
                 match api_client.save_client(&new_client) {
-                    Ok(client) => *client.id().expect(ID_EMPTY),
+                    Ok(client) => break Ok(*client.id().expect(ID_EMPTY)),
                     Err(error) => {
-                        panic!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
+                        error!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
                     }
                 }
             },
-            |client| *client.id().expect(ID_EMPTY),
-        )
+            |choice| Ok(*clients[choice].id().expect(ID_EMPTY)),
+        );
+
+    wat
 }
 
 #[cfg(test)]
