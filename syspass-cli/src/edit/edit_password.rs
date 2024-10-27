@@ -1,13 +1,12 @@
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::process;
 
 use chrono::{NaiveDateTime, Utc};
 use clap::{arg, ArgMatches, Command, ValueHint};
 use colored::Colorize;
 use dialoguer::{theme::ColorfulTheme, Select};
-use log::{error, info, warn};
+use log::{info, warn};
 use passwords::analyzer;
 use passwords::scorer;
 use passwords::PasswordGenerator;
@@ -175,11 +174,7 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
         suggest.append(&mut generator.generate(random_count).expect("Password generator failed"));
     }
 
-    let mut pairs: Vec<PasswordData> = vec![PasswordData {
-        password: String::new(),
-        strength: "use own".to_owned(),
-        strength_value: 0.0,
-    }];
+    let mut pairs: Vec<PasswordData> = vec![];
 
     for password in &suggest {
         let score = scorer::score(&analyzer::analyze(password));
@@ -202,21 +197,18 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
 
 pub fn get_password(prompt: &str) -> String {
     let pairs: Vec<PasswordData> = generate_passwords(5);
-    let answer = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose password")
+    Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose password (Press ESC to enter your own):")
         .default(0)
         .items(&pairs)
+        .report(false)
         .max_length(10)
-        .interact()
-        .unwrap_or_else(|_| {
-            error!("Cancelled");
-            process::exit(1);
-        });
-
-    if answer == 0 {
-        return ask_for_password(prompt, true);
-    }
-    pairs[answer].password.clone()
+        .interact_opt()
+        .expect("Failed to select password")
+        .map_or_else(
+            || ask_for_password(prompt, true),
+            |choice| pairs[choice].password.clone(),
+        )
 }
 
 #[cfg(test)]
@@ -227,15 +219,13 @@ mod tests {
     fn test_generate_passwords() {
         let passwords = generate_passwords(5);
 
-        assert_eq!((5 * 8) + 1, passwords.len());
+        assert_eq!(5 * 8, passwords.len());
 
-        let own = passwords.first().expect("Use own");
-        assert_eq!("", own.password);
-        assert_eq!("use own", own.strength);
+        let own = passwords.first().expect("Failed to get generated password");
         assert!(
-            (own.strength_value - 0.0).abs() < f64::EPSILON,
+            (own.strength_value - 100.0).abs() < f64::EPSILON,
             "left: {:?} not equal right: {:?}",
-            0.0,
+            100.0,
             own.strength_value
         );
     }
