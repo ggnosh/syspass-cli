@@ -229,7 +229,7 @@ impl api::Client for Syspass {
                     }
 
                     let usage_data: HashMap<u32, u32> = if usage {
-                        Config::get_usage_data()
+                        Config::get_usage_data(None)
                     } else {
                         HashMap::from([(0, 0)])
                     };

@@ -209,7 +209,7 @@ fn select_account(
     match selection {
         Ok(choice) => {
             if !disable_usage {
-                Config::record_usage(*accounts[choice].id().expect("Id should be set"));
+                Config::record_usage(*accounts[choice].id().expect("Id should be set"), None);
             }
             Ok(api_client.get_password(&accounts[choice])?)
         }

@@ -117,7 +117,7 @@ impl api::Client for Syspass {
             Ok(result) => {
                 let mut list: Vec<Account> = serde_json::from_value(result.result).expect("Invalid response");
                 let usage_data: HashMap<u32, u32> = if usage {
-                    Config::get_usage_data()
+                    Config::get_usage_data(None)
                 } else {
                     HashMap::from([(0, 0)])
                 };

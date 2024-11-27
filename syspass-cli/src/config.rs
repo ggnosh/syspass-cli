@@ -28,22 +28,25 @@ pub struct Config {
     pub no_clipboard: bool,
 }
 
-fn get_config_path(file: &str) -> OsString {
-    home::home_dir().map_or_else(
-        || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
-        |path| {
-            let mut p = path.into_os_string();
-            p.push(DEFAULT_CONFIG_DIR.to_owned() + file);
-            p
-        },
-    )
+fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
+    let mut path = dir.map_or_else(|| home::home_dir().map_or_else(
+            || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
+            |path| {
+                path.into_os_string()
+            },
+        ), |path| {
+        OsString::from(path)
+    });
+
+    path.push(DEFAULT_CONFIG_DIR.to_owned() + file);
+    path
 }
 
-fn get_config_file_or_write<T>(file: &str, value: T) -> String
+fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> String
 where
     T: Sized + serde::Serialize,
 {
-    let path = get_config_path(file);
+    let path = get_config_path(file, dir);
     fs::read_to_string(&path).unwrap_or_else(|error| {
         if error.kind() == NotFound {
             let data = serde_json::to_string(&value).expect("Saved");
@@ -63,7 +66,7 @@ impl From<&ArgMatches> for Config {
             .to_owned();
 
         let data = if config_file.is_empty() {
-            get_config_file_or_write("config.json", Self::default())
+            get_config_file_or_write("config.json", None, Self::default())
         } else {
             fs::read_to_string(shellexpand::tilde(&config_file).to_string()).expect("Unable to read file")
         };
@@ -73,14 +76,14 @@ impl From<&ArgMatches> for Config {
 }
 
 impl Config {
-    pub fn get_usage_data() -> HashMap<u32, u32> {
-        let data = get_config_file_or_write("usage.json", HashMap::from([(0, 0)]));
+    pub fn get_usage_data(dir: Option<&str>) -> HashMap<u32, u32> {
+        let data = get_config_file_or_write("usage.json", dir, HashMap::from([(0, 0)]));
 
         serde_json::from_str::<HashMap<u32, u32>>(&data).expect("JSON does not have correct format.")
     }
 
-    pub fn record_usage(id: u32) {
-        let mut usage = Self::get_usage_data();
+    pub fn record_usage(id: u32, dir: Option<&str>) {
+        let mut usage = Self::get_usage_data(dir);
 
         #[allow(clippy::option_if_let_else)]
         match usage.get_mut(&id) {
@@ -93,7 +96,7 @@ impl Config {
         };
 
         fs::write(
-            get_config_path("usage.json"),
+            get_config_path("usage.json", dir),
             serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed") + "\n",
         )
         .expect("Unable to write file");
@@ -102,78 +105,69 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
     use std::ffi::OsString;
-    use std::path::PathBuf;
 
     use tempfile::tempdir;
 
     use crate::config::{get_config_file_or_write, get_config_path, Config};
 
-    fn create_temp_dir() -> (Option<OsString>, PathBuf) {
-        let old_home = env::var_os("HOME");
+    fn create_temp_dir() -> OsString {
         let temp_path = tempdir().expect("Failed to create temp dir").path().to_owned();
-
         std::fs::create_dir_all(temp_path.join(".syspass")).expect("Failed to create dir");
-        env::set_var("HOME", temp_path.as_os_str());
 
-        (old_home, temp_path)
+        temp_path.into_os_string()
     }
 
     #[test]
     #[ignore]
     fn test_get_config_file_or_write() {
         let temp = create_temp_dir();
-
+        let temp_str = temp.to_str();
         assert_eq!(
             "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
-            get_config_file_or_write("config.json", Config::default()),
+            get_config_file_or_write("config.json", temp_str, Config::default()),
         );
 
-        cleanup_temp_dir(temp);
+        cleanup_temp_dir(temp_str);
     }
 
-    fn cleanup_temp_dir(temp: (Option<OsString>, PathBuf)) {
-        if let Some(home) = temp.0 {
-            env::set_var("HOME", home);
-        } else {
-            env::remove_var("HOME");
-        }
-
-        std::fs::remove_dir_all(temp.1).expect("Failed to remove dir");
+    fn cleanup_temp_dir(temp: Option<&str>) {
+        std::fs::remove_dir_all(std::path::PathBuf::from(temp.expect("failed to get path"))).expect("Failed to remove dir");
     }
 
     #[test]
     fn test_get_config_path() {
         let temp = create_temp_dir();
-        let path = get_config_path("config.json");
+        let temp_str = temp.to_str();
+        let path = get_config_path("config.json", temp_str);
         assert_eq!(
-            temp.1.as_os_str().to_str().expect("String").to_string() + "/.syspass/config.json",
+            temp_str.expect("Failed to get path").to_string() + "/.syspass/config.json",
             path.as_os_str().to_str().expect("String")
         );
 
-        cleanup_temp_dir(temp);
+        cleanup_temp_dir(temp_str);
     }
 
     #[test]
     fn test_record_usage() {
         let temp = create_temp_dir();
-
-        let usage = Config::get_usage_data();
+        let temp_str = temp.to_str();
+        
+        let usage = Config::get_usage_data(temp_str);
         assert_eq!(usage.get(&31337), None);
 
-        Config::record_usage(31337);
-        let usage = Config::get_usage_data();
+        Config::record_usage(31337, temp_str);
+        let usage = Config::get_usage_data(temp_str);
         assert_eq!(usage.get(&31337), Some(&1));
 
-        Config::record_usage(31337);
-        let usage = Config::get_usage_data();
+        Config::record_usage(31337, temp_str);
+        let usage = Config::get_usage_data(temp_str);
         assert_eq!(usage.get(&31337), Some(&2));
 
-        let usage = Config::get_usage_data();
+        let usage = Config::get_usage_data(temp_str);
         assert_eq!(usage.get(&31337), Some(&2));
         assert_eq!(usage.get(&31337), Some(&2));
 
-        cleanup_temp_dir(temp);
+        cleanup_temp_dir(temp_str);
     }
 }
