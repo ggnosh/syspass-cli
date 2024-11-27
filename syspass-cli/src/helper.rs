@@ -17,10 +17,8 @@ where
                 } else if quiet {
                     warn!("Could not ask for input");
                     process::exit(1);
-                } else if let Some(callback) = callback {
-                    callback()
                 } else {
-                    0
+                    callback.map_or(0, |callback| callback())
                 }
             },
             |id| id,

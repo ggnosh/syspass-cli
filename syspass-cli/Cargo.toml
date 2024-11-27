@@ -1,7 +1,7 @@
 [package]
 name = "syspass-cli"
 version = "0.7.0"
-edition = "2021"
+edition = "2024"
 description = "A CLI client for Syspass"
 repository = "https://github.com/ggnosh/syspass-cli"
 homepage = "https://github.com/ggnosh/syspass-cli"

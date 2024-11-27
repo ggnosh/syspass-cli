@@ -86,10 +86,12 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> 
             thread::sleep(Duration::from_secs(timeout));
         }
 
-        if let Ok(mut clipboard) = Clipboard::new() {
-            clipboard.clear().expect("Failed to clear clipboard");
-        } else {
-            return Err(Box::from(AppError("Could not clear clipboard".to_owned())));
+        match Clipboard::new() {
+            Ok(mut clipboard) => {
+                clipboard.clear().expect("Failed to clear clipboard");
+            } _ => {
+                return Err(Box::from(AppError("Could not clear clipboard".to_owned())));
+            }
         }
     }
 
