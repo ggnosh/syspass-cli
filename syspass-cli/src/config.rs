@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind::NotFound;
-
+use std::path::Path;
 use clap::ArgMatches;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -50,6 +50,9 @@ where
     fs::read_to_string(&path).unwrap_or_else(|error| {
         if error.kind() == NotFound {
             let data = serde_json::to_string(&value).expect("Saved");
+            if let Some(parent) = Path::new(&path).parent() {
+                fs::create_dir_all(parent).expect("Failed to create directories");
+            }
             fs::write(&path, &data).expect("Failed to write data");
             data
         } else {
