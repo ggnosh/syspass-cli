@@ -33,10 +33,10 @@ fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
         || {
             home::home_dir().map_or_else(
                 || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
-                |path| path.into_os_string(),
+                std::path::PathBuf::into_os_string,
             )
         },
-        |path| OsString::from(path),
+        OsString::from,
     );
 
     path.push(DEFAULT_CONFIG_DIR.to_owned() + file);
