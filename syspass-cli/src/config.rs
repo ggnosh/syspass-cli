@@ -1,11 +1,11 @@
+use clap::ArgMatches;
+use colored::Colorize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind::NotFound;
 use std::path::Path;
-use clap::ArgMatches;
-use colored::Colorize;
-use serde::{Deserialize, Serialize};
 
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
@@ -29,14 +29,15 @@ pub struct Config {
 }
 
 fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
-    let mut path = dir.map_or_else(|| home::home_dir().map_or_else(
-            || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
-            |path| {
-                path.into_os_string()
-            },
-        ), |path| {
-        OsString::from(path)
-    });
+    let mut path = dir.map_or_else(
+        || {
+            home::home_dir().map_or_else(
+                || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
+                |path| path.into_os_string(),
+            )
+        },
+        |path| OsString::from(path),
+    );
 
     path.push(DEFAULT_CONFIG_DIR.to_owned() + file);
     path
@@ -135,7 +136,8 @@ mod tests {
     }
 
     fn cleanup_temp_dir(temp: Option<&str>) {
-        std::fs::remove_dir_all(std::path::PathBuf::from(temp.expect("failed to get path"))).expect("Failed to remove dir");
+        std::fs::remove_dir_all(std::path::PathBuf::from(temp.expect("failed to get path")))
+            .expect("Failed to remove dir");
     }
 
     #[test]
@@ -155,7 +157,7 @@ mod tests {
     fn test_record_usage() {
         let temp = create_temp_dir();
         let temp_str = temp.to_str();
-        
+
         let usage = Config::get_usage_data(temp_str);
         assert_eq!(usage.get(&31337), None);
 
