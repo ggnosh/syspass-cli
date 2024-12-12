@@ -940,7 +940,7 @@ version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717b6b5b077764fb5966237269cb3c64edddde4b14ce42647430a78ced9e7b7"
 dependencies = [
-    "once_cell",
+ "once_cell",
  "wasm-bindgen",
 ]
 
@@ -1617,7 +1617,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
-    "windows-sys 0.59.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2262,7 +2262,7 @@ checksum = "38176d9b44ea84e9184eff0bc34cc167ed044f816accfe5922e54d84cf48eca2"
 dependencies = [
  "cfg-if",
  "js-sys",
-    "once_cell",
+ "once_cell",
  "wasm-bindgen",
  "web-sys",
 ]

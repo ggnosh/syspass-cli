@@ -1,5 +1,9 @@
 # CHANGELOG
 
+- Update libraries
+- Make password selection optional in
+- Don't error out if `~/.syspass` doesn't exist
+
 ## 0.6.0 - 2024-10-25
 
 - Add `noClipboard` config flag to disable clipboard usage
