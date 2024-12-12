@@ -83,7 +83,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::resul
         }
     };
 
-    let wat: std::result::Result<u32, api::Error> = FuzzySelect::with_theme(&ColorfulTheme::default())
+    FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right client (ESC for new):")
         .max_length(10)
         .items(&clients)
@@ -109,9 +109,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::resul
                 }
             },
             |choice| Ok(*clients[choice].id().expect(ID_EMPTY)),
-        );
-
-    wat
+        )
 }
 
 #[cfg(test)]
