@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.7.0 - 2024-12-12
+
 - Update libraries
 - Make password selection optional in
 - Don't error out if `~/.syspass` doesn't exist
