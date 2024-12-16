@@ -20,7 +20,7 @@ arboard = { version = "3.4", default-features = false, features = ["wayland-data
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.5", features = ["cargo", "wrap_help", "color", "suggestions"] }
 clap_complete = { version = "4.5" }
-colored = { version = "2.0" }
+colored = { version = "2.2" }
 home = "0.5"
 log = { version = "0.4" }
 passwords = { version = "3.1" }
