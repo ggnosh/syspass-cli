@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.7.1 - 2025-01-21
+
+- Update libraries
+
 ## 0.7.0 - 2024-12-12
 
 - Update libraries
