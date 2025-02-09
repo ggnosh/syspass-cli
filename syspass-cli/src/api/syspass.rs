@@ -1,11 +1,11 @@
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::sync::LazyLock;
 use log::debug;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use crate::api;
 use crate::api::account::Account;
