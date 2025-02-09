@@ -1,8 +1,7 @@
 use std::cell::Cell;
 use std::collections::HashMap;
-
+use std::sync::LazyLock;
 use log::debug;
-use once_cell::sync::Lazy;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -17,7 +16,7 @@ use crate::prompt::ask_for_password;
 pub mod v2;
 pub mod v3;
 
-static PASSWORD: Lazy<String> = Lazy::new(|| ask_for_password("API password: ", false));
+static PASSWORD: LazyLock<String> = LazyLock::new(|| ask_for_password("API password: ", false));
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
 

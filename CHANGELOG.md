@@ -1,5 +1,8 @@
 # CHANGELOG
 
+- switch once_cell::sync::Lazy to LazyLock
+- Update libraries
+
 ## 0.7.1 - 2025-01-21
 
 - Update libraries

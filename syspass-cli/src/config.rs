@@ -97,7 +97,7 @@ impl Config {
             None => {
                 usage.insert(id, 1);
             }
-        };
+        }
 
         fs::write(
             get_config_path("usage.json", dir),
