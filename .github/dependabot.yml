@@ -4,6 +4,14 @@ updates:
         directory: "/" # Location of package manifests
         schedule:
             interval: "weekly"
+        ignore:
+            -   dependency-name: "assert_cmd"
+            -   dependency-name: "mockito"
+            -   dependency-name: "predicates"
+            -   dependency-name: "test-case"
+            -   dependency-name: "regex"
+            -   dependency-name: "strip-ansi-escapes"
+            -   dependency-name: "tempfile"
     -   package-ecosystem: "github-actions"
         directory: "/"
         schedule:

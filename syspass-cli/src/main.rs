@@ -51,17 +51,11 @@ const COMMAND_NOT_FOUND: &str = "Command not found";
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Debug
+        metadata.level() <= Level::Info
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            if record.metadata().level() == Level::Error {
-                eprintln!("{}", record.args());
-            } else {
-                println!("{}", record.args());
-            }
-        }
+        println!("{}", record.args());
     }
 
     fn flush(&self) {}

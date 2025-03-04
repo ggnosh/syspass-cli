@@ -19,10 +19,10 @@ exclude = [
 arboard = { version = "3.4", default-features = false, features = ["wayland-data-control"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.5", features = ["cargo", "wrap_help", "color", "suggestions"] }
-clap_complete = { version = "4.5" }
+clap_complete = { version = "4.5", features = ["default"] }
 colored = { version = "3.0" }
-home = "0.5"
-log = { version = "0.4" }
+home = { version = "0.5" }
+log = { version = "0.4", features = ["release_max_level_error"] }
 passwords = { version = "3.1" }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
