@@ -47,7 +47,7 @@ fn process_release(release: &GithubRelease, version: &Version) -> Result<u8, Box
             "{} New version {} was released on {}\nDownload from: {}",
             "\u{2714}".bright_green(),
             release.tag_name,
-            published.format("%Y-%m-%d").to_string(),
+            published.format("%Y-%m-%d"),
             release.html_url
         );
     } else {

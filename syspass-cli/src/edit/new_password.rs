@@ -78,7 +78,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) 
             false,
             Some(|| {
                 api::category::ask_for(api_client).unwrap_or_else(|error| {
-                    error!("{} {}", "\u{2716}".bright_red(), error.to_string());
+                    error!("{} {}", "\u{2716}".bright_red(), error);
                     process::exit(1);
                 })
             }),

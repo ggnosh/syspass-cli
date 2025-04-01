@@ -88,7 +88,7 @@ impl Syspass {
     }
 
     fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> Result<T, api::Error> {
-        debug!("Sending request to {}:\n{:#?}\n", request_url, req);
+        debug!("Sending request to {request_url}:\n{req:#?}\n");
 
         match get_response(&self.client, request_url, req) {
             Ok(result) => {
@@ -97,7 +97,7 @@ impl Syspass {
                     Err(_) => return Err(api::Error("Server response did not contain JSON".to_string())),
                 };
 
-                debug!("Received response:\n{:#?}\n", json);
+                debug!("Received response:\n{json:#?}\n");
 
                 match serde_json::from_value::<T>(json) {
                     Ok(result) => Ok(result),

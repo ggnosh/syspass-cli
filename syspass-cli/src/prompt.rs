@@ -75,7 +75,7 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
             .with_prompt(prompt)
             .validate_with(|input: &String| -> Result<(), &str> {
                 let strength = password_strength(scorer::score(&analyzer::analyze(input)));
-                warn!("Password strength: {}", strength);
+                warn!("Password strength: {strength}");
                 Ok(())
             });
 
