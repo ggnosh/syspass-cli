@@ -2,8 +2,8 @@ use std::error::Error;
 
 use clap::{ArgMatches, Command};
 
-use crate::api::Client;
 use crate::CommandError;
+use crate::api::Client;
 
 mod category;
 mod client;

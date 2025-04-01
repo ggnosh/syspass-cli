@@ -4,8 +4,8 @@ use std::fmt::{Display, Formatter, Result};
 use colored::Colorize;
 use serde::Deserialize;
 
-use crate::api::entity::Entity;
 use crate::TERMINAL_SIZE;
+use crate::api::entity::Entity;
 
 #[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -129,7 +129,7 @@ impl Entity for Account {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::account::{truncate, Account};
+    use crate::api::account::{Account, truncate};
 
     #[test]
     fn test_truncate() {

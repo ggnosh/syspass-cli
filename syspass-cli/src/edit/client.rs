@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use clap::{arg, ArgMatches, Command, ValueHint};
+use clap::{ArgMatches, Command, ValueHint, arg};
 use colored::Colorize;
 use log::{info, warn};
 
-use crate::api::client::{ask_for, Client};
+use crate::api::client::{Client, ask_for};
 use crate::api::entity::Entity;
 use crate::prompt::get_match_string;
 use crate::{api, helper};

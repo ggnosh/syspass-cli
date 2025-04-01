@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
-use dialoguer::theme::ColorfulTheme;
 use dialoguer::FuzzySelect;
+use dialoguer::theme::ColorfulTheme;
 use log::error;
 use serde::Deserialize;
 

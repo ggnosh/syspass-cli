@@ -4,9 +4,9 @@ use std::time::Duration;
 use std::{cmp, env, process, thread};
 
 use arboard::Clipboard;
-use clap::{arg, Arg, ArgAction, ArgMatches, Command, ValueHint};
+use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::{error, warn};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
@@ -89,7 +89,8 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> 
         match Clipboard::new() {
             Ok(mut clipboard) => {
                 clipboard.clear().expect("Failed to clear clipboard");
-            } _ => {
+            }
+            _ => {
                 return Err(Box::from(AppError("Could not clear clipboard".to_owned())));
             }
         }
@@ -248,17 +249,19 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new("Address".green()),
     ];
 
-    table.add_row(Row::new(vec![TableCell::builder(data.account.name())
-        .alignment(Alignment::Center)
-        .col_span(cells.len())
-        .build()]));
+    table.add_row(Row::new(vec![
+        TableCell::builder(data.account.name())
+            .alignment(Alignment::Center)
+            .col_span(cells.len())
+            .build(),
+    ]));
 
-    table.add_row(Row::new(vec![TableCell::builder(
-        data.account.client_name().unwrap_or(""),
-    )
-    .alignment(Alignment::Center)
-    .col_span(cells.len())
-    .build()]));
+    table.add_row(Row::new(vec![
+        TableCell::builder(data.account.client_name().unwrap_or(""))
+            .alignment(Alignment::Center)
+            .col_span(cells.len())
+            .build(),
+    ]));
 
     table.add_row(Row::new(cells));
 

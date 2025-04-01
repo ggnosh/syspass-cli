@@ -3,12 +3,12 @@ use std::str::FromStr;
 
 use colored::Colorize;
 
+use crate::api::Api::{SyspassV2, SyspassV3};
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client as SyspassClient;
 use crate::api::syspass::v2;
 use crate::api::syspass::v3;
-use crate::api::Api::{SyspassV2, SyspassV3};
 use crate::config::Config;
 
 pub mod account;

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use clap::{arg, ArgMatches, Command, ValueHint};
+use clap::{ArgMatches, Command, ValueHint, arg};
 
 use crate::api::{AppError, Client};
 use crate::helper;

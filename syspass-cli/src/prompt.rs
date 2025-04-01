@@ -2,7 +2,7 @@ use std::process;
 
 use chrono::{NaiveDate, NaiveDateTime};
 use clap::ArgMatches;
-use dialoguer::{theme::ColorfulTheme, Input, Password};
+use dialoguer::{Input, Password, theme::ColorfulTheme};
 use log::warn;
 use passwords::{analyzer, scorer};
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::api;
@@ -9,7 +9,7 @@ use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
-use crate::api::syspass::{sort_accounts, JsonReq, RequestArguments, Syspass as SyspassShared};
+use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, sort_accounts};
 use crate::config::Config;
 
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
@@ -273,10 +273,10 @@ mod tests {
     use mockito::{Mock, ServerGuard};
     use test_case::test_case;
 
+    use crate::api::Client;
     use crate::api::account::{Account, ChangePassword};
     use crate::api::entity::Entity;
     use crate::api::syspass::v3::Syspass;
-    use crate::api::Client;
     use crate::config::Config;
 
     fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> (Mock, Syspass, ServerGuard) {

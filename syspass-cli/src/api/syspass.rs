@@ -1,7 +1,7 @@
 use log::debug;
 use reqwest::blocking::{ClientBuilder, Response};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::cell::Cell;
 use std::collections::HashMap;

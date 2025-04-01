@@ -113,7 +113,7 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use crate::config::{get_config_file_or_write, get_config_path, Config};
+    use crate::config::{Config, get_config_file_or_write, get_config_path};
 
     fn create_temp_dir() -> OsString {
         let temp_path = tempdir().expect("Failed to create temp dir").path().to_owned();

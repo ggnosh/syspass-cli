@@ -95,8 +95,8 @@ mod tests {
     use version_compare::Version;
 
     use crate::update::{
-        create_client, get_github_release, get_version, has_new_release, process_release, GithubRelease,
-        DATETIME_FORMAT, FAILED_TO_PARSE_DATETIME,
+        DATETIME_FORMAT, FAILED_TO_PARSE_DATETIME, GithubRelease, create_client, get_github_release, get_version,
+        has_new_release, process_release,
     };
 
     fn get_test_release() -> GithubRelease {

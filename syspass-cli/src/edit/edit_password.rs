@@ -3,13 +3,13 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use chrono::{NaiveDateTime, Utc};
-use clap::{arg, ArgMatches, Command, ValueHint};
+use clap::{ArgMatches, Command, ValueHint, arg};
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{Select, theme::ColorfulTheme};
 use log::{info, warn};
+use passwords::PasswordGenerator;
 use passwords::analyzer;
 use passwords::scorer;
-use passwords::PasswordGenerator;
 
 use crate::api::account::ChangePassword;
 use crate::prompt::{ask_for_date, ask_for_password, password_strength};
@@ -213,7 +213,7 @@ pub fn get_password(prompt: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::edit::edit_password::{generate_passwords, PasswordData};
+    use crate::edit::edit_password::{PasswordData, generate_passwords};
 
     #[test]
     fn test_generate_passwords() {

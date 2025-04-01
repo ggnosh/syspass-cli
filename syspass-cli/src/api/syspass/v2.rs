@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::syspass::{sort_accounts, JsonReq, RequestArguments};
+use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
 use crate::config::Config;
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
@@ -423,10 +423,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::api;
+    use crate::api::Client as ApiClient;
     use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
-    use crate::api::syspass::v2::{Account, Category, Client, Syspass, NOT_SUPPORTED};
-    use crate::api::Client as ApiClient;
+    use crate::api::syspass::v2::{Account, Category, Client, NOT_SUPPORTED, Syspass};
     use crate::config::Config;
 
     fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> (Mock, Syspass, ServerGuard) {
@@ -545,9 +545,11 @@ mod tests {
             expire_date: 1_689_091_943,
         };
 
-        assert!(client
-            .change_password(&change)
-            .is_err_and(|error| NOT_SUPPORTED == error.to_string()));
+        assert!(
+            client
+                .change_password(&change)
+                .is_err_and(|error| NOT_SUPPORTED == error.to_string())
+        );
     }
 
     #[test]

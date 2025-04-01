@@ -26,11 +26,11 @@ use std::process::ExitCode;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use clap::{arg, crate_description, crate_name, crate_version, value_parser, ArgAction, Command, ValueHint};
-use clap_complete::aot::{generate, Generator, Shell};
+use clap::{ArgAction, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser};
+use clap_complete::aot::{Generator, Shell, generate};
 use colored::Colorize;
-use log::{error, Level, LevelFilter, Metadata, Record};
-use terminal_size::{terminal_size, Height, Width};
+use log::{Level, LevelFilter, Metadata, Record, error};
+use terminal_size::{Height, Width, terminal_size};
 
 use crate::api::{Api, Client};
 use crate::config::Config;

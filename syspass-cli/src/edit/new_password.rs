@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::process;
 
-use clap::{arg, ArgMatches, Command, ValueHint};
+use clap::{ArgMatches, Command, ValueHint, arg};
 use colored::Colorize;
 use log::{error, warn};
 
