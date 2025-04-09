@@ -36,13 +36,13 @@ fn create_client() -> Result<Client, Box<dyn Error>> {
 
 fn get_version() -> Result<Version<'static>, Box<dyn Error>> {
     Version::from(env!("CARGO_PKG_VERSION"))
-        .ok_or_else(|| Box::new(std::io::Error::new(std::io::ErrorKind::Other, FAILED_TO_GET_VERSION)).into())
+        .ok_or_else(|| Box::new(std::io::Error::other(FAILED_TO_GET_VERSION)).into())
 }
 
 fn process_release(release: &GithubRelease, version: &Version) -> Result<u8, Box<dyn Error>> {
     if has_new_release(release, version) {
         let published = NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, FAILED_TO_PARSE_DATETIME))?;
+            .map_err(|_| std::io::Error::other(FAILED_TO_PARSE_DATETIME))?;
         warn!(
             "{} New version {} was released on {}\nDownload from: {}",
             "\u{2714}".bright_green(),
@@ -63,13 +63,7 @@ fn get_github_release(client: &Client, url: &str) -> Result<GithubRelease, Box<d
         .header(USER_AGENT, USER_AGENT_NAME)
         .send()?;
     response.json::<GithubRelease>().map_or_else(
-        |_| {
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                COULD_NOT_PARSE_RELEASE_INFO,
-            ))
-            .into())
-        },
+        |_| Err(Box::new(std::io::Error::other(COULD_NOT_PARSE_RELEASE_INFO)).into()),
         Ok,
     )
 }
@@ -88,7 +82,6 @@ struct GithubRelease {
 #[cfg(test)]
 mod tests {
     use std::error::Error;
-    use std::io::ErrorKind;
 
     use chrono::NaiveDateTime;
     use reqwest::blocking::ClientBuilder;
@@ -211,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_error_handling() {
-        let error = std::io::Error::new(ErrorKind::Other, "Test error");
+        let error = std::io::Error::other("Test error");
         let boxed_error: Box<dyn Error> = Box::new(error);
         assert_eq!("Test error", boxed_error.to_string());
     }

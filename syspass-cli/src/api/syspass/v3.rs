@@ -279,7 +279,9 @@ mod tests {
     use crate::api::syspass::v3::Syspass;
     use crate::config::Config;
 
-    fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> (Mock, Syspass, ServerGuard) {
+    type CreatedServer = (Mock, Syspass, ServerGuard);
+
+    fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> CreatedServer {
         let response = crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
 
         (response.0, Syspass { syspass: response.1 }, response.2)

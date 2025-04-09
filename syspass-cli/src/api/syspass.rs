@@ -131,11 +131,13 @@ mod tests {
     use crate::api::syspass::Syspass;
     use crate::config::Config;
 
+    type CreatedServer = (Mock, Syspass, ServerGuard);
+
     pub fn create_server_response(
         response: Option<impl AsRef<Path>>,
         status: usize,
         api_version: &str,
-    ) -> (Mock, Syspass, ServerGuard) {
+    ) -> CreatedServer {
         let path = "/".to_string()
             + &PasswordGenerator::new()
                 .length(20)

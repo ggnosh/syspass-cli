@@ -190,12 +190,14 @@ mod tests {
     use assert_cmd::Command;
     use mockito::{Mock, Server, ServerGuard};
 
+    type ServerResponse = (Mock, ServerGuard);
+
     pub fn create_server_response(
         response: Option<impl AsRef<Path>>,
         status: usize,
         method: &str,
         path: &str,
-    ) -> (Mock, ServerGuard) {
+    ) -> ServerResponse {
         let mut server = Server::new();
         let mut mock = server.mock(method, path);
 
