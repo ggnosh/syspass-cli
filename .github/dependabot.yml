@@ -12,6 +12,8 @@ updates:
             -   dependency-name: "regex"
             -   dependency-name: "strip-ansi-escapes"
             -   dependency-name: "tempfile"
+        target-branch: "development"
+        labels: ["dependencies"]
     -   package-ecosystem: "github-actions"
         directory: "/"
         schedule:
