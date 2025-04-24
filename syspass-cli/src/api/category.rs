@@ -1,8 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use colored::Colorize;
-use dialoguer::FuzzySelect;
-use dialoguer::theme::ColorfulTheme;
+use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::error;
 use serde::Deserialize;
 
@@ -59,12 +58,9 @@ impl Entity for Category {
 }
 
 pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
-    let categories = match api_client.get_categories() {
-        Ok(categories) => categories,
-        Err(error) => {
-            return Err(api::Error(format!("{error}: Could not list categories")));
-        }
-    };
+    let categories = api_client
+        .get_categories()
+        .map_err(|error| api::Error(format!("{error}: Could not list categories")))?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right category (ESC for new):")

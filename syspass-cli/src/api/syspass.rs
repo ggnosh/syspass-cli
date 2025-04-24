@@ -1,7 +1,6 @@
 use log::debug;
 use reqwest::blocking::{ClientBuilder, Response};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -25,11 +24,7 @@ fn sort_accounts(list: &mut [Account], usage_data: &HashMap<u32, u32>) {
         let left = usage_data.get(a.id().expect("Id is set")).unwrap_or(&0);
         let right = usage_data.get(b.id().expect("Id is set")).unwrap_or(&0);
 
-        if *left == 0 && *right == 0 {
-            a.id().cmp(&b.id())
-        } else {
-            right.cmp(left)
-        }
+        right.cmp(left).then_with(|| a.id().cmp(&b.id()))
     });
 }
 
@@ -46,16 +41,18 @@ fn get_builder(config: &Config) -> ClientBuilder {
 }
 
 fn get_response(client: &reqwest::blocking::Client, request_url: &str, req: &JsonReq) -> Result<Response, api::Error> {
-    match client.post(request_url).json(&req).send() {
-        Ok(r) => {
+    client
+        .post(request_url)
+        .json(req)
+        .send()
+        .map_err(|e| api::Error(format!("Request failed: {e}")))
+        .and_then(|r| {
             if r.status().is_success() {
                 Ok(r)
             } else {
                 Err(api::Error(format!("Server responded with code {}", r.status())))
             }
-        }
-        Err(e) => Err(api::Error(e.to_string())),
-    }
+        })
 }
 
 pub struct Syspass {
@@ -69,11 +66,14 @@ impl Syspass {
         let mut params: HashMap<String, String> = HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
 
         if needs_password {
-            if self.config.password.is_empty() {
-                params.insert("tokenPass".to_owned(), PASSWORD.to_string());
-            } else {
-                params.insert("tokenPass".to_owned(), self.config.password.clone());
-            }
+            params.insert(
+                "tokenPass".to_owned(),
+                if self.config.password.is_empty() {
+                    PASSWORD.to_string()
+                } else {
+                    self.config.password.clone()
+                },
+            );
         }
 
         if let Some(args) = args {
@@ -90,29 +90,22 @@ impl Syspass {
     fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> Result<T, api::Error> {
         debug!("Sending request to {request_url}:\n{req:#?}\n");
 
-        match get_response(&self.client, request_url, req) {
-            Ok(result) => {
-                let json: Value = match result.json() {
-                    Ok(value) => value,
-                    Err(_) => return Err(api::Error("Server response did not contain JSON".to_string())),
-                };
+        get_response(&self.client, request_url, req).and_then(|result| {
+            let json: Value = result
+                .json()
+                .map_err(|_| api::Error("Server response did not contain JSON".to_string()))?;
 
-                debug!("Received response:\n{json:#?}\n");
+            debug!("Received response:\n{json:#?}\n");
 
-                match serde_json::from_value::<T>(json) {
-                    Ok(result) => Ok(result),
-                    Err(error) => Err(api::Error(error.to_string())),
-                }
-            }
-            Err(error) => Err(error),
-        }
+            serde_json::from_value::<T>(json).map_err(|e| api::Error(e.to_string()))
+        })
     }
 }
 
 impl From<Config> for Syspass {
     fn from(value: Config) -> Self {
         Self {
-            client: get_builder(&value).build().expect("Got client"),
+            client: get_builder(&value).build().expect("Failed to create client"),
             request_number: Cell::new(1),
             config: value,
         }

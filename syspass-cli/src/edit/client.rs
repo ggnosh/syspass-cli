@@ -50,7 +50,7 @@ pub fn command(
 }
 
 fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quiet: bool) -> Result<u8, Box<dyn Error>> {
-    let mut client: Client = if id == 0 {
+    let mut client = if id == 0 {
         warn!("Creating a new client");
         Client::default()
     } else {
@@ -69,8 +69,9 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
 
     info!("Trying to edit client");
 
-    match api_client.save_client(&client) {
-        Ok(client) => {
+    api_client.save_client(&client).map_or_else(
+        |error| Err(format!("{error}: Could not save client").into()),
+        |client| {
             warn!(
                 "{} Client {} ({}) saved!",
                 "\u{2714}".bright_green(),
@@ -78,7 +79,6 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
                 client.id().expect("Id should be set after saving")
             );
             Ok(0)
-        }
-        Err(error) => Err(format!("{error}: Could not save client"))?,
-    }
+        },
+    )
 }

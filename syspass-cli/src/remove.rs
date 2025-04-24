@@ -23,15 +23,17 @@ pub fn command_helper() -> Command {
         )
         .about("Remove entity")
         .subcommand_required(true)
-        .subcommand(client::command_helper())
-        .subcommand(category::command_helper())
-        .subcommand(account::command_helper())
+        .subcommands([
+            client::command_helper(),
+            category::command_helper(),
+            account::command_helper(),
+        ])
 }
 
 pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
-    let id: u32 = helper::get_numeric_input("id", matches, false, None::<fn() -> u32>, quiet);
+    let id = helper::get_numeric_input("id", matches, false, None::<fn() -> u32>, quiet);
     if id == 0 {
-        Err(AppError("Invalid id given".to_owned()))?;
+        return Err(Box::new(AppError("Invalid id given".to_owned())));
     }
 
     match matches.subcommand() {

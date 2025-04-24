@@ -57,15 +57,16 @@ fn process_release(release: &GithubRelease, version: &Version) -> Result<u8, Box
 }
 
 fn get_github_release(client: &Client, url: &str) -> Result<GithubRelease, Box<dyn Error>> {
-    let response = client
+    client
         .get(url)
         .header(ACCEPT, "application/vnd.github+json")
         .header(USER_AGENT, USER_AGENT_NAME)
-        .send()?;
-    response.json::<GithubRelease>().map_or_else(
-        |_| Err(Box::new(std::io::Error::other(COULD_NOT_PARSE_RELEASE_INFO)).into()),
-        Ok,
-    )
+        .send()?
+        .json::<GithubRelease>()
+        .map_or_else(
+            |_| Err(Box::new(std::io::Error::other(COULD_NOT_PARSE_RELEASE_INFO)).into()),
+            Ok,
+        )
 }
 
 fn has_new_release(release: &GithubRelease, compare_to: &Version) -> bool {

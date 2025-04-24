@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt::{Display, Formatter, Result};
 
 use colored::Colorize;
@@ -99,11 +98,10 @@ impl Display for Account {
 }
 
 fn truncate(s: &str, max_chars: usize) -> String {
-    let max_chars = cmp::max(max_chars, 40);
-    match s.char_indices().nth(max_chars) {
-        None => s.to_string(),
-        Some((idx, _)) => format!("{}...{}", &s[..idx], "".white()),
-    }
+    let max_chars = max_chars.max(40);
+    s.char_indices()
+        .nth(max_chars)
+        .map_or_else(|| s.to_string(), |(idx, _)| format!("{}...{}", &s[..idx], "".white()))
 }
 
 pub struct ViewPassword {

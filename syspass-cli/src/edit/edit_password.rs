@@ -181,7 +181,7 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
         pairs.push(PasswordData {
             password: password.replace('<', "").clone(),
             strength_value: score,
-            strength: password_strength(score),
+            strength: password_strength(score).to_owned(),
         });
     }
 

@@ -2,8 +2,7 @@ use std::error::Error;
 
 use clap::{ArgMatches, Command};
 
-use crate::CommandError;
-use crate::api::Client;
+use crate::{CommandError, api::Client};
 
 mod category;
 mod client;
@@ -13,16 +12,17 @@ mod new_password;
 pub const COMMAND_NAME_EDIT: &str = "edit";
 pub const COMMAND_NAME_NEW: &str = "new";
 
-#[allow(clippy::module_name_repetitions)]
 pub fn command_helper_edit() -> Command {
     Command::new(COMMAND_NAME_EDIT)
         .short_flag('e')
         .visible_aliases(["change"])
         .about("Edit entity")
         .subcommand_required(true)
-        .subcommand(edit_password::command_helper())
-        .subcommand(category::command_helper())
-        .subcommand(client::command_helper())
+        .subcommands([
+            edit_password::command_helper(),
+            category::command_helper(),
+            client::command_helper(),
+        ])
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -43,9 +43,11 @@ pub fn command_helper_new() -> Command {
         .short_flag_alias('a')
         .about("Add a new entity")
         .subcommand_required(true)
-        .subcommand(new_password::command_helper())
-        .subcommand(category::command_helper())
-        .subcommand(client::command_helper())
+        .subcommands([
+            new_password::command_helper(),
+            category::command_helper(),
+            client::command_helper(),
+        ])
 }
 
 pub fn command_new(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {

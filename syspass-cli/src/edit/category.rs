@@ -52,13 +52,32 @@ fn edit_category(
     id: u32,
     quiet: bool,
 ) -> Result<u8, Box<dyn Error>> {
-    let mut category: Category = if id == 0 {
+    let mut category = if id == 0 {
         warn!("Creating a new category");
         Category::default()
     } else {
         api_client.get_category(id)?
     };
 
+    update_category_fields(matches, &mut category, quiet);
+
+    info!("Trying to edit category");
+
+    api_client.save_category(&category).map_or_else(
+        |error| Err(format!("{error}: Could not save category").into()),
+        |category| {
+            warn!(
+                "{} Category {} ({}) saved!",
+                "\u{2714}".bright_green(),
+                category.name().green(),
+                category.id().expect("Id should be set after saving")
+            );
+            Ok(0)
+        },
+    )
+}
+
+fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: bool) {
     category.set_name(get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref());
     category.set_description(Some(get_match_string(
         matches,
@@ -68,19 +87,4 @@ fn edit_category(
         category.description().unwrap_or_default(),
         false,
     )));
-
-    info!("Trying to edit category");
-
-    match api_client.save_category(&category) {
-        Ok(category) => {
-            warn!(
-                "{} Category {} ({}) saved!",
-                "\u{2714}".bright_green(),
-                category.name().green(),
-                category.id().expect("Id should be set after saving")
-            );
-            Ok(0)
-        }
-        Err(error) => Err(format!("{error}: Could not save category"))?,
-    }
 }

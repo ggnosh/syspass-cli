@@ -54,7 +54,7 @@ impl Display for Client {
         write!(
             f,
             "{}. {}{}",
-            self.id().expect("Id should not be empty"),
+            self.id().expect(ID_EMPTY),
             self.name(),
             if *self.is_global() > 0 {
                 " (*)".to_string()
@@ -76,19 +76,16 @@ impl Entity for Client {
 }
 
 pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::result::Result<u32, api::Error> {
-    let clients = match api_client.get_clients() {
-        Ok(clients) => clients,
-        Err(error) => {
-            return Err(api::Error(format!("{error}: Could not list clients")));
-        }
-    };
+    let clients = api_client
+        .get_clients()
+        .map_err(|error| api::Error(format!("{error}: Could not list clients")))?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right client (ESC for new):")
         .max_length(10)
         .items(&clients)
         .interact_opt()
-        .expect("Failed to select client")
+        .map_err(|_| api::Error("Failed to select client".to_string()))?
         .map_or_else(
             || loop {
                 let new_client = Client {
@@ -117,7 +114,7 @@ mod tests {
     use crate::api::client::Client;
 
     #[test]
-    fn test_display_account() {
+    fn test_display_client() {
         assert_eq!(
             "0. name (*)",
             strip_ansi_escapes::strip_str(

@@ -29,11 +29,13 @@ use std::sync::Mutex;
 use clap::{ArgAction, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser};
 use clap_complete::aot::{Generator, Shell, generate};
 use colored::Colorize;
-use log::{Level, LevelFilter, Metadata, Record, error};
+use log::{LevelFilter, error};
 use terminal_size::{Height, Width, terminal_size};
 
-use crate::api::{Api, Client};
-use crate::config::Config;
+use crate::{
+    api::{Api, Client},
+    config::Config,
+};
 
 mod api;
 mod config;
@@ -50,11 +52,11 @@ const DEFAULT_TERMINAL_SIZE: (usize, usize) = (80, 25);
 const COMMAND_NOT_FOUND: &str = "Command not found";
 
 impl log::Log for SimpleLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= LevelFilter::Info
     }
 
-    fn log(&self, record: &Record) {
+    fn log(&self, record: &log::Record) {
         println!("{}", record.args());
     }
 
@@ -68,45 +70,41 @@ static TERMINAL_SIZE: Mutex<(usize, usize)> = Mutex::new(DEFAULT_TERMINAL_SIZE);
 fn get_command() -> Command {
     Command::new(crate_name!())
         .about(crate_description!())
-        .subcommand_required(false)
-        .arg_required_else_help(true)
         .version(crate_version!())
+        .arg_required_else_help(true)
         .arg(
             arg!(-c --config <FILE> "Sets a custom config file")
                 .global(true)
-                .required(false)
-                .display_order(100)
                 .value_hint(ValueHint::FilePath),
         )
         .arg(
             arg!(-q --quiet "Do not output any message")
                 .global(true)
-                .required(false)
                 .display_order(100),
         )
         .arg(
             arg!(-v --verbose "Output more information")
                 .global(true)
-                .required(false)
                 .display_order(100),
         )
         .arg(
             arg!(-d --debug "Output debug information")
                 .global(true)
-                .required(false)
                 .display_order(100),
         )
         .arg(
-            arg!(--completions "Output debug information")
+            arg!(--completions "Generate shell completions")
                 .action(ArgAction::Set)
                 .display_order(200)
                 .value_parser(value_parser!(Shell)),
         )
-        .subcommand(search::command_helper())
-        .subcommand(edit::command_helper_edit())
-        .subcommand(remove::command_helper())
-        .subcommand(edit::command_helper_new())
-        .subcommand(update::command_helper())
+        .subcommands([
+            search::command_helper(),
+            edit::command_helper_edit(),
+            remove::command_helper(),
+            edit::command_helper_new(),
+            update::command_helper(),
+        ])
 }
 
 fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
@@ -119,7 +117,7 @@ fn main() -> ExitCode {
     if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
         let mut commands = get_command();
         print_completions(generator, &mut commands);
-        return ExitCode::from(0);
+        return ExitCode::SUCCESS;
     }
 
     let config = Config::from(&matches);
@@ -142,11 +140,10 @@ fn main() -> ExitCode {
         LevelFilter::Warn
     };
 
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log_level))
-        .expect("Failed to set logger");
+    log::set_logger(&LOGGER).expect("Failed to set logger");
+    log::set_max_level(log_level);
 
-    *TERMINAL_SIZE.lock().expect("Fail") =
+    *TERMINAL_SIZE.lock().expect("Failed to lock terminal size") =
         terminal_size().map_or(DEFAULT_TERMINAL_SIZE, |(Width(w), Height(h))| (w as usize, h as usize));
 
     match match matches.subcommand() {
@@ -175,9 +172,7 @@ enum CommandError {
 
 impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::NotFound => write!(f, "{COMMAND_NOT_FOUND}"),
-        }
+        write!(f, "{COMMAND_NOT_FOUND}")
     }
 }
 

@@ -7,22 +7,16 @@ pub fn get_numeric_input<F>(field: &str, matches: &ArgMatches, new: bool, callba
 where
     F: FnOnce() -> u32,
 {
-    matches
-        .get_one::<u32>(field)
-        .map(std::borrow::ToOwned::to_owned)
-        .map_or_else(
-            || {
-                if new {
-                    0
-                } else if quiet {
-                    warn!("Could not ask for input");
-                    process::exit(1);
-                } else {
-                    callback.map_or(0, |callback| callback())
-                }
-            },
-            |id| id,
-        )
+    matches.get_one::<u32>(field).copied().unwrap_or_else(|| {
+        if new {
+            0
+        } else if quiet {
+            warn!("Could not ask for input");
+            process::exit(1);
+        } else {
+            callback.map_or(0, |cb| cb())
+        }
+    })
 }
 
 #[cfg(test)]
@@ -40,11 +34,7 @@ mod tests {
     fn test_get_numeric_input(id: &str, new: bool, result: u32) {
         let command = Command::new("test").arg(Arg::new("id").long("id").value_parser(clap::value_parser!(u32)));
 
-        let callback: Option<fn() -> u32> = if result == 1337 {
-            Some(|| 1337)
-        } else {
-            None::<fn() -> u32>
-        };
+        let callback = if result == 1337 { Some(|| 1337) } else { None };
 
         let input = if id.is_empty() {
             vec!["test"]

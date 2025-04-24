@@ -36,7 +36,7 @@ pub trait Client {
 }
 
 #[derive(Debug)]
-pub struct Error(String);
+pub struct Error(pub String);
 
 #[derive(Debug)]
 pub struct AppError(pub String);

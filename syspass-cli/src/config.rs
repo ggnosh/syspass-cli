@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
-use std::io::ErrorKind::NotFound;
+use std::io::ErrorKind;
 use std::path::Path;
 
 const CONFIG: &str = "config";
@@ -30,12 +30,7 @@ pub struct Config {
 
 fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
     let mut path = dir.map_or_else(
-        || {
-            home::home_dir().map_or_else(
-                || panic!("{} Impossible to get your home dir!", "\u{2716}".bright_red()),
-                std::path::PathBuf::into_os_string,
-            )
-        },
+        || home::home_dir().expect("Unable to get home directory").into_os_string(),
         OsString::from,
     );
 
@@ -45,29 +40,26 @@ fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
 
 fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> String
 where
-    T: Sized + serde::Serialize,
+    T: Serialize,
 {
     let path = get_config_path(file, dir);
     fs::read_to_string(&path).unwrap_or_else(|error| {
-        if error.kind() == NotFound {
-            let data = serde_json::to_string(&value).expect("Saved");
+        if error.kind() == ErrorKind::NotFound {
+            let data = serde_json::to_string(&value).expect("Serialization failed");
             if let Some(parent) = Path::new(&path).parent() {
                 fs::create_dir_all(parent).expect("Failed to create directories");
             }
             fs::write(&path, &data).expect("Failed to write data");
             data
         } else {
-            panic!("{} Couldn't read config file", "\u{2716}".bright_red())
+            panic!("{} Couldn't read config file", "\u{2716}".bright_red());
         }
     })
 }
 
 impl From<&ArgMatches> for Config {
     fn from(value: &ArgMatches) -> Self {
-        let config_file = value
-            .get_one::<String>(CONFIG)
-            .map_or_else(|| "", |s| s.as_str())
-            .to_owned();
+        let config_file = value.get_one::<String>(CONFIG).unwrap_or(&String::new()).to_owned();
 
         let data = if config_file.is_empty() {
             get_config_file_or_write("config.json", None, Self::default())
@@ -81,27 +73,18 @@ impl From<&ArgMatches> for Config {
 
 impl Config {
     pub fn get_usage_data(dir: Option<&str>) -> HashMap<u32, u32> {
-        let data = get_config_file_or_write("usage.json", dir, HashMap::from([(0, 0)]));
+        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new());
 
         serde_json::from_str::<HashMap<u32, u32>>(&data).expect("JSON does not have correct format.")
     }
 
     pub fn record_usage(id: u32, dir: Option<&str>) {
         let mut usage = Self::get_usage_data(dir);
-
-        #[allow(clippy::option_if_let_else)]
-        match usage.get_mut(&id) {
-            Some(count) => {
-                *count += 1;
-            }
-            None => {
-                usage.insert(id, 1);
-            }
-        }
+        *usage.entry(id).or_insert(0) += 1;
 
         fs::write(
             get_config_path("usage.json", dir),
-            serde_json::to_string::<HashMap<u32, u32>>(&usage).expect("Serialization failed") + "\n",
+            serde_json::to_string(&usage).expect("Serialization failed") + "\n",
         )
         .expect("Unable to write file");
     }
@@ -109,11 +92,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsString;
-
-    use tempfile::tempdir;
-
     use crate::config::{Config, get_config_file_or_write, get_config_path};
+    use std::ffi::OsString;
+    use tempfile::tempdir;
 
     fn create_temp_dir() -> OsString {
         let temp_path = tempdir().expect("Failed to create temp dir").path().to_owned();
@@ -136,8 +117,7 @@ mod tests {
     }
 
     fn cleanup_temp_dir(temp: Option<&str>) {
-        std::fs::remove_dir_all(std::path::PathBuf::from(temp.expect("failed to get path")))
-            .expect("Failed to remove dir");
+        std::fs::remove_dir_all(temp.expect("Failed to get path")).expect("Failed to remove dir");
     }
 
     #[test]
@@ -147,7 +127,7 @@ mod tests {
         let path = get_config_path("config.json", temp_str);
         assert_eq!(
             temp_str.expect("Failed to get path").to_string() + "/.syspass/config.json",
-            path.as_os_str().to_str().expect("String")
+            path.to_str().expect("Failed to convert path")
         );
 
         cleanup_temp_dir(temp_str);

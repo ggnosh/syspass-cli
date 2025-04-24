@@ -71,13 +71,12 @@ fn get_accounts_list(
     search_string: Vec<(&str, String)>,
     usage_disabled: bool,
 ) -> Vec<Account> {
-    match api_client.search_account(search_string, usage_disabled) {
-        Ok(accounts) => accounts,
-        Err(error) => {
+    api_client
+        .search_account(search_string, usage_disabled)
+        .unwrap_or_else(|error| {
             error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
             process::exit(1);
-        }
-    }
+        })
 }
 
 fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> {
@@ -86,27 +85,19 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> 
             thread::sleep(Duration::from_secs(timeout));
         }
 
-        match Clipboard::new() {
-            Ok(mut clipboard) => {
-                clipboard.clear().expect("Failed to clear clipboard");
-            }
-            _ => {
-                return Err(Box::from(AppError("Could not clear clipboard".to_owned())));
-            }
-        }
+        Clipboard::new()
+            .map_err(|_| AppError("Could not clear clipboard".to_owned()))?
+            .clear()
+            .map_err(|_| AppError("Failed to clear clipboard".to_owned()))?;
     }
 
     Ok(0)
 }
 
 pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
-    let name = matches
-        .get_one::<String>("name")
-        .map_or_else(String::new, std::borrow::ToOwned::to_owned);
-    let id: u32 = matches.get_one::<u32>("id").map_or(0, std::borrow::ToOwned::to_owned);
-    let category: u32 = matches
-        .get_one::<u32>("category")
-        .map_or(0, std::borrow::ToOwned::to_owned);
+    let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
+    let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
+    let category = matches.get_one::<u32>("category").copied().unwrap_or(0);
     let config = api_client.get_config();
     let show = matches.get_flag("show-password") || config.no_clipboard;
 
@@ -114,10 +105,8 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
         return clear_clipboard(config.password_timeout.unwrap_or(10), false);
     }
 
-    let accounts: Vec<Account>;
-
-    if id > 0 {
-        accounts = vec![api_client.view_account(id).expect("Invalid account id")];
+    let accounts = if id > 0 {
+        vec![api_client.view_account(id).expect("Invalid account id")]
     } else if name.is_empty() {
         warn!("{} {}", "\u{2716}".bright_red(), "Name or id is required".red());
         process::exit(1);
@@ -126,36 +115,31 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
         if category > 0 {
             search_string.push(("categoryId", category.to_string()));
         }
-
-        accounts = get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"));
-    }
+        get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"))
+    };
 
     if accounts.len() > 1 && quiet {
         return Ok(1);
     }
 
     let account: ViewPassword = {
+        let handle_error = |error: &dyn Error, message: &str, status: i32| -> ! {
+            error!("{} {}: {}", "\u{2716}".bright_red(), message, error);
+            process::exit(status);
+        };
+
         if accounts.len() > 1 {
-            match select_account(&accounts, api_client, matches.get_flag("disable-usage")) {
-                Ok(account) => account,
-                Err(error) => {
-                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
-                    process::exit(1);
-                }
-            }
+            select_account(&accounts, api_client, matches.get_flag("disable-usage"))
+                .unwrap_or_else(|error| handle_error(&error, "Error while searching", 1))
         } else {
-            let Some(account) = accounts.first() else {
+            let account = accounts.first().unwrap_or_else(|| {
                 warn!("{} No account found", "\u{2716}".bright_red());
                 process::exit(1);
-            };
+            });
 
-            match api_client.get_password(account) {
-                Ok(password) => password,
-                Err(error) => {
-                    error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
-                    process::exit(1);
-                }
-            }
+            api_client
+                .get_password(account)
+                .unwrap_or_else(|error| handle_error(&error, "Error while searching", 1))
         }
     };
 
@@ -167,12 +151,12 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
 
         if config.password_timeout.unwrap_or(10) > 0 {
             if let Some(path) = env::current_exe()?.as_path().to_str() {
-                let mut child = process::Command::new(path)
+                process::Command::new(path)
                     .args(["search", "--clear"])
                     .spawn()
-                    .expect("Failed to start child");
-
-                child.wait().expect("Failed to wait for child");
+                    .expect("Failed to start child")
+                    .wait()
+                    .expect("Failed to wait for child");
             }
         }
     }
@@ -202,44 +186,33 @@ fn select_account(
     api_client: &dyn Client,
     disable_usage: bool,
 ) -> Result<ViewPassword, AppError> {
-    let selection = FuzzySelect::with_theme(&ColorfulTheme::default())
+    FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right account:")
         .default(0)
         .max_length(10)
         .items(accounts)
-        .interact();
-
-    match selection {
-        Ok(choice) => {
+        .interact()
+        .map_err(|err| AppError(err.to_string()))
+        .and_then(|choice| {
             if !disable_usage {
                 Config::record_usage(*accounts[choice].id().expect("Id should be set"), None);
             }
-            Ok(api_client.get_password(&accounts[choice])?)
-        }
-        Err(err) => Err(AppError(err.to_string())),
-    }
+            api_client
+                .get_password(&accounts[choice])
+                .map_err(|err| AppError(err.to_string()))
+        })
 }
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     let mut table = Table::new();
     let terminal_width = TERMINAL_SIZE.try_lock().map_or(DEFAULT_TERMINAL_SIZE.0, |size| size.0);
-    let width = [
+    let widths = [
         terminal_width * 7 / 100,
         terminal_width * 29 / 100,
-        terminal_width * 33 / 100,
+        cmp::max(terminal_width * 30 / 100, terminal_width - (terminal_width * 69 / 100)),
     ];
 
-    let widths = HashMap::from([
-        (0, width[0]),
-        (1, width[1]),
-        (
-            2,
-            cmp::max(terminal_width * 30 / 100, terminal_width - width.iter().sum::<usize>()),
-        ),
-        (3, width[2]),
-    ]);
-
-    table.max_column_widths = widths;
+    table.max_column_widths = HashMap::from([(0, widths[0]), (1, widths[1]), (2, widths[2]), (3, widths[1])]);
     table.style = TableStyle::rounded();
 
     let cells = vec![
@@ -268,12 +241,10 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.add_row(Row::new(vec![
         TableCell::new(data.account.id().expect("Id should not be empty")),
         TableCell::new(data.account.login()),
-        TableCell::new({
-            if show {
-                data.password.clone()
-            } else {
-                "\u{2714} Copied to clipboard \u{2714}".to_string()
-            }
+        TableCell::new(if show {
+            data.password.clone()
+        } else {
+            "\u{2714} Copied to clipboard \u{2714}".to_string()
         }),
         TableCell::new(data.account.url().unwrap_or_default()),
     ]));
