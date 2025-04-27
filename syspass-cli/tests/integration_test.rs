@@ -222,11 +222,7 @@ fn run_new_delete_password(version: &str, success: bool) {
         ])
         .assert();
 
-    let status = if success {
-        assert.success().code(0)
-    } else {
-        assert.failure().code(1)
-    };
+    let status = if success { assert.success() } else { assert.failure() };
 
     let reg = Regex::new(r" Account new_password_test \((\d+)\) saved!\n$").expect("Failed to create regex");
     let data: String = String::from_utf8(status.get_output().clone().stdout).expect("Failed to get output");

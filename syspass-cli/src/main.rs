@@ -28,8 +28,9 @@ use std::sync::Mutex;
 
 use clap::{ArgAction, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser};
 use clap_complete::aot::{Generator, Shell, generate};
-use colored::Colorize;
 use log::{LevelFilter, error};
+use miette::miette;
+use owo_colors::{OwoColorize, Stream::Stdout};
 use terminal_size::{Height, Width, terminal_size};
 
 use crate::{
@@ -53,11 +54,13 @@ const COMMAND_NOT_FOUND: &str = "Command not found";
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= LevelFilter::Info
+        metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &log::Record) {
-        println!("{}", record.args());
+        if self.enabled(record.metadata()) {
+            println!("{}", record.args());
+        }
     }
 
     fn flush(&self) {}
@@ -121,48 +124,51 @@ fn main() -> ExitCode {
     }
 
     let config = Config::from(&matches);
-    let api_version = config.api_version.as_ref().map_or("", |version| version);
+    let api_version = config.api_version.as_deref().unwrap_or("");
     let api_client_box: Box<dyn Client> = Api::from_str(api_version)
-        .unwrap_or_else(|()| panic!("No such API is supported ({})", &api_version))
+        .unwrap_or_else(|()| panic!("No such API is supported ({api_version})"))
         .get(config);
 
     let api_client = api_client_box.as_ref();
 
-    let quiet = matches.get_flag("quiet");
-
-    let log_level = if matches.get_flag("debug") {
-        LevelFilter::Debug
-    } else if matches.get_flag("verbose") {
-        LevelFilter::Info
-    } else if matches.get_flag("quiet") {
-        LevelFilter::Off
-    } else {
-        LevelFilter::Warn
-    };
-
     log::set_logger(&LOGGER).expect("Failed to set logger");
-    log::set_max_level(log_level);
+    log::set_max_level(
+        match (
+            matches.get_flag("debug"),
+            matches.get_flag("verbose"),
+            matches.get_flag("quiet"),
+        ) {
+            (true, _, _) => LevelFilter::Debug,
+            (_, true, _) => LevelFilter::Info,
+            (_, _, true) => LevelFilter::Off,
+            _ => LevelFilter::Warn,
+        },
+    );
 
-    *TERMINAL_SIZE.lock().expect("Failed to lock terminal size") =
-        terminal_size().map_or(DEFAULT_TERMINAL_SIZE, |(Width(w), Height(h))| (w as usize, h as usize));
-
-    match match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet),
-        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client, quiet),
-        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet),
-        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet),
-        Some((update::COMMAND_NAME, matches)) => update::command(matches),
-        _ => {
-            let error: Box<dyn Error> = Box::new(CommandError::NotFound);
-            Err(error)
-        }
-    } {
-        Ok(code) => ExitCode::from(code),
-        Err(e) => {
-            error!("{} {}", "\u{2716}".bright_red(), e);
-            ExitCode::from(1)
-        }
+    if let Some((Width(w), Height(h))) = terminal_size() {
+        *TERMINAL_SIZE.lock().expect("Failed to lock terminal size") = (w as usize, h as usize);
     }
+
+    let quiet = matches.get_flag("quiet");
+    match matches.subcommand() {
+        Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet).map(|_| 0),
+        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client, quiet).map(|()| 0),
+        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet).map(|()| 0),
+        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet).map(|()| 0),
+        Some((update::COMMAND_NAME, matches)) => update::command(matches).map(|()| 0),
+        _ => Err(miette!(CommandError::NotFound)),
+    }
+    .map_or_else(
+        |e| {
+            error!(
+                "{} {}",
+                "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
+                e
+            );
+            ExitCode::FAILURE
+        },
+        |_| ExitCode::SUCCESS,
+    )
 }
 
 #[derive(Debug)]
@@ -208,8 +214,10 @@ mod tests {
 
     #[test]
     fn test_main_help() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).expect("Failed to build binary");
-        cmd.arg("--help");
-        cmd.assert().success();
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .expect("Failed to build binary")
+            .arg("--help")
+            .assert()
+            .success();
     }
 }

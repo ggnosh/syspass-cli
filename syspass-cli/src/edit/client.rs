@@ -1,13 +1,11 @@
-use std::error::Error;
-
-use clap::{ArgMatches, Command, ValueHint, arg};
-use colored::Colorize;
-use log::{info, warn};
-
 use crate::api::client::{Client, ask_for};
 use crate::api::entity::Entity;
 use crate::prompt::get_match_string;
 use crate::{api, helper};
+use clap::{ArgMatches, Command, ValueHint, arg};
+use log::{info, warn};
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub const COMMAND_NAME: &str = "client";
 
@@ -33,28 +31,26 @@ pub fn command_helper() -> Command {
         )
 }
 
-pub fn command(
-    matches: &ArgMatches,
-    api_client: &dyn api::Client,
-    quiet: bool,
-    new: bool,
-) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool, new: bool) -> Result<Client> {
     let id = helper::get_numeric_input(
         "id",
         matches,
         new,
-        Some(|| ask_for(api_client, matches).expect("Failed to get client")),
+        Ok(|| ask_for(api_client, matches).map_err(|e| miette!("{e}: Failed to get client"))),
         quiet,
-    );
+    )?;
+
     edit_client(matches, api_client, id, quiet)
 }
 
-fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quiet: bool) -> Result<u8, Box<dyn Error>> {
+fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quiet: bool) -> Result<Client> {
     let mut client = if id == 0 {
         warn!("Creating a new client");
         Client::default()
     } else {
-        api_client.get_client(id)?
+        api_client
+            .get_client(id)
+            .map_err(|e| miette!("{e}: Failed to retrieve client"))?
     };
 
     client.set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
@@ -69,16 +65,15 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
 
     info!("Trying to edit client");
 
-    api_client.save_client(&client).map_or_else(
-        |error| Err(format!("{error}: Could not save client").into()),
-        |client| {
+    api_client
+        .save_client(client)
+        .map_err(|e| miette!("{e}: Could not save client"))
+        .inspect(|client| {
             warn!(
                 "{} Client {} ({}) saved!",
-                "\u{2714}".bright_green(),
-                client.name().green(),
+                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+                client.name().if_supports_color(Stdout, |text| text.green()),
                 client.id().expect("Id should be set after saving")
             );
-            Ok(0)
-        },
-    )
+        })
 }

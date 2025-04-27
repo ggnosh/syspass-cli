@@ -1,22 +1,21 @@
-use std::collections::HashMap;
-use std::error::Error;
-use std::time::Duration;
-use std::{cmp, env, process, thread};
-
 use arboard::Clipboard;
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
-use colored::Colorize;
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
-use log::{error, warn};
+use log::warn;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
+use std::collections::HashMap;
+use std::time::Duration;
+use std::{cmp, env, process, thread};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
 use term_table::{Table, TableStyle};
 
+use crate::api::Client;
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::{AppError, Client};
 use crate::config::Config;
-use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE};
+use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE, api};
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -70,31 +69,28 @@ fn get_accounts_list(
     api_client: &dyn Client,
     search_string: Vec<(&str, String)>,
     usage_disabled: bool,
-) -> Vec<Account> {
+) -> Result<Vec<Account>> {
     api_client
         .search_account(search_string, usage_disabled)
-        .unwrap_or_else(|error| {
-            error!("{} Error while searching: {}", "\u{2716}".bright_red(), error);
-            process::exit(1);
-        })
+        .map_err(|error| miette!("Error while searching: {error}"))
 }
 
-fn clear_clipboard(timeout: u64, immediate: bool) -> Result<u8, Box<dyn Error>> {
+fn clear_clipboard(timeout: u64, immediate: bool) -> Result<()> {
     if timeout > 0 {
         if !immediate {
             thread::sleep(Duration::from_secs(timeout));
         }
 
         Clipboard::new()
-            .map_err(|_| AppError("Could not clear clipboard".to_owned()))?
+            .map_err(|_| miette!("Could not clear clipboard"))?
             .clear()
-            .map_err(|_| AppError("Failed to clear clipboard".to_owned()))?;
+            .map_err(|_| miette!("Failed to clear clipboard"))?;
     }
 
-    Ok(0)
+    Ok(())
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<Option<ViewPassword>> {
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
     let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
     let category = matches.get_one::<u32>("category").copied().unwrap_or(0);
@@ -102,44 +98,38 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
     let show = matches.get_flag("show-password") || config.no_clipboard;
 
     if matches.get_flag("clear") {
-        return clear_clipboard(config.password_timeout.unwrap_or(10), false);
+        clear_clipboard(config.password_timeout.unwrap_or(10), false)?;
+        return Ok(None);
     }
 
     let accounts = if id > 0 {
-        vec![api_client.view_account(id).expect("Invalid account id")]
+        vec![api_client.view_account(id)?]
     } else if name.is_empty() {
-        warn!("{} {}", "\u{2716}".bright_red(), "Name or id is required".red());
-        process::exit(1);
+        return Err(miette!("Name or id is required"));
     } else {
         let mut search_string = vec![("text", name)];
         if category > 0 {
             search_string.push(("categoryId", category.to_string()));
         }
-        get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"))
+        get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"))?
     };
 
     if accounts.len() > 1 && quiet {
-        return Ok(1);
+        return Ok(None);
     }
 
     let account: ViewPassword = {
-        let handle_error = |error: &dyn Error, message: &str, status: i32| -> ! {
-            error!("{} {}: {}", "\u{2716}".bright_red(), message, error);
-            process::exit(status);
-        };
-
         if accounts.len() > 1 {
             select_account(&accounts, api_client, matches.get_flag("disable-usage"))
-                .unwrap_or_else(|error| handle_error(&error, "Error while searching", 1))
+                .map_err(|error| miette!("Error while selecting account: {error}"))?
         } else {
-            let account = accounts.first().unwrap_or_else(|| {
-                warn!("{} No account found", "\u{2716}".bright_red());
-                process::exit(1);
-            });
+            let account = accounts
+                .first()
+                .ok_or_else(|| api::ApiError::NoResults("accounts".to_string()))?;
 
             api_client
                 .get_password(account)
-                .unwrap_or_else(|error| handle_error(&error, "Error while searching", 1))
+                .map_err(|error| miette!("Error while fetching password: {error}"))?
         }
     };
 
@@ -150,13 +140,17 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
         }
 
         if config.password_timeout.unwrap_or(10) > 0 {
-            if let Some(path) = env::current_exe()?.as_path().to_str() {
+            if let Some(path) = env::current_exe()
+                .map_err(|e| miette!("{e}: Failed to get current executable path"))?
+                .as_path()
+                .to_str()
+            {
                 process::Command::new(path)
                     .args(["search", "--clear"])
                     .spawn()
-                    .expect("Failed to start child")
+                    .map_err(|e| miette!("{e}: Failed to start child process"))?
                     .wait()
-                    .expect("Failed to wait for child");
+                    .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
             }
         }
     }
@@ -168,7 +162,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Re
         open_shell(&account.account);
     }
 
-    Ok(0)
+    Ok(Some(account))
 }
 
 fn open_shell(account: &Account) {
@@ -181,25 +175,19 @@ fn open_shell(account: &Account) {
         .expect("Failed to exit ssh");
 }
 
-fn select_account(
-    accounts: &[Account],
-    api_client: &dyn Client,
-    disable_usage: bool,
-) -> Result<ViewPassword, AppError> {
+fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: bool) -> Result<ViewPassword> {
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right account:")
         .default(0)
         .max_length(10)
         .items(accounts)
         .interact()
-        .map_err(|err| AppError(err.to_string()))
+        .map_err(|err| miette!(err))
         .and_then(|choice| {
             if !disable_usage {
                 Config::record_usage(*accounts[choice].id().expect("Id should be set"), None);
             }
-            api_client
-                .get_password(&accounts[choice])
-                .map_err(|err| AppError(err.to_string()))
+            api_client.get_password(&accounts[choice]).map_err(|err| miette!(err))
         })
 }
 
@@ -216,10 +204,10 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.style = TableStyle::rounded();
 
     let cells = vec![
-        TableCell::new("Id".green()),
-        TableCell::new("Username".green()),
-        TableCell::new("Password".green()),
-        TableCell::new("Address".green()),
+        TableCell::new("Id".if_supports_color(Stdout, |text| text.green())),
+        TableCell::new("Username".if_supports_color(Stdout, |text| text.green())),
+        TableCell::new("Password".if_supports_color(Stdout, |text| text.green())),
+        TableCell::new("Address".if_supports_color(Stdout, |text| text.green())),
     ];
 
     table.add_row(Row::new(vec![
@@ -244,7 +232,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
         TableCell::new(if show {
             data.password.clone()
         } else {
-            "\u{2714} Copied to clipboard \u{2714}".to_string()
+            "Copied to clipboard".to_string()
         }),
         TableCell::new(data.account.url().unwrap_or_default()),
     ]));

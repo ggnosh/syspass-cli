@@ -1,9 +1,8 @@
-use std::error::Error;
-
 use chrono::NaiveDateTime;
 use clap::{ArgMatches, Command};
-use colored::Colorize;
 use log::warn;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 use reqwest::blocking::{Client, ClientBuilder};
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
@@ -23,50 +22,53 @@ pub fn command_helper() -> Command {
 
 const GITHUB_RELEASE_PAGE: &str = "https://api.github.com/repos/ggnosh/syspass-cli/releases/latest";
 
-pub fn command(_matches: &ArgMatches) -> Result<u8, Box<dyn Error>> {
+pub fn command(_matches: &ArgMatches) -> Result<()> {
     let client = create_client()?;
     let release = get_github_release(&client, GITHUB_RELEASE_PAGE)?;
     let version = get_version()?;
     process_release(&release, &version)
 }
 
-fn create_client() -> Result<Client, Box<dyn Error>> {
-    ClientBuilder::new().build().map_err(Into::into)
+fn create_client() -> Result<Client> {
+    ClientBuilder::new()
+        .build()
+        .map_err(|e| miette!("{e}: Failed to create client"))
 }
 
-fn get_version() -> Result<Version<'static>, Box<dyn Error>> {
-    Version::from(env!("CARGO_PKG_VERSION"))
-        .ok_or_else(|| Box::new(std::io::Error::other(FAILED_TO_GET_VERSION)).into())
+fn get_version() -> Result<Version<'static>> {
+    Version::from(env!("CARGO_PKG_VERSION")).ok_or_else(|| miette!(FAILED_TO_GET_VERSION))
 }
 
-fn process_release(release: &GithubRelease, version: &Version) -> Result<u8, Box<dyn Error>> {
+fn process_release(release: &GithubRelease, version: &Version) -> Result<()> {
     if has_new_release(release, version) {
         let published = NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT)
-            .map_err(|_| std::io::Error::other(FAILED_TO_PARSE_DATETIME))?;
+            .map_err(|_| miette!(FAILED_TO_PARSE_DATETIME))?;
         warn!(
             "{} New version {} was released on {}\nDownload from: {}",
-            "\u{2714}".bright_green(),
+            "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
             release.tag_name,
             published.format("%Y-%m-%d"),
             release.html_url
         );
     } else {
-        warn!("{} No new versions available", "\u{2716}".bright_red());
+        warn!(
+            "{} No new versions available",
+            "\u{2716}".if_supports_color(Stdout, |text| text.bright_red())
+        );
     }
-    Ok(0)
+
+    Ok(())
 }
 
-fn get_github_release(client: &Client, url: &str) -> Result<GithubRelease, Box<dyn Error>> {
+fn get_github_release(client: &Client, url: &str) -> Result<GithubRelease> {
     client
         .get(url)
         .header(ACCEPT, "application/vnd.github+json")
         .header(USER_AGENT, USER_AGENT_NAME)
-        .send()?
+        .send()
+        .map_err(|e| miette!("{e}: Failed to send request"))?
         .json::<GithubRelease>()
-        .map_or_else(
-            |_| Err(Box::new(std::io::Error::other(COULD_NOT_PARSE_RELEASE_INFO)).into()),
-            Ok,
-        )
+        .map_or_else(|_| Err(miette!(COULD_NOT_PARSE_RELEASE_INFO)), Ok)
 }
 
 fn has_new_release(release: &GithubRelease, compare_to: &Version) -> bool {
@@ -200,7 +202,6 @@ mod tests {
         let version = Version::from("v0.2.0").expect("Failed to get current version");
         let result = process_release(&release, &version);
         assert!(result.is_ok());
-        assert_eq!(0, result.expect("Failed to process release"));
     }
 
     #[test]

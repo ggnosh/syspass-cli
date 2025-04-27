@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter, Result};
 
-use colored::Colorize;
+use owo_colors::{OwoColorize, Stream::Stdout};
 use serde::Deserialize;
 
 use crate::TERMINAL_SIZE;
 use crate::api::entity::Entity;
 
-#[derive(Deserialize, Default, Clone)]
+#[derive(Deserialize, Default, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     id: Option<u32>,
@@ -99,9 +99,10 @@ impl Display for Account {
 
 fn truncate(s: &str, max_chars: usize) -> String {
     let max_chars = max_chars.max(40);
-    s.char_indices()
-        .nth(max_chars)
-        .map_or_else(|| s.to_string(), |(idx, _)| format!("{}...{}", &s[..idx], "".white()))
+    s.char_indices().nth(max_chars).map_or_else(
+        || s.to_string(),
+        |(idx, _)| format!("{}...{}", &s[..idx], "".if_supports_color(Stdout, |text| text.white())),
+    )
 }
 
 pub struct ViewPassword {

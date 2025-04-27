@@ -20,7 +20,6 @@ arboard = { version = "3.4", default-features = false, features = ["wayland-data
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 clap = { version = "4.5", features = ["cargo", "wrap_help", "color", "suggestions"] }
 clap_complete = { version = "4.5", features = ["default"] }
-colored = { version = "3.0" }
 home = { version = "0.5" }
 log = { version = "0.4", features = ["release_max_level_error"] }
 passwords = { version = "3.1" }
@@ -32,6 +31,10 @@ term-table = "1.3"
 terminal_size = "0.4"
 version-compare = "0.2"
 dialoguer = { version = "0.11", features = ["fuzzy-select", "password"] }
+miette = { version = "7.5" }
+thiserror = "2.0"
+owo-colors = { version = "4.2", features = ["supports-colors"] }
+itertools = "0.14"
 
 [dev-dependencies]
 assert_cmd = "2.0"

@@ -1,17 +1,18 @@
+use miette::{Result, miette};
 use std::cmp::Ordering;
-use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use chrono::{NaiveDateTime, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
-use colored::Colorize;
 use dialoguer::{Select, theme::ColorfulTheme};
+use itertools::Itertools;
 use log::{info, warn};
+use owo_colors::{OwoColorize, Stream::Stdout};
 use passwords::PasswordGenerator;
 use passwords::analyzer;
 use passwords::scorer;
 
-use crate::api::account::ChangePassword;
+use crate::api::account::{Account, ChangePassword};
 use crate::prompt::{ask_for_date, ask_for_password, password_strength};
 
 pub const COMMAND_NAME: &str = "password";
@@ -65,11 +66,11 @@ pub fn command_helper() -> Command {
         )
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet: bool) -> Result<Account> {
     let args: ChangeAccountArgs = get_args(matches, quiet);
 
     if args.password.is_empty() {
-        Err("Password can't be empty")?;
+        Err(miette!("Password can't be empty"))?;
     }
 
     let change = ChangePassword {
@@ -84,14 +85,14 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet:
         Ok(account) => {
             warn!(
                 "{} Password changed for account {}",
-                "\u{2714}".bright_green(),
-                format!("{account}").green()
+                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+                format!("{account}").if_supports_color(Stdout, |text| text.green())
             );
+
+            Ok(account)
         }
         Err(error) => Err(error)?,
     }
-
-    Ok(0)
 }
 
 fn get_args(matches: &ArgMatches, quiet: bool) -> ChangeAccountArgs {
@@ -142,8 +143,6 @@ impl Display for PasswordData {
 struct GeneratorParams(usize, bool, bool);
 
 fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
-    let mut suggest: Vec<String> = Vec::new();
-
     let params = [
         GeneratorParams(25, true, true),
         GeneratorParams(25, false, true),
@@ -155,9 +154,9 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
         GeneratorParams(8, false, false),
     ];
 
-    let mut generators: Vec<PasswordGenerator> = Vec::new();
-    for flags in params {
-        generators.push(
+    params
+        .iter()
+        .flat_map(|flags| {
             PasswordGenerator::new()
                 .length(flags.0)
                 .symbols(flags.1)
@@ -166,33 +165,25 @@ fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
                 .strict(true)
                 .spaces(false)
                 .lowercase_letters(true)
-                .uppercase_letters(true),
-        );
-    }
-
-    for generator in generators {
-        suggest.append(&mut generator.generate(random_count).expect("Password generator failed"));
-    }
-
-    let mut pairs: Vec<PasswordData> = vec![];
-
-    for password in &suggest {
-        let score = scorer::score(&analyzer::analyze(password));
-        pairs.push(PasswordData {
-            password: password.replace('<', "").clone(),
-            strength_value: score,
-            strength: password_strength(score).to_owned(),
-        });
-    }
-
-    pairs.sort_by(|a, b| {
-        if b.strength_value == 0.0 {
-            return Ordering::Greater;
-        }
-        b.strength_value.total_cmp(&a.strength_value)
-    });
-
-    pairs
+                .uppercase_letters(true)
+                .generate(random_count)
+                .expect("Password generator failed")
+        })
+        .map(|password| {
+            let score = scorer::score(&analyzer::analyze(&password));
+            PasswordData {
+                password: password.replace('<', ""),
+                strength_value: score,
+                strength: password_strength(score).to_owned(),
+            }
+        })
+        .sorted_by(|a, b| {
+            if b.strength_value == 0.0 {
+                return Ordering::Greater;
+            }
+            b.strength_value.total_cmp(&a.strength_value)
+        })
+        .collect()
 }
 
 pub fn get_password(prompt: &str) -> String {

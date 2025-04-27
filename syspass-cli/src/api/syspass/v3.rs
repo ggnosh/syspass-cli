@@ -1,34 +1,30 @@
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
-
 use crate::api;
+use crate::api::ApiErrorResponse;
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
 use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, sort_accounts};
 use crate::config::Config;
-
+use itertools::Itertools;
+use miette::Result;
+use serde::Deserialize;
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ApiResult {
+pub struct ApiResult {
     item_id: Option<u32>,
     result: Value,
     result_code: i32,
 }
 
 #[derive(Deserialize)]
-struct ApiResponse {
+pub struct ApiResponse {
     result: Option<ApiResult>,
     error: Option<ApiErrorResponse>,
-}
-
-#[derive(Deserialize)]
-struct ApiErrorResponse {
-    message: String,
 }
 
 pub struct Syspass {
@@ -44,7 +40,7 @@ impl Syspass {
         method: &str,
         args: RequestArguments,
         needs_password: bool,
-    ) -> Result<ApiResult, api::Error> {
+    ) -> Result<ApiResult, api::ApiError> {
         let req = JsonReq {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
@@ -60,14 +56,14 @@ impl Syspass {
 
         response
             .result
-            .ok_or_else(|| api::Error(response.error.expect("Invalid response").message))
+            .ok_or_else(|| api::ApiError::InvalidResponse(response.error.expect("Should have an error")))
     }
 
     fn create_or_edit(id: Option<&u32>) -> &str {
         id.filter(|&&id| id != 0).map_or(Self::CREATE, |_| Self::EDIT)
     }
 
-    fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::Error> {
+    fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::ApiError> {
         self.forge_and_send(method, Some(vec![("id", id.to_string())]), false)
             .map(|result| result.result_code == 0)
     }
@@ -77,7 +73,7 @@ impl Syspass {
         path: &str,
         id: Option<&u32>,
         mut args: Option<Vec<(&str, String)>>,
-    ) -> Result<T, api::Error> {
+    ) -> Result<T, api::ApiError> {
         let method = format!("{}/{}", path, Self::create_or_edit(id));
         if let Some(id) = id.filter(|&&id| id != 0) {
             args.get_or_insert_with(Vec::new).push(("id", id.to_string()));
@@ -100,18 +96,23 @@ impl From<Config> for Syspass {
 }
 
 impl api::Client for Syspass {
-    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::Error> {
+    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::ApiError> {
         self.forge_and_send("account/search", Some(search), false)
             .map(|result| {
-                let mut list: Vec<Account> = serde_json::from_value(result.result).expect("Invalid response");
+                let usage_data = &Config::get_usage_data(None);
+                let list = serde_json::from_value::<Vec<Account>>(result.result)
+                    .expect("Invalid response")
+                    .into_iter();
+
                 if usage {
-                    sort_accounts(&mut list, &Config::get_usage_data(None));
+                    list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
+                } else {
+                    list.collect()
                 }
-                list
             })
     }
 
-    fn get_password(&self, account: &Account) -> Result<ViewPassword, api::Error> {
+    fn get_password(&self, account: &Account) -> Result<ViewPassword, api::ApiError> {
         self.forge_and_send(
             "account/viewPass",
             Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
@@ -128,23 +129,27 @@ impl api::Client for Syspass {
         })
     }
 
-    fn get_clients(&self) -> Result<Vec<Client>, api::Error> {
+    fn get_clients(&self) -> Result<Vec<Client>, api::ApiError> {
         self.forge_and_send("client/search", None, false).map(|result| {
-            let mut list: Vec<Client> = serde_json::from_value(result.result).expect("Invalid response");
-            list.sort_by(|a, b| a.id().cmp(&b.id()));
-            list
+            serde_json::from_value::<Vec<Client>>(result.result)
+                .expect("Invalid response")
+                .into_iter()
+                .sorted_by(|a, b| a.id().cmp(&b.id()))
+                .collect()
         })
     }
 
-    fn get_categories(&self) -> Result<Vec<Category>, api::Error> {
+    fn get_categories(&self) -> Result<Vec<Category>, api::ApiError> {
         self.forge_and_send("category/search", None, false).map(|result| {
-            let mut list: Vec<Category> = serde_json::from_value(result.result).expect("Invalid response");
-            list.sort_by(|a, b| a.id().cmp(&b.id()));
-            list
+            serde_json::from_value::<Vec<Category>>(result.result)
+                .expect("Invalid response")
+                .into_iter()
+                .sorted_by(|a, b| a.id().cmp(&b.id()))
+                .collect()
         })
     }
 
-    fn save_client(&self, client: &Client) -> Result<Client, api::Error> {
+    fn save_client(&self, client: Client) -> Result<Client, api::ApiError> {
         self.save(
             "client",
             client.id(),
@@ -156,7 +161,7 @@ impl api::Client for Syspass {
         )
     }
 
-    fn save_category(&self, category: &Category) -> Result<Category, api::Error> {
+    fn save_category(&self, category: Category) -> Result<Category, api::ApiError> {
         self.save(
             "category",
             category.id(),
@@ -167,7 +172,7 @@ impl api::Client for Syspass {
         )
     }
 
-    fn save_account(&self, account: &Account) -> Result<Account, api::Error> {
+    fn save_account(&self, account: Account) -> Result<Account, api::ApiError> {
         self.save(
             "account",
             account.id(),
@@ -183,7 +188,7 @@ impl api::Client for Syspass {
         )
     }
 
-    fn change_password(&self, password: &ChangePassword) -> Result<Account, api::Error> {
+    fn change_password(&self, password: &ChangePassword) -> Result<Account, api::ApiError> {
         self.forge_and_send(
             "account/editPass",
             Some(vec![
@@ -196,29 +201,29 @@ impl api::Client for Syspass {
         .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
     }
 
-    fn delete_client(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_client(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("client/delete", id)
     }
 
-    fn delete_category(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_category(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("category/delete", id)
     }
 
-    fn delete_account(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_account(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("account/delete", id)
     }
 
-    fn view_account(&self, id: u32) -> Result<Account, api::Error> {
+    fn view_account(&self, id: u32) -> Result<Account, api::ApiError> {
         self.forge_and_send("account/view", Some(vec![("id", id.to_string())]), true)
             .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
     }
 
-    fn get_category(&self, id: u32) -> Result<Category, api::Error> {
+    fn get_category(&self, id: u32) -> Result<Category, api::ApiError> {
         self.forge_and_send("category/view", Some(vec![("id", id.to_string())]), true)
             .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
     }
 
-    fn get_client(&self, id: u32) -> Result<Client, api::Error> {
+    fn get_client(&self, id: u32) -> Result<Client, api::ApiError> {
         self.forge_and_send("client/view", Some(vec![("id", id.to_string())]), true)
             .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
     }
@@ -268,7 +273,12 @@ mod tests {
         let response = test.1.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(response.err().expect("Err was not set").0.contains(search.as_str()));
+        assert!(
+            response
+                .expect_err("Err was not set")
+                .to_string()
+                .contains(search.as_str())
+        );
 
         test.0.assert();
     }
@@ -284,7 +294,12 @@ mod tests {
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(accounts.err().expect("Err should be set").0.contains(search.as_str()));
+        assert!(
+            accounts
+                .expect_err("Err should be set")
+                .to_string()
+                .contains(search.as_str())
+        );
 
         test.0.assert();
     }
@@ -391,7 +406,7 @@ mod tests {
                 panic!("Request should have failed")
             }
             Err(e) => {
-                assert_eq!("The account doesn't exist", e.0);
+                assert_eq!("The account doesn't exist", e.to_string());
             }
         }
     }

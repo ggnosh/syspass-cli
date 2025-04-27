@@ -10,7 +10,7 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
     Input::with_theme(&ColorfulTheme::default())
         .with_prompt(text)
         .allow_empty(!required)
-        .with_initial_text(default.to_owned())
+        .with_initial_text(default.to_string())
         .interact_text()
         .unwrap_or_else(|_| process::exit(1))
 }
@@ -76,13 +76,13 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
 
 pub fn password_strength(strength: f64) -> &'static str {
     match strength {
-        s if s < 20.0 => "Very dangerous",
-        s if s < 40.0 => "Dangerous",
-        s if s < 60.0 => "Very weak",
-        s if s < 80.0 => "Weak",
-        s if s < 90.0 => "Good",
-        s if s < 95.0 => "Strong",
-        s if s < 99.0 => "Very strong",
+        0.0..=19.9 => "Very dangerous",
+        20.0..=39.9 => "Dangerous",
+        40.0..=59.9 => "Very weak",
+        60.0..=79.9 => "Weak",
+        80.0..=89.9 => "Good",
+        90.0..=94.9 => "Strong",
+        95.0..=98.9 => "Very strong",
         _ => "Heat death",
     }
 }

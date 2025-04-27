@@ -1,16 +1,16 @@
-use log::debug;
-use reqwest::blocking::{ClientBuilder, Response};
-use serde::{Serialize, de::DeserializeOwned};
-use serde_json::Value;
-use std::cell::Cell;
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
 use crate::api;
 use crate::api::account::Account;
 use crate::api::entity::Entity;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
+use log::debug;
+use reqwest::blocking::{ClientBuilder, Response};
+use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
+use std::cell::Cell;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 pub mod v2;
 pub mod v3;
@@ -19,13 +19,11 @@ static PASSWORD: LazyLock<String> = LazyLock::new(|| ask_for_password("API passw
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
 
-fn sort_accounts(list: &mut [Account], usage_data: &HashMap<u32, u32>) {
-    list.sort_by(|a, b| {
-        let left = usage_data.get(a.id().expect("Id is set")).unwrap_or(&0);
-        let right = usage_data.get(b.id().expect("Id is set")).unwrap_or(&0);
+fn sort_accounts(a: &Account, b: &Account, usage_data: &HashMap<u32, u32>) -> Ordering {
+    let left = usage_data.get(a.id().expect("Id is set")).unwrap_or(&0);
+    let right = usage_data.get(b.id().expect("Id is set")).unwrap_or(&0);
 
-        right.cmp(left).then_with(|| a.id().cmp(&b.id()))
-    });
+    right.cmp(left).then_with(|| a.id().cmp(&b.id()))
 }
 
 #[derive(Serialize, Debug)]
@@ -40,17 +38,24 @@ fn get_builder(config: &Config) -> ClientBuilder {
     ClientBuilder::new().danger_accept_invalid_certs(!config.verify_host)
 }
 
-fn get_response(client: &reqwest::blocking::Client, request_url: &str, req: &JsonReq) -> Result<Response, api::Error> {
+fn get_response(
+    client: &reqwest::blocking::Client,
+    request_url: &str,
+    req: &JsonReq,
+) -> Result<Response, api::ApiError> {
     client
         .post(request_url)
         .json(req)
         .send()
-        .map_err(|e| api::Error(format!("Request failed: {e}")))
+        .map_err(api::ApiError::Request)
         .and_then(|r| {
             if r.status().is_success() {
                 Ok(r)
             } else {
-                Err(api::Error(format!("Server responded with code {}", r.status())))
+                Err(api::ApiError::BadResponse(format!(
+                    "Server responded with code {}",
+                    r.status()
+                )))
             }
         })
 }
@@ -87,17 +92,21 @@ impl Syspass {
         params
     }
 
-    fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> Result<T, api::Error> {
+    fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> miette::Result<T, api::ApiError> {
         debug!("Sending request to {request_url}:\n{req:#?}\n");
 
         get_response(&self.client, request_url, req).and_then(|result| {
+            if result.status() == 403 {
+                return Err(api::ApiError::BadResponse("Invalid token".to_string()));
+            }
+
             let json: Value = result
                 .json()
-                .map_err(|_| api::Error("Server response did not contain JSON".to_string()))?;
+                .map_err(|_| api::ApiError::ParseError("Server response did not contain JSON".to_string()))?;
 
             debug!("Received response:\n{json:#?}\n");
 
-            serde_json::from_value::<T>(json).map_err(|e| api::Error(e.to_string()))
+            serde_json::from_value::<T>(json).map_err(|e| api::ApiError::ParseError(e.to_string()))
         })
     }
 }

@@ -1,5 +1,5 @@
 use clap::ArgMatches;
-use colored::Colorize;
+use miette::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -38,21 +38,21 @@ fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
     path
 }
 
-fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> String
+fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> Result<String>
 where
     T: Serialize,
 {
     let path = get_config_path(file, dir);
-    fs::read_to_string(&path).unwrap_or_else(|error| {
+    fs::read_to_string(&path).or_else(|error| {
         if error.kind() == ErrorKind::NotFound {
-            let data = serde_json::to_string(&value).expect("Serialization failed");
+            let data = serde_json::to_string(&value).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
             if let Some(parent) = Path::new(&path).parent() {
-                fs::create_dir_all(parent).expect("Failed to create directories");
+                fs::create_dir_all(parent).map_err(|e| miette::miette!("Failed to create directories: {}", e))?;
             }
-            fs::write(&path, &data).expect("Failed to write data");
-            data
+            fs::write(&path, &data).map_err(|e| miette::miette!("Failed to write data: {}", e))?;
+            Ok(data)
         } else {
-            panic!("{} Couldn't read config file", "\u{2716}".bright_red());
+            Err(miette::miette!("Couldn't read config file: {}", error))
         }
     })
 }
@@ -62,7 +62,7 @@ impl From<&ArgMatches> for Config {
         let config_file = value.get_one::<String>(CONFIG).unwrap_or(&String::new()).to_owned();
 
         let data = if config_file.is_empty() {
-            get_config_file_or_write("config.json", None, Self::default())
+            get_config_file_or_write("config.json", None, Self::default()).expect("Failed to get or write config file")
         } else {
             fs::read_to_string(shellexpand::tilde(&config_file).to_string()).expect("Unable to read file")
         };
@@ -73,7 +73,8 @@ impl From<&ArgMatches> for Config {
 
 impl Config {
     pub fn get_usage_data(dir: Option<&str>) -> HashMap<u32, u32> {
-        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new());
+        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new())
+            .expect("Failed to get or write config file");
 
         serde_json::from_str::<HashMap<u32, u32>>(&data).expect("JSON does not have correct format.")
     }
@@ -110,7 +111,8 @@ mod tests {
         let temp_str = temp.to_str();
         assert_eq!(
             "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
-            get_config_file_or_write("config.json", temp_str, Config::default()),
+            get_config_file_or_write("config.json", temp_str, Config::default())
+                .expect("Failed to get config file or write"),
         );
 
         cleanup_temp_dir(temp_str);

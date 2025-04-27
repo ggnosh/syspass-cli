@@ -1,7 +1,7 @@
-use std::fmt;
+use miette::Result;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
-use colored::Colorize;
+use thiserror::Error;
 
 use crate::api::Api::{SyspassV2, SyspassV3};
 use crate::api::account::{Account, ChangePassword, ViewPassword};
@@ -18,48 +18,50 @@ pub mod entity;
 mod syspass;
 
 pub trait Client {
-    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, Error>;
-    fn get_password(&self, account: &Account) -> Result<ViewPassword, Error>;
-    fn get_clients(&self) -> Result<Vec<SyspassClient>, Error>;
-    fn get_categories(&self) -> Result<Vec<Category>, Error>;
-    fn save_client(&self, client: &SyspassClient) -> Result<SyspassClient, Error>;
-    fn save_category(&self, category: &Category) -> Result<Category, Error>;
-    fn save_account(&self, account: &Account) -> Result<Account, Error>;
-    fn change_password(&self, password: &ChangePassword) -> Result<Account, Error>;
-    fn delete_client(&self, id: u32) -> Result<bool, Error>;
-    fn delete_category(&self, id: u32) -> Result<bool, Error>;
-    fn delete_account(&self, id: u32) -> Result<bool, Error>;
-    fn view_account(&self, id: u32) -> Result<Account, Error>;
-    fn get_category(&self, id: u32) -> Result<Category, Error>;
-    fn get_client(&self, id: u32) -> Result<SyspassClient, Error>;
+    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, ApiError>;
+    fn get_password(&self, account: &Account) -> Result<ViewPassword, ApiError>;
+    fn get_clients(&self) -> Result<Vec<SyspassClient>, ApiError>;
+    fn get_categories(&self) -> Result<Vec<Category>, ApiError>;
+    fn save_client(&self, client: SyspassClient) -> Result<SyspassClient, ApiError>;
+    fn save_category(&self, category: Category) -> Result<Category, ApiError>;
+    fn save_account(&self, account: Account) -> Result<Account, ApiError>;
+    fn change_password(&self, password: &ChangePassword) -> Result<Account, ApiError>;
+    fn delete_client(&self, id: u32) -> Result<bool, ApiError>;
+    fn delete_category(&self, id: u32) -> Result<bool, ApiError>;
+    fn delete_account(&self, id: u32) -> Result<bool, ApiError>;
+    fn view_account(&self, id: u32) -> Result<Account, ApiError>;
+    fn get_category(&self, id: u32) -> Result<Category, ApiError>;
+    fn get_client(&self, id: u32) -> Result<SyspassClient, ApiError>;
     fn get_config(&self) -> &Config;
 }
 
-#[derive(Debug)]
-pub struct Error(pub String);
-
-#[derive(Debug)]
-pub struct AppError(pub String);
-
-impl std::error::Error for Error {}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
+#[derive(Debug, Error)]
+pub enum ApiError {
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+    #[error(transparent)]
+    SerdeJson(#[from] serde_json::error::Error),
+    #[error("Bad response: {0}")]
+    BadResponse(String),
+    #[error("{0}")]
+    InvalidResponse(ApiErrorResponse),
+    #[error("Could not get entity data: {0}")]
+    ParseError(String),
+    #[error("No password set")]
+    NoPassword,
+    #[error("Not supported by this version of the API")]
+    NotSupported,
+    #[error("Saving failed")]
+    SavingFailed,
+    #[error("{0} does not exist")]
+    NotFound(String),
+    #[error("Did not find any {0}")]
+    NoResults(String),
 }
 
-impl std::error::Error for AppError {}
-
-impl fmt::Display for AppError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} Error: {}", "\u{2716}".bright_red(), self.0)
-    }
-}
-
-impl From<Error> for AppError {
-    fn from(value: Error) -> Self {
-        Self(value.0)
+impl From<ApiError> for miette::Error {
+    fn from(err: ApiError) -> Self {
+        Self::msg(err.to_string())
     }
 }
 
@@ -89,13 +91,23 @@ impl FromStr for Api {
     }
 }
 
+#[derive(Deserialize, Debug, Serialize)]
+pub struct ApiErrorResponse {
+    code: i32,
+    message: String,
+}
+
+impl std::fmt::Display for ApiErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::api::Api;
     use std::str::FromStr;
-
     use test_case::test_case;
-
-    use crate::api::{Api, AppError};
 
     #[test_case("SyspassV3", true)]
     #[test_case("SyspassV2", true)]
@@ -106,15 +118,6 @@ mod tests {
         assert!(
             !((expected && api.is_err()) || (!expected && api.is_ok())),
             "Expected {version} to be {expected}"
-        );
-    }
-
-    #[test]
-    fn test_display() {
-        let error = AppError("test this error".to_owned());
-        assert_eq!(
-            "✖ Error: test this error",
-            strip_ansi_escapes::strip_str(error.to_string())
         );
     }
 }

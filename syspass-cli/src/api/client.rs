@@ -1,10 +1,11 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 
 use clap::ArgMatches;
-use colored::Colorize;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, FuzzySelect};
 use log::error;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 use serde::Deserialize;
 
 use crate::api;
@@ -50,7 +51,7 @@ impl Client {
 }
 
 impl Display for Client {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}. {}{}",
@@ -75,17 +76,17 @@ impl Entity for Client {
     }
 }
 
-pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::result::Result<u32, api::Error> {
+pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32> {
     let clients = api_client
         .get_clients()
-        .map_err(|error| api::Error(format!("{error}: Could not list clients")))?;
+        .map_err(|error| miette!("{error}: Could not list clients"))?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right client (ESC for new):")
         .max_length(10)
         .items(&clients)
         .interact_opt()
-        .map_err(|_| api::Error("Failed to select client".to_string()))?
+        .map_err(|_| miette!("Failed to select client"))?
         .map_or_else(
             || loop {
                 let new_client = Client {
@@ -98,10 +99,14 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> std::resul
                     ),
                 };
 
-                match api_client.save_client(&new_client) {
+                match api_client.save_client(new_client) {
                     Ok(client) => break Ok(*client.id().expect(ID_EMPTY)),
                     Err(error) => {
-                        error!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
+                        error!(
+                            "{} Failed to save client: {}",
+                            "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
+                            error
+                        );
                     }
                 }
             },

@@ -1,8 +1,7 @@
-use std::error::Error;
-
 use clap::{ArgMatches, Command};
-use colored::Colorize;
 use log::warn;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub const COMMAND_NAME: &str = "password";
 
@@ -13,19 +12,16 @@ pub fn command_helper() -> Command {
         .about("Remove account")
 }
 
-pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<u8, Box<dyn Error>> {
+pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
     match api_client.delete_account(id) {
-        Ok(status) => {
-            if status {
-                warn!("{} Account removed", "\u{2714}".bright_green());
-            } else {
-                warn!("{} Failed to remove account", "\u{2716}".bright_red());
-            }
+        Ok(true) => {
+            warn!(
+                "{} Account removed",
+                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green())
+            );
+            Ok(())
         }
-        Err(error) => {
-            Err(error)?;
-        }
+        Ok(false) => Err(miette!("Failed to remove account")),
+        Err(error) => Err(miette!(error))?,
     }
-
-    Ok(0)
 }

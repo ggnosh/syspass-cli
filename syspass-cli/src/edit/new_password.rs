@@ -1,9 +1,7 @@
-use std::error::Error;
-use std::process;
-
 use clap::{ArgMatches, Command, ValueHint, arg};
-use colored::Colorize;
-use log::{error, warn};
+use log::warn;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 
 use crate::api::account::Account;
 use crate::api::entity::Entity;
@@ -42,56 +40,57 @@ pub fn command_helper() -> Command {
         .arg(arg!(-p --password <PASSWORD> "Password").value_hint(ValueHint::Other))
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) -> Result<Account> {
+    let category_id = helper::get_numeric_input(
+        "category",
+        matches,
+        false,
+        Ok(|| api::category::ask_for(api_client).map_err(|error| miette!("Failed to retrieve category: {error}"))),
+        quiet,
+    )
+    .map_err(|e| miette!("{e}: Failed to retrieve a valid category ID"))?;
+
+    let client_id = helper::get_numeric_input(
+        "client",
+        matches,
+        false,
+        Ok(|| api::client::ask_for(api_client, matches).map_err(|_| miette!("Failed to get client"))),
+        quiet,
+    )
+    .map_err(|e| miette!("{e}: Failed to retrieve a valid client ID"))?;
+
     let account: Account = Account::new(
         Some(0),
         get_match_string(matches, quiet, "name", "Name: ", "", true),
         get_match_string(matches, quiet, "login", "Username: ", "", false),
         Some(get_match_string(matches, quiet, "url", "Url: ", "", false)),
         Some(get_match_string(matches, quiet, "note", "Notes: ", "", false)),
-        helper::get_numeric_input(
-            "category",
-            matches,
-            false,
-            Some(|| {
-                api::category::ask_for(api_client).unwrap_or_else(|error| {
-                    error!("{} {}", "\u{2716}".bright_red(), error);
-                    process::exit(1);
-                })
-            }),
-            quiet,
-        ),
-        helper::get_numeric_input(
-            "client",
-            matches,
-            false,
-            Some(|| api::client::ask_for(api_client, matches).expect("Failed to get client")),
-            quiet,
-        ),
+        category_id,
+        client_id,
         Some(matches.get_one::<String>("password").map_or_else(
             || {
                 if quiet {
                     warn!("Could not ask for client");
-                    process::exit(1);
+                    return Err(miette!("Password input required but not provided"));
                 }
-                get_password("Password: ")
+                Ok(get_password("Password: "))
             },
-            std::clone::Clone::clone,
-        )),
+            |password| Ok(password.clone()),
+        )?),
         None,
     );
 
     warn!("Trying to save account");
-    match api_client.save_account(&account) {
-        Ok(account) => {
-            warn!(
-                "{} Account {} ({}) saved!",
-                "\u{2714}".bright_green(),
-                account.name().green(),
-                account.id().expect("Id should not be empty")
-            );
-            Ok(0)
-        }
-        Err(error) => Err(format!("Could not save client: {error}"))?,
-    }
+    let saved_account = api_client
+        .save_account(account)
+        .map_err(|error| miette!("Could not save account: {error}"))?;
+
+    warn!(
+        "{} Account {} ({}) saved!",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        saved_account.name().if_supports_color(Stdout, |text| text.green()),
+        saved_account.id().expect("Id should not be empty")
+    );
+
+    Ok(saved_account)
 }

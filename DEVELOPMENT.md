@@ -23,10 +23,11 @@ Open up https://localhost:5000/ and finish the installation for a syspass instan
 | Admin user         | admin      |
 | Password           | syspass    |
 | Master password    | *any*      |
-| Db access user     | root       |
+| Db access user     | syspass    |
 | Db access password | syspass    |
 | Database name      | syspass    |
 | Database server    | syspass-db |
+| Hosting mode       | true       |
 
 After installing, you can log in using the same address and add API authorization for the current user.
 
@@ -50,10 +51,11 @@ Open up https://localhost:5001/ and finish the installation for a syspass instan
 | Admin user         | admin        |
 | Password           | syspass      |
 | Master password    | *any*        |
-| Db access user     | root         |
+| Db access user     | syspass      |
 | Db access password | syspass      |
 | Database name      | syspass      |
 | Database server    | syspass-dbv2 |
+| Hosting mode       | true         |
 
 After installing, you can log in using the same address and add API authorization for the current user.
 

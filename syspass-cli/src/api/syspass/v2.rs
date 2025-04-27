@@ -1,26 +1,27 @@
-use std::collections::HashMap;
-
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
 use crate::api;
+use crate::api::ApiErrorResponse;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
 use crate::config::Config;
+use itertools::Itertools;
+use miette::Result;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct ApiResult {
+pub struct ApiResult {
     item_id: Option<String>,
     result_code: i32,
 }
 
 #[derive(Deserialize, Debug)]
-struct ApiResponse {
+pub struct ApiResponse {
     result: Option<ApiResult>,
     error: Option<ApiErrorResponse>,
 }
@@ -31,12 +32,6 @@ struct ApiResponseEntity {
     jsonrpc: String,
     result: Value,
     error: Option<ApiErrorResponse>,
-}
-
-#[derive(Deserialize, Debug, Serialize)]
-struct ApiErrorResponse {
-    code: i32,
-    message: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -114,15 +109,13 @@ impl From<Account> for api::account::Account {
     }
 }
 
-const NOT_SUPPORTED: &str = "Syspass does not support this";
-
 impl Syspass {
     fn forge_and_send(
         &self,
         method: &str,
         args: RequestArguments,
         needs_password: bool,
-    ) -> Result<ApiResponseResult, api::Error> {
+    ) -> Result<ApiResponseResult, api::ApiError> {
         let req = JsonReq {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
@@ -134,31 +127,30 @@ impl Syspass {
 
         self.syspass
             .send_request::<ApiResponseResult>(&self.syspass.config.host, &req)
-            .map_err(|err| api::Error(err.to_string()))
     }
 
-    fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::Error> {
+    fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::ApiError> {
         self.forge_and_send(method, Some(vec![("id", id.to_string())]), false)
             .and_then(|result| {
                 if let ApiResponseResult::Code(result) = result {
                     result.error.map_or_else(
                         || Ok(result.result.expect("Invalid response").result_code == 0),
-                        |error| Err(api::Error(error.message)),
+                        |error| Err(api::ApiError::InvalidResponse(error)),
                     )
                 } else {
-                    Err(api::Error("Save failed".to_owned()))
+                    Err(api::ApiError::SavingFailed)
                 }
             })
     }
 
-    fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::Error> {
+    fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::ApiError> {
         if id.filter(|&&new_id| new_id > 0).is_some() {
-            return Err(api::Error(NOT_SUPPORTED.to_owned()));
+            return Err(api::ApiError::NotSupported);
         }
 
         self.forge_and_send(path, args, true).and_then(|result| match result {
             ApiResponseResult::Code(result) => match result.error {
-                Some(error) => Err(api::Error(error.message)),
+                Some(error) => Err(api::ApiError::InvalidResponse(error)),
                 _ => Ok(result
                     .result
                     .expect("Invalid response")
@@ -169,7 +161,7 @@ impl Syspass {
             },
             ApiResponseResult::Entity(result) => {
                 if let Some(error) = result.error {
-                    Err(api::Error(error.message))
+                    Err(api::ApiError::InvalidResponse(error))
                 } else {
                     let item_id = result.result.get("itemId").expect("No password set").to_string();
                     Ok(item_id.parse::<u32>().expect("Invalid id"))
@@ -211,30 +203,34 @@ impl api::Client for Syspass {
         &self,
         search: Vec<(&str, String)>,
         usage: bool,
-    ) -> Result<Vec<api::account::Account>, api::Error> {
+    ) -> Result<Vec<api::account::Account>, api::ApiError> {
         self.forge_and_send("getAccountSearch", Some(search), false)
             .and_then(|response| match response {
                 ApiResponseResult::Entity(result) => {
-                    let mut list: Vec<api::account::Account> = serde_json::from_value::<Vec<Account>>(result.result)
-                        .map_err(|_| api::Error("Invalid response".to_owned()))?
-                        .into_iter()
-                        .map(api::account::Account::from)
-                        .collect();
+                    let accounts: Vec<Account> =
+                        serde_json::from_value(result.result).map_err(api::ApiError::SerdeJson)?;
 
                     let usage_data = if usage {
                         Config::get_usage_data(None)
                     } else {
-                        HashMap::from([(0, 0)])
+                        HashMap::new()
                     };
 
-                    sort_accounts(&mut list, &usage_data);
+                    let list: Vec<api::account::Account> = accounts
+                        .into_iter()
+                        .map(api::account::Account::from)
+                        .sorted_by(|a, b| sort_accounts(a, b, &usage_data))
+                        .collect();
+
                     Ok(list)
                 }
-                ApiResponseResult::Code(_) => Err(api::Error(format!("Invalid response: {response:?}"))),
+                ApiResponseResult::Code(_) => Err(api::ApiError::BadResponse(format!(
+                    "Unexpected response format: {response:?}"
+                ))),
             })
     }
 
-    fn get_password(&self, account: &api::account::Account) -> Result<ViewPassword, api::Error> {
+    fn get_password(&self, account: &api::account::Account) -> Result<ViewPassword, api::ApiError> {
         self.forge_and_send(
             "getAccountPassword",
             Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
@@ -246,7 +242,7 @@ impl api::Client for Syspass {
                     .result
                     .get("pass")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| api::Error("No password set".to_owned()))?
+                    .ok_or(api::ApiError::NoPassword)?
                     .to_owned();
 
                 Ok(ViewPassword {
@@ -254,44 +250,50 @@ impl api::Client for Syspass {
                     password,
                 })
             } else {
-                Err(api::Error(format!("Invalid response {response:?}")))
+                Err(api::ApiError::BadResponse(format!("{response:?}")))
             }
         })
     }
 
-    fn get_clients(&self) -> Result<Vec<api::client::Client>, api::Error> {
-        self.forge_and_send("getCustomers", None, false).and_then(|response| {
-            if let ApiResponseResult::Entity(result) = response {
-                let mut list: Vec<api::client::Client> = Self::fix_result_object::<Client>(&result.result)
-                    .into_iter()
-                    .map(api::client::Client::from)
-                    .collect();
+    fn get_clients(&self) -> Result<Vec<api::client::Client>, api::ApiError> {
+        self.forge_and_send("getCustomers", None, false)
+            .and_then(|response| match response {
+                ApiResponseResult::Entity(result) => {
+                    let list: Vec<api::client::Client> = Self::fix_result_object::<Client>(&result.result)
+                        .into_iter()
+                        .map(api::client::Client::from)
+                        .sorted_by(|a, b| a.id().cmp(&b.id()))
+                        .collect();
 
-                list.sort_by(|a, b| a.id().cmp(&b.id()));
-                Ok(list)
-            } else {
-                Err(api::Error("Invalid response format".to_owned()))
-            }
-        })
+                    Ok(list)
+                }
+                ApiResponseResult::Code(result) => result.error.map_or_else(
+                    || Err(api::ApiError::BadResponse("Unexpected response format".to_owned())),
+                    |error| Err(api::ApiError::InvalidResponse(error)),
+                ),
+            })
     }
 
-    fn get_categories(&self) -> Result<Vec<api::category::Category>, api::Error> {
-        self.forge_and_send("getCategories", None, false).and_then(|response| {
-            if let ApiResponseResult::Entity(result) = response {
-                let mut list: Vec<api::category::Category> = Self::fix_result_object::<Category>(&result.result)
-                    .into_iter()
-                    .map(api::category::Category::from)
-                    .collect();
+    fn get_categories(&self) -> Result<Vec<api::category::Category>, api::ApiError> {
+        self.forge_and_send("getCategories", None, false)
+            .and_then(|response| match response {
+                ApiResponseResult::Entity(result) => {
+                    let list = Self::fix_result_object::<Category>(&result.result)
+                        .into_iter()
+                        .map(api::category::Category::from)
+                        .sorted_by(|a, b| a.id().cmp(&b.id()))
+                        .collect();
 
-                list.sort_by(|a, b| a.id().cmp(&b.id()));
-                Ok(list)
-            } else {
-                Err(api::Error("Invalid response format".to_owned()))
-            }
-        })
+                    Ok(list)
+                }
+                ApiResponseResult::Code(result) => result.error.map_or_else(
+                    || Err(api::ApiError::BadResponse("Unexpected response format".to_owned())),
+                    |error| Err(api::ApiError::InvalidResponse(error)),
+                ),
+            })
     }
 
-    fn save_client(&self, client: &api::client::Client) -> Result<api::client::Client, api::Error> {
+    fn save_client(&self, client: api::client::Client) -> Result<api::client::Client, api::ApiError> {
         self.save(
             "addCustomer",
             client.id(),
@@ -310,7 +312,7 @@ impl api::Client for Syspass {
         })
     }
 
-    fn save_category(&self, category: &api::category::Category) -> Result<api::category::Category, api::Error> {
+    fn save_category(&self, category: api::category::Category) -> Result<api::category::Category, api::ApiError> {
         self.save(
             "addCategory",
             category.id(),
@@ -328,7 +330,7 @@ impl api::Client for Syspass {
         })
     }
 
-    fn save_account(&self, account: &api::account::Account) -> Result<api::account::Account, api::Error> {
+    fn save_account(&self, account: api::account::Account) -> Result<api::account::Account, api::ApiError> {
         self.save(
             "addAccount",
             account.id(),
@@ -345,38 +347,38 @@ impl api::Client for Syspass {
         .and_then(|id| self.view_account(id))
     }
 
-    fn change_password(&self, _password: &ChangePassword) -> Result<api::account::Account, api::Error> {
-        Err(api::Error(NOT_SUPPORTED.to_owned()))
+    fn change_password(&self, _password: &ChangePassword) -> Result<api::account::Account, api::ApiError> {
+        Err(api::ApiError::NotSupported)
     }
 
-    fn delete_client(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_client(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("deleteCustomer", id)
     }
 
-    fn delete_category(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_category(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("deleteCategory", id)
     }
 
-    fn delete_account(&self, id: u32) -> Result<bool, api::Error> {
+    fn delete_account(&self, id: u32) -> Result<bool, api::ApiError> {
         self.delete_request("deleteAccount", id)
     }
 
-    fn view_account(&self, id: u32) -> Result<api::account::Account, api::Error> {
+    fn view_account(&self, id: u32) -> Result<api::account::Account, api::ApiError> {
         self.forge_and_send("getAccountData", Some(vec![("id", id.to_string())]), true)
             .and_then(|response| match response {
                 ApiResponseResult::Entity(result) => serde_json::from_value::<Account>(result.result)
                     .map(api::account::Account::from)
-                    .map_err(|error| api::Error(format!("{error}: Could not get account data"))),
-                ApiResponseResult::Code(_) => Err(api::Error(format!("Invalid response: {response:?}"))),
+                    .map_err(|error| api::ApiError::ParseError(error.to_string())),
+                ApiResponseResult::Code(_) => Err(api::ApiError::NotFound("Account".to_owned())),
             })
     }
 
-    fn get_category(&self, _id: u32) -> Result<api::category::Category, api::Error> {
-        Err(api::Error(NOT_SUPPORTED.to_owned()))
+    fn get_category(&self, _id: u32) -> Result<api::category::Category, api::ApiError> {
+        Err(api::ApiError::NotSupported)
     }
 
-    fn get_client(&self, _id: u32) -> Result<api::client::Client, api::Error> {
-        Err(api::Error(NOT_SUPPORTED.to_owned()))
+    fn get_client(&self, _id: u32) -> Result<api::client::Client, api::ApiError> {
+        Err(api::ApiError::NotSupported)
     }
 
     fn get_config(&self) -> &Config {
@@ -395,7 +397,7 @@ mod tests {
     use crate::api::Client as ApiClient;
     use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
-    use crate::api::syspass::v2::{Account, Category, Client, NOT_SUPPORTED, Syspass};
+    use crate::api::syspass::v2::{Account, Category, Client, Syspass};
     use crate::config::Config;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
@@ -438,7 +440,12 @@ mod tests {
         let response = test.1.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(response.err().expect("Err was not set").0.contains(search.as_str()));
+        assert!(
+            response
+                .expect_err("Err was not set")
+                .to_string()
+                .contains(search.as_str())
+        );
 
         test.0.assert();
     }
@@ -454,7 +461,12 @@ mod tests {
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(accounts.err().expect("Err was not set").0.contains(search.as_str()));
+        assert!(
+            accounts
+                .expect_err("Err was not set")
+                .to_string()
+                .contains(search.as_str())
+        );
 
         test.0.assert();
     }
@@ -519,7 +531,7 @@ mod tests {
         assert!(
             client
                 .change_password(&change)
-                .is_err_and(|error| NOT_SUPPORTED == error.to_string())
+                .is_err_and(|error| matches!(error, api::ApiError::NotSupported))
         );
     }
 
@@ -692,13 +704,21 @@ mod tests {
     #[test]
     fn test_get_client() {
         let client = get_test_client(String::new());
-        assert!(client.get_client(1).is_err_and(|e| NOT_SUPPORTED == e.to_string()));
+        assert!(
+            client
+                .get_client(1)
+                .is_err_and(|e| matches!(e, api::ApiError::NotSupported))
+        );
     }
 
     #[test]
     fn test_get_category() {
         let client = get_test_client(String::new());
-        assert!(client.get_category(1).is_err_and(|e| NOT_SUPPORTED == e.to_string()));
+        assert!(
+            client
+                .get_client(1)
+                .is_err_and(|e| matches!(e, api::ApiError::NotSupported))
+        );
     }
 
     #[test]
@@ -724,11 +744,11 @@ mod tests {
         let test = create_server_response(Some("tests/responses/syspass/v2/account_add.json"), 200);
 
         let account = get_test_account();
-        let result = test.1.save_account(&account);
+        let result = test.1.save_account(account);
 
-        assert!(
-            result.is_err_and(|x| x.to_string() == "missing field `account_categoryId`: Could not get account data")
-        );
+        assert!(result.is_err_and(
+            |x| matches!(x, api::ApiError::ParseError(err) if err == "missing field `account_categoryId`")
+        ));
     }
 
     #[test]
@@ -736,7 +756,7 @@ mod tests {
         let test = create_server_response(Some("tests/responses/syspass/v2/account_add_failed.json"), 200);
 
         let account = get_test_account();
-        let result = test.1.save_account(&account);
+        let result = test.1.save_account(account);
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
     }

@@ -1,9 +1,7 @@
-use std::error::Error;
-
-use clap::{ArgMatches, Command, ValueHint, arg};
-
-use crate::api::{AppError, Client};
+use crate::api::Client;
 use crate::helper;
+use clap::{ArgMatches, Command, ValueHint, arg};
+use miette::{Result, miette};
 
 mod account;
 mod category;
@@ -30,11 +28,15 @@ pub fn command_helper() -> Command {
         ])
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<u8, Box<dyn Error>> {
-    let id = helper::get_numeric_input("id", matches, false, None::<fn() -> u32>, quiet);
-    if id == 0 {
-        return Err(Box::new(AppError("Invalid id given".to_owned())));
-    }
+pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<()> {
+    let id = helper::get_numeric_input::<fn() -> Result<u32>>(
+        "id",
+        matches,
+        false,
+        Err(miette!("Invalid ID provided")),
+        quiet,
+    )
+    .expect("Could not get ID");
 
     match matches.subcommand() {
         Some((account::COMMAND_NAME, matches)) => account::command(matches, api_client, id),

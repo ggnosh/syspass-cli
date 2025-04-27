@@ -17,9 +17,12 @@ services:
     db:
         container_name: syspass-db
         restart: always
-        image: mariadb:10.3
+        image: mariadb:latest
         environment:
-            - MYSQL_ROOT_PASSWORD=syspass
+            - MARIADB_ROOT_PASSWORD=syspass
+            - MARIADB_USER=syspass
+            - MARIADB_PASSWORD=syspass
+            - MARIADB_DATABASE=syspass
         volumes:
             - syspass-db:/var/lib/mysql
         ports:
@@ -44,10 +47,12 @@ services:
     dbv2:
         container_name: syspass-dbv2
         restart: always
-        image: mariadb:10.3
+        image: mariadb:latest
         environment:
-            - MYSQL_ROOT_PASSWORD=syspass
-            - DB_REMOTE_ROOT_PASS=syspass
+            - MARIADB_ROOT_PASSWORD=syspass
+            - MARIADB_USER=syspass
+            - MARIADB_PASSWORD=syspass
+            - MARIADB_DATABASE=syspass
         volumes:
             - syspassv2-db:/var/lib/mysql
         ports:

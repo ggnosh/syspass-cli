@@ -1,8 +1,9 @@
 use std::fmt::{Display, Formatter};
 
-use colored::Colorize;
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::error;
+use miette::{Result, miette};
+use owo_colors::{OwoColorize, Stream::Stdout};
 use serde::Deserialize;
 
 use crate::api;
@@ -57,17 +58,17 @@ impl Entity for Category {
     }
 }
 
-pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
+pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
     let categories = api_client
         .get_categories()
-        .map_err(|error| api::Error(format!("{error}: Could not list categories")))?;
+        .map_err(|error| miette!("{error}: Could not list categories"))?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right category (ESC for new):")
         .max_length(10)
         .items(&categories)
         .interact_opt()
-        .expect("Failed to select category")
+        .map_err(|e| miette!("{e}: Failed to list categories"))?
         .map_or_else(
             || loop {
                 let new_category = Category {
@@ -76,10 +77,14 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32, api::Error> {
                     description: Some(ask_prompt("Category description", false, "")),
                 };
 
-                match api_client.save_category(&new_category) {
+                match api_client.save_category(new_category) {
                     Ok(client) => break Ok(client.id.expect(ID_EMPTY)),
                     Err(error) => {
-                        error!("{} Failed to save client: {}", "\u{2716}".bright_red(), error);
+                        error!(
+                            "{} Failed to save category: {}",
+                            "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
+                            error
+                        );
                     }
                 }
             },
