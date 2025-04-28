@@ -125,8 +125,7 @@ impl Syspass {
 
         self.syspass.request_number.set(self.syspass.request_number.get() + 1);
 
-        self.syspass
-            .send_request::<ApiResponseResult>(&self.syspass.config.host, &req)
+        self.syspass.send_request::<ApiResponseResult>(&self.syspass.config.host, &req)
     }
 
     fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::ApiError> {
@@ -176,9 +175,7 @@ impl Syspass {
             .map(|obj| {
                 obj.iter()
                     .filter_map(|(key, value)| {
-                        key.parse::<u32>()
-                            .ok()
-                            .and_then(|_| serde_json::from_value(value.clone()).ok())
+                        key.parse::<u32>().ok().and_then(|_| serde_json::from_value(value.clone()).ok())
                     })
                     .collect()
             })
@@ -441,12 +438,7 @@ mod tests {
         let response = test.1.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(
-            response
-                .expect_err("Err was not set")
-                .to_string()
-                .contains(search.as_str())
-        );
+        assert!(response.expect_err("Err was not set").to_string().contains(search.as_str()));
 
         test.0.assert();
     }
@@ -462,12 +454,7 @@ mod tests {
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(
-            accounts
-                .expect_err("Err was not set")
-                .to_string()
-                .contains(search.as_str())
-        );
+        assert!(accounts.expect_err("Err was not set").to_string().contains(search.as_str()));
 
         test.0.assert();
     }
@@ -617,11 +604,7 @@ mod tests {
             converted.description().unwrap_or_default()
         );
         assert_eq!(
-            category
-                .category_id
-                .parse::<u32>()
-                .expect("Failed to read id")
-                .to_owned(),
+            category.category_id.parse::<u32>().expect("Failed to read id").to_owned(),
             converted.id().expect("Failed to read id").to_owned()
         );
         assert_eq!(category.category_name, converted.name());
@@ -705,21 +688,13 @@ mod tests {
     #[test]
     fn test_get_client() {
         let client = get_test_client(String::new());
-        assert!(
-            client
-                .get_client(1)
-                .is_err_and(|e| matches!(e, api::ApiError::NotSupported))
-        );
+        assert!(client.get_client(1).is_err_and(|e| matches!(e, api::ApiError::NotSupported)));
     }
 
     #[test]
     fn test_get_category() {
         let client = get_test_client(String::new());
-        assert!(
-            client
-                .get_client(1)
-                .is_err_and(|e| matches!(e, api::ApiError::NotSupported))
-        );
+        assert!(client.get_client(1).is_err_and(|e| matches!(e, api::ApiError::NotSupported)));
     }
 
     #[test]

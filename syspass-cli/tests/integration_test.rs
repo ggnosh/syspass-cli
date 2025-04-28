@@ -122,16 +122,7 @@ fn run_create_delete_category_client(version: &str, category_client: &str, succe
 
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
-        .args([
-            "-q",
-            "-d",
-            "-c",
-            version,
-            "remove",
-            category_client,
-            "--id",
-            id.as_str(),
-        ])
+        .args(["-q", "-d", "-c", version, "remove", category_client, "--id", id.as_str()])
         .assert();
 
     if success {
@@ -154,9 +145,7 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
         .lowercase_letters(true)
         .uppercase_letters(true);
 
-    let password = generator
-        .generate_one()
-        .expect("Password generator should not have failed");
+    let password = generator.generate_one().expect("Password generator should not have failed");
 
     let assert = cmd
         .args([

@@ -21,11 +21,7 @@ pub fn command_helper() -> Command {
                 .value_parser(clap::value_parser!(u32))
                 .value_hint(ValueHint::Other),
         )
-        .arg(
-            arg!(-n --name <NAME> "New name")
-                .required(false)
-                .value_hint(ValueHint::Other),
-        )
+        .arg(arg!(-n --name <NAME> "New name").required(false).value_hint(ValueHint::Other))
         .arg(
             arg!(-e --description <DESCRIPTION> "New description")
                 .required(false)

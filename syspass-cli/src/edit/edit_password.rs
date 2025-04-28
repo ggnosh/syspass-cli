@@ -30,14 +30,8 @@ impl ChangeAccountArgs {
                 .get_one::<u32>("id")
                 .map(std::borrow::ToOwned::to_owned)
                 .expect("Id is required"),
-            password: matches
-                .get_one::<String>("password")
-                .map_or("", String::as_str)
-                .to_owned(),
-            expiration_date: matches
-                .get_one::<String>("expiration")
-                .map_or("", |s| s.as_str())
-                .to_owned(),
+            password: matches.get_one::<String>("password").map_or("", String::as_str).to_owned(),
+            expiration_date: matches.get_one::<String>("expiration").map_or("", |s| s.as_str()).to_owned(),
         }
     }
 }

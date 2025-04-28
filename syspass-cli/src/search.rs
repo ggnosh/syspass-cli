@@ -58,11 +58,7 @@ pub fn command_helper() -> Command {
                 .long("disable-usage")
                 .help("Do not sort account list by usage and do not track usage history"),
         )
-        .arg(
-            arg!(--clear "Clear clipboard")
-                .hide(true)
-                .value_hint(ValueHint::Unknown),
-        )
+        .arg(arg!(--clear "Clear clipboard").hide(true).value_hint(ValueHint::Unknown))
 }
 
 fn get_accounts_list(

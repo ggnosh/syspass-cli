@@ -21,11 +21,7 @@ pub fn command_helper() -> Command {
         )
         .about("Remove entity")
         .subcommand_required(true)
-        .subcommands([
-            client::command_helper(),
-            category::command_helper(),
-            account::command_helper(),
-        ])
+        .subcommands([client::command_helper(), category::command_helper(), account::command_helper()])
 }
 
 pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {

@@ -50,9 +50,7 @@ impl Syspass {
 
         self.syspass.request_number.set(self.syspass.request_number.get() + 1);
 
-        let response = self
-            .syspass
-            .send_request::<ApiResponse>(&self.syspass.config.host, &req)?;
+        let response = self.syspass.send_request::<ApiResponse>(&self.syspass.config.host, &req)?;
 
         response
             .result
@@ -97,19 +95,18 @@ impl From<Config> for Syspass {
 
 impl api::Client for Syspass {
     fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::ApiError> {
-        self.forge_and_send("account/search", Some(search), false)
-            .map(|result| {
-                let usage_data = &Config::get_usage_data(None);
-                let list = serde_json::from_value::<Vec<Account>>(result.result)
-                    .expect("Invalid response")
-                    .into_iter();
+        self.forge_and_send("account/search", Some(search), false).map(|result| {
+            let usage_data = &Config::get_usage_data(None);
+            let list = serde_json::from_value::<Vec<Account>>(result.result)
+                .expect("Invalid response")
+                .into_iter();
 
-                if usage {
-                    list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
-                } else {
-                    list.collect()
-                }
-            })
+            if usage {
+                list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
+            } else {
+                list.collect()
+            }
+        })
     }
 
     fn get_password(&self, account: &Account) -> Result<ViewPassword, api::ApiError> {
@@ -286,12 +283,7 @@ mod tests {
         let response = test.1.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(
-            response
-                .expect_err("Err was not set")
-                .to_string()
-                .contains(search.as_str())
-        );
+        assert!(response.expect_err("Err was not set").to_string().contains(search.as_str()));
 
         test.0.assert();
     }
@@ -307,12 +299,7 @@ mod tests {
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
-        assert!(
-            accounts
-                .expect_err("Err should be set")
-                .to_string()
-                .contains(search.as_str())
-        );
+        assert!(accounts.expect_err("Err should be set").to_string().contains(search.as_str()));
 
         test.0.assert();
     }

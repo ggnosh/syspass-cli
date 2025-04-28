@@ -81,21 +81,9 @@ fn get_command() -> Command {
                 .global(true)
                 .value_hint(ValueHint::FilePath),
         )
-        .arg(
-            arg!(-q --quiet "Do not output any message")
-                .global(true)
-                .display_order(100),
-        )
-        .arg(
-            arg!(-v --verbose "Output more information")
-                .global(true)
-                .display_order(100),
-        )
-        .arg(
-            arg!(-d --debug "Output debug information")
-                .global(true)
-                .display_order(100),
-        )
+        .arg(arg!(-q --quiet "Do not output any message").global(true).display_order(100))
+        .arg(arg!(-v --verbose "Output more information").global(true).display_order(100))
+        .arg(arg!(-d --debug "Output debug information").global(true).display_order(100))
         .arg(
             arg!(--completions "Generate shell completions")
                 .action(ArgAction::Set)
