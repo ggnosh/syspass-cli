@@ -237,14 +237,14 @@ impl api::Client for Syspass {
 mod tests {
     use std::path::Path;
 
-    use mockito::{Mock, ServerGuard};
-    use test_case::test_case;
-
     use crate::api::Client;
     use crate::api::account::{Account, ChangePassword};
     use crate::api::entity::Entity;
     use crate::api::syspass::v3::Syspass;
+    use crate::api::tests::{get_test_account, get_test_category, get_test_client};
     use crate::config::Config;
+    use mockito::{Mock, ServerGuard};
+    use test_case::test_case;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
 
@@ -252,6 +252,19 @@ mod tests {
         let response = crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
 
         (response.0, Syspass { syspass: response.1 }, response.2)
+    }
+
+    fn create_test_client() -> Syspass {
+        Syspass::from(Config {
+            host: "http://localhost:1/api.php".to_owned(),
+            token: "1234".to_owned(),
+            password: "<PASSWORD>".to_owned(),
+            verify_host: false,
+            api_version: Some("SyspassV3".to_owned()),
+            password_timeout: None,
+            no_clipboard: false,
+            no_shell: false,
+        })
     }
 
     //noinspection DuplicatedCode
@@ -333,17 +346,23 @@ mod tests {
     }
 
     #[test]
+    fn test_set_and_get_config() {
+        let syspass = create_test_client();
+        let config = syspass.get_config();
+
+        assert_eq!("http://localhost:1/api.php", config.host);
+        assert_eq!("1234", config.token);
+        assert_eq!("<PASSWORD>", config.password);
+        assert!(!config.verify_host);
+        assert!(config.password_timeout.is_none());
+        assert!(!config.no_clipboard);
+        assert!(!config.no_shell);
+        assert_eq!("SyspassV3", config.api_version.clone().expect("Failed to get version"));
+    }
+
+    #[test]
     fn test_invalid_server_address() {
-        let client = Syspass::from(Config {
-            host: "http://localhost:1/api.php".to_owned(),
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Some("SyspassV3".to_owned()),
-            password_timeout: None,
-            no_clipboard: false,
-            no_shell: false,
-        });
+        let client = create_test_client();
 
         assert!(client.search_account(vec![], false).is_err());
     }
@@ -469,5 +488,99 @@ mod tests {
         );
 
         test.0.assert();
+    }
+
+    #[test]
+    fn test_save_account() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_add.json"), 200);
+
+        let account = get_test_account();
+        let result = test.1.save_account(account);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_save_account_failed() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/account_add_failed.json"), 200);
+
+        let account = get_test_account();
+        let result = test.1.save_account(account);
+
+        assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
+    }
+
+    #[test]
+    fn test_save_category() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/category_add.json"), 200);
+
+        let category = get_test_category();
+        let result = test.1.save_category(category);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_save_category_failed() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/category_add_failed.json"), 200);
+
+        let category = get_test_category();
+        let result = test.1.save_category(category);
+
+        assert!(result.is_err_and(|x| x.to_string() == "Failed to add category"));
+    }
+
+    #[test]
+    fn test_get_client() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/client_view.json"), 200);
+        let result = test.1.get_client(17);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_category() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/category_view.json"), 200);
+        let result = test.1.get_category(17);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_save_client() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/client_add.json"), 200);
+
+        let client = get_test_client();
+        let result = test.1.save_client(client);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_save_client_failed() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/client_add_failed.json"), 200);
+
+        let client = get_test_client();
+        let result = test.1.save_client(client);
+
+        assert!(result.is_err_and(|x| x.to_string() == "Failed to add client"));
+    }
+
+    #[test]
+    fn test_delete_client() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/client_delete.json"), 200);
+
+        let result = test.1.delete_client(17);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_delete_category() {
+        let test = create_server_response(Some("tests/responses/syspass/v3/category_delete.json"), 200);
+
+        let result = test.1.delete_category(17);
+
+        assert!(result.is_ok());
     }
 }

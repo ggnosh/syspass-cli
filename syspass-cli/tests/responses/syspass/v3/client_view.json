@@ -1,0 +1,17 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "count": 1,
+    "itemId": 17,
+    "resultCode": 0,
+    "resultMessage": null,
+    "result": {
+      "id": 17,
+      "description": "created",
+      "hash": "",
+      "name": "new client",
+      "isGlobal": 0
+    }
+  }
+}

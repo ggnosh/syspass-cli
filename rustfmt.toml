@@ -19,3 +19,5 @@ newline_style = "Unix"
 
 # Reorder imports
 reorder_imports = true
+
+edition = "2024"

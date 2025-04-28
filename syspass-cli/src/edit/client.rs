@@ -31,7 +31,8 @@ pub fn command_helper() -> Command {
         )
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool, new: bool) -> Result<Client> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Client> {
+    let quiet = matches.get_flag("quiet");
     let id = helper::get_numeric_input(
         "id",
         matches,

@@ -1,0 +1,16 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "count": null,
+    "itemId": 17,
+    "resultCode": 0,
+    "resultMessage": "Category added",
+    "result": {
+      "id": null,
+      "description": "created",
+      "hash": "",
+      "name": "new category"
+    }
+  }
+}

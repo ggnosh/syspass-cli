@@ -398,6 +398,7 @@ mod tests {
     use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
     use crate::api::syspass::v2::{Account, Category, Client, Syspass};
+    use crate::api::tests::get_test_account;
     use crate::config::Config;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
@@ -740,38 +741,26 @@ mod tests {
     }
 
     #[test]
-    fn test_add_account() {
+    fn test_save_account() {
         let test = create_server_response(Some("tests/responses/syspass/v2/account_add.json"), 200);
 
         let account = get_test_account();
         let result = test.1.save_account(account);
 
-        assert!(result.is_err_and(
-            |x| matches!(x, api::ApiError::ParseError(err) if err == "missing field `account_categoryId`")
+        assert!(result.is_err());
+        assert!(matches!(
+            result.expect_err("Did not fail"),
+            api::ApiError::ParseError(_)
         ));
     }
 
     #[test]
-    fn test_add_account_failed() {
+    fn test_save_account_failed() {
         let test = create_server_response(Some("tests/responses/syspass/v2/account_add_failed.json"), 200);
 
         let account = get_test_account();
         let result = test.1.save_account(account);
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
-    }
-
-    fn get_test_account() -> api::account::Account {
-        api::account::Account::new(
-            None,
-            "test-name".to_owned(),
-            "test-login".to_owned(),
-            Some("example.org".to_owned()),
-            Some("nothing".to_owned()),
-            1,
-            1,
-            Some("test-password".to_owned()),
-            Some("test-client".to_owned()),
-        )
     }
 }

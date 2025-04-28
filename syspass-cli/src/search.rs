@@ -90,7 +90,8 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn Client, quiet: bool) -> Result<Option<ViewPassword>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<ViewPassword>> {
+    let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
     let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
     let category = matches.get_one::<u32>("category").copied().unwrap_or(0);

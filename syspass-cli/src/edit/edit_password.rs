@@ -66,7 +66,8 @@ pub fn command_helper() -> Command {
         )
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, quiet: bool) -> Result<Account> {
+pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Result<Account> {
+    let quiet = matches.get_flag("quiet");
     let args: ChangeAccountArgs = get_args(matches, quiet);
 
     if args.password.is_empty() {
@@ -134,8 +135,8 @@ impl Display for PasswordData {
             f,
             "{: <25} {}({})",
             self.password,
-            String::new().yellow(),
-            self.strength.yellow()
+            String::new().if_supports_color(Stdout, |text| text.yellow()),
+            self.strength.if_supports_color(Stdout, |text| text.yellow())
         )
     }
 }
@@ -225,26 +226,22 @@ mod tests {
     fn test_display_password() {
         assert_eq!(
             "pass                      (str)",
-            strip_ansi_escapes::strip_str(
-                PasswordData {
-                    password: "pass".to_string(),
-                    strength: "str".to_string(),
-                    strength_value: 0.0,
-                }
-                .to_string()
-            )
+            PasswordData {
+                password: "pass".to_string(),
+                strength: "str".to_string(),
+                strength_value: 0.0,
+            }
+            .to_string()
         );
 
         assert_eq!(
             "very long pass.....that.....just.....keeps.....going (str)",
-            strip_ansi_escapes::strip_str(
-                PasswordData {
-                    password: "very long pass.....that.....just.....keeps.....going".to_string(),
-                    strength: "str".to_string(),
-                    strength_value: 0.0,
-                }
-                .to_string()
-            )
+            PasswordData {
+                password: "very long pass.....that.....just.....keeps.....going".to_string(),
+                strength: "str".to_string(),
+                strength_value: 0.0,
+            }
+            .to_string()
         );
     }
 }

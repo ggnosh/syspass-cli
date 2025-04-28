@@ -26,7 +26,9 @@ use std::process::ExitCode;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use clap::{ArgAction, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser};
+use clap::{
+    ArgAction, ArgMatches, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser,
+};
 use clap_complete::aot::{Generator, Shell, generate};
 use log::{LevelFilter, error};
 use miette::miette;
@@ -50,7 +52,6 @@ mod update;
 struct SimpleLogger;
 
 const DEFAULT_TERMINAL_SIZE: (usize, usize) = (80, 25);
-const COMMAND_NOT_FOUND: &str = "Command not found";
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
@@ -114,24 +115,9 @@ fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
     generate(generator, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
-fn main() -> ExitCode {
-    let matches = get_command().get_matches();
+fn set_log_level(matches: &ArgMatches) {
+    let _ = log::set_logger(&LOGGER);
 
-    if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
-        let mut commands = get_command();
-        print_completions(generator, &mut commands);
-        return ExitCode::SUCCESS;
-    }
-
-    let config = Config::from(&matches);
-    let api_version = config.api_version.as_deref().unwrap_or("");
-    let api_client_box: Box<dyn Client> = Api::from_str(api_version)
-        .unwrap_or_else(|()| panic!("No such API is supported ({api_version})"))
-        .get(config);
-
-    let api_client = api_client_box.as_ref();
-
-    log::set_logger(&LOGGER).expect("Failed to set logger");
     log::set_max_level(
         match (
             matches.get_flag("debug"),
@@ -144,19 +130,43 @@ fn main() -> ExitCode {
             _ => LevelFilter::Warn,
         },
     );
+}
+
+fn main() -> ExitCode {
+    let matches = get_command().get_matches();
+
+    if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
+        let mut commands = get_command();
+        print_completions(generator, &mut commands);
+        return ExitCode::SUCCESS;
+    }
+
+    let config = Config::from(&matches);
+    let api_client_box: Box<dyn Client> = Api::from_str(config.api_version.as_deref().unwrap_or(""))
+        .unwrap_or_else(|()| panic!("No such API is supported"))
+        .get(config);
+
+    let api_client = api_client_box.as_ref();
+
+    set_log_level(&matches);
 
     if let Some((Width(w), Height(h))) = terminal_size() {
         *TERMINAL_SIZE.lock().expect("Failed to lock terminal size") = (w as usize, h as usize);
     }
 
-    let quiet = matches.get_flag("quiet");
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client, quiet).map(|_| 0),
-        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client, quiet).map(|()| 0),
-        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client, quiet).map(|()| 0),
-        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client, quiet).map(|()| 0),
+        Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client).map(|_| 0),
+        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client).map(|()| 0),
+        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client).map(|()| 0),
+        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client).map(|()| 0),
         Some((update::COMMAND_NAME, matches)) => update::command(matches).map(|()| 0),
-        _ => Err(miette!(CommandError::NotFound)),
+        _ => {
+            let mut cmd = get_command();
+            cmd.print_help().expect("Failed to print help");
+            println!();
+
+            Err(miette!(CommandError::NotFound))
+        }
     }
     .map_or_else(
         |e| {
@@ -178,7 +188,7 @@ enum CommandError {
 
 impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{COMMAND_NOT_FOUND}")
+        write!(f, "Required command or argument missing")
     }
 }
 
@@ -188,7 +198,9 @@ impl Error for CommandError {}
 mod tests {
     use std::path::Path;
 
+    use crate::{get_command, set_log_level};
     use assert_cmd::Command;
+    use log::LevelFilter;
     use mockito::{Mock, Server, ServerGuard};
 
     type ServerResponse = (Mock, ServerGuard);
@@ -219,5 +231,37 @@ mod tests {
             .arg("--help")
             .assert()
             .success();
+    }
+
+    #[test]
+    fn test_subcommand_not_found() {
+        let matches = get_command().try_get_matches_from(vec!["test", "invalid"]);
+        assert!(matches.is_err());
+        assert_eq!(
+            matches.expect_err("Should not have panicked").kind(),
+            clap::error::ErrorKind::InvalidSubcommand
+        );
+
+        let matches = get_command().try_get_matches_from(vec!["invalid"]);
+        assert!(matches.is_err());
+        assert_eq!(
+            matches.expect_err("Should not have panicked").kind(),
+            clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+        );
+    }
+
+    #[test]
+    fn test_logger_initialization() {
+        let matches = get_command().get_matches_from(vec!["--version", "--debug"]);
+        set_log_level(&matches);
+        assert_eq!(log::max_level(), LevelFilter::Debug);
+
+        let matches = get_command().get_matches_from(vec!["--version", "--verbose"]);
+        set_log_level(&matches);
+        assert_eq!(log::max_level(), LevelFilter::Info);
+
+        let matches = get_command().get_matches_from(vec!["--version", "--quiet"]);
+        set_log_level(&matches);
+        assert_eq!(log::max_level(), LevelFilter::Off);
     }
 }

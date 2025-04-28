@@ -91,7 +91,7 @@ pub fn password_strength(strength: f64) -> &'static str {
 mod tests {
     use test_case::test_case;
 
-    use crate::prompt::password_strength;
+    use crate::prompt::{get_match_string, password_strength};
 
     #[test_case("Very dangerous", 0.0)]
     #[test_case("Very dangerous", 19.0)]
@@ -105,5 +105,15 @@ mod tests {
     #[test_case("Heat death", 1000.0)]
     pub fn test_password_strength(text: &str, strength: f64) {
         assert_eq!(text, password_strength(strength));
+    }
+
+    #[test]
+    fn test_get_match_string_default() {
+        let matches = clap::Command::new("test")
+            .arg(clap::arg!(--"name" <NAME> "Name argument"))
+            .get_matches_from(vec!["test"]);
+
+        let result = get_match_string(&matches, true, "name", "Enter name:", "default", false);
+        assert_eq!(result, "default", "Should return the default value");
     }
 }

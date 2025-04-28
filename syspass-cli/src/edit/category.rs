@@ -33,7 +33,8 @@ pub fn command_helper() -> Command {
         )
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool, new: bool) -> Result<Category> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Category> {
+    let quiet = matches.get_flag("quiet");
     let id = helper::get_numeric_input(
         "id",
         matches,
@@ -82,4 +83,37 @@ fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: 
         category.description().unwrap_or_default(),
         false,
     )));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Arg;
+    use itertools::Itertools;
+
+    #[test]
+    fn test_command_helper() {
+        let helper = command_helper();
+        let mut arguments = helper.get_arguments();
+
+        assert!(arguments.contains(&Arg::new("id")));
+        assert!(arguments.contains(&Arg::new("name")));
+        assert!(arguments.contains(&Arg::new("description")));
+    }
+
+    #[test]
+    fn test_update_category_fields() {
+        let matches = command_helper()
+            .try_get_matches_from(["test", "--name", "New Category", "--description", "Updated description"])
+            .expect("Failure");
+
+        let mut category = Category::default();
+        update_category_fields(&matches, &mut category, false);
+
+        assert_eq!(category.name(), "New Category");
+        assert_eq!(
+            category.description().expect("Failed to get description"),
+            "Updated description"
+        );
+    }
 }

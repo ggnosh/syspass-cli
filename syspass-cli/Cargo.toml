@@ -12,7 +12,9 @@ authors = ["GGnosh"]
 categories = ["command-line-utilities"]
 exclude = [
     "tests",
-    "report.json"
+    "report.json",
+    "coverage",
+    "resources"
 ]
 
 [dependencies]
@@ -38,9 +40,8 @@ itertools = "0.14"
 
 [dev-dependencies]
 assert_cmd = "2.0"
-mockito = "1.2"
+mockito = { version = "1.2", features = [] }
 predicates = "3.0"
 test-case = "3.2"
 regex = "1.9"
-strip-ansi-escapes = "0.2"
 tempfile = "3.14"

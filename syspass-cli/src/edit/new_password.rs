@@ -40,7 +40,8 @@ pub fn command_helper() -> Command {
         .arg(arg!(-p --password <PASSWORD> "Password").value_hint(ValueHint::Other))
 }
 
-pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, quiet: bool) -> Result<Account> {
+pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Account> {
+    let quiet = matches.get_flag("quiet");
     let category_id = helper::get_numeric_input(
         "category",
         matches,

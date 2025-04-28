@@ -122,28 +122,24 @@ mod tests {
     fn test_display_client() {
         assert_eq!(
             "0. name (*)",
-            strip_ansi_escapes::strip_str(
-                Client {
-                    id: Some(0),
-                    name: "name".to_string(),
-                    description: Some("description".to_string()),
-                    is_global: 1
-                }
-                .to_string()
-            )
+            Client {
+                id: Some(0),
+                name: "name".to_string(),
+                description: Some("description".to_string()),
+                is_global: 1
+            }
+            .to_string()
         );
 
         assert_eq!(
             "0. name",
-            strip_ansi_escapes::strip_str(
-                Client {
-                    id: Some(0),
-                    name: "name".to_string(),
-                    description: Some("description".to_string()),
-                    is_global: 0
-                }
-                .to_string()
-            )
+            Client {
+                id: Some(0),
+                name: "name".to_string(),
+                description: Some("description".to_string()),
+                is_global: 0
+            }
+            .to_string()
         );
     }
 }

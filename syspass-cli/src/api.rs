@@ -105,9 +105,32 @@ impl std::fmt::Display for ApiErrorResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::Api;
+    use crate::api;
+    use crate::api::{Api, ApiError, ApiErrorResponse};
     use std::str::FromStr;
     use test_case::test_case;
+
+    pub fn get_test_account() -> api::account::Account {
+        api::account::Account::new(
+            None,
+            "test-name".to_owned(),
+            "test-login".to_owned(),
+            Some("example.org".to_owned()),
+            Some("nothing".to_owned()),
+            1,
+            1,
+            Some("test-password".to_owned()),
+            Some("test-client".to_owned()),
+        )
+    }
+
+    pub fn get_test_category() -> api::category::Category {
+        api::category::Category::new(None, "name".to_owned(), Some("description".to_owned()))
+    }
+
+    pub fn get_test_client() -> api::client::Client {
+        api::client::Client::new(None, "name".to_owned(), Some("description".to_owned()), 0)
+    }
 
     #[test_case("SyspassV3", true)]
     #[test_case("SyspassV2", true)]
@@ -119,5 +142,25 @@ mod tests {
             !((expected && api.is_err()) || (!expected && api.is_ok())),
             "Expected {version} to be {expected}"
         );
+    }
+
+    #[test]
+    fn test_api_error_response_display() {
+        let error_response = ApiErrorResponse {
+            code: 404,
+            message: "Not Found".to_string(),
+        };
+
+        assert_eq!(error_response.to_string(), "Not Found");
+    }
+
+    #[test]
+    fn test_convert_api_error_to_miette() {
+        let error_response = ApiError::NotFound("Test".to_string());
+
+        assert_eq!(error_response.to_string(), "Test does not exist");
+
+        let miette_error: miette::Error = error_response.into();
+        assert_eq!(miette_error.to_string(), "Test does not exist");
     }
 }

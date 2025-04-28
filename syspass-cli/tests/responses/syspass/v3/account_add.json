@@ -1,0 +1,42 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "count": 2,
+    "itemId": 68,
+    "resultCode": 0,
+    "resultMessage": "Account created",
+    "result": {
+      "id": 68,
+      "userId": 1,
+      "userGroupId": 1,
+      "userEditId": 0,
+      "name": "TestAccount",
+      "clientId": 1,
+      "categoryId": 1,
+      "login": "test",
+      "url": "example.org",
+      "notes": "nothing",
+      "otherUserEdit": 0,
+      "otherUserGroupEdit": 0,
+      "isPrivate": 0,
+      "isPrivat  eGroup": 0,
+      "dateEdit": null,
+      "passDate": 1687904141,
+      "passDateChange": 0,
+      "parentId": 0,
+      "categoryName": "asddasd",
+      "clientName": "asdasdas",
+      "userGroupName": "Admins",
+      "userName": "sysPass Admin",
+      "userLogin": "admin",
+      "userEditName": "",
+      "userEditLogin": "",
+      "num_files": 0,
+      "publicLinkHash": null,
+      "publicLinkDateExpire": null,
+      "publicL  inkTotalCountViews": null,
+      "countView": 0
+    }
+  }
+}
