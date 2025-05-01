@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use passwords::PasswordGenerator;
 use predicates::prelude::predicate;
 use regex::Regex;
 use test_case::test_case;
@@ -135,18 +134,6 @@ fn run_create_delete_category_client(version: &str, category_client: &str, succe
 fn create_new_category_client(version: &str, category_client: &str) -> u32 {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
 
-    let generator = PasswordGenerator::new()
-        .length(8)
-        .symbols(false)
-        .spaces(false)
-        .exclude_similar_characters(true)
-        .strict(true)
-        .numbers(true)
-        .lowercase_letters(true)
-        .uppercase_letters(true);
-
-    let password = generator.generate_one().expect("Password generator should not have failed");
-
     let assert = cmd
         .args([
             "-q",
@@ -156,7 +143,7 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
             "new",
             category_client,
             "-n",
-            password.as_str(),
+            "test_password",
             "-e",
             "nothing",
         ])

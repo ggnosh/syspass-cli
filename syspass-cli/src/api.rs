@@ -17,8 +17,15 @@ pub mod client;
 pub mod entity;
 mod syspass;
 
+#[cfg(test)]
+use mockall::automock;
+
+pub type AccountSearchParams = Vec<(&'static str, String)>;
+
+#[allow(clippy::needless_lifetimes)]
+#[cfg_attr(test, automock)]
 pub trait Client {
-    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, ApiError>;
+    fn search_account(&self, search: AccountSearchParams, usage: bool) -> Result<Vec<Account>, ApiError>;
     fn get_password(&self, account: &Account) -> Result<ViewPassword, ApiError>;
     fn get_clients(&self) -> Result<Vec<SyspassClient>, ApiError>;
     fn get_categories(&self) -> Result<Vec<Category>, ApiError>;
@@ -138,10 +145,7 @@ mod tests {
     #[test_case("Invalid-version", false)]
     fn test_from_str(version: &str, expected: bool) {
         let api = Api::from_str(version);
-        assert!(
-            !((expected && api.is_err()) || (!expected && api.is_ok())),
-            "Expected {version} to be {expected}"
-        );
+        assert!(!((expected && api.is_err()) || (!expected && api.is_ok())));
     }
 
     #[test]

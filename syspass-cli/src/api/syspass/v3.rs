@@ -1,10 +1,10 @@
 use crate::api;
-use crate::api::ApiErrorResponse;
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
 use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, sort_accounts};
+use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
 use miette::Result;
@@ -70,7 +70,7 @@ impl Syspass {
         &self,
         path: &str,
         id: Option<&u32>,
-        mut args: Option<Vec<(&str, String)>>,
+        mut args: Option<AccountSearchParams>,
     ) -> Result<T, api::ApiError> {
         let method = format!("{}/{}", path, Self::create_or_edit(id));
         if let Some(id) = id.filter(|&&id| id != 0) {
@@ -94,14 +94,14 @@ impl From<Config> for Syspass {
 }
 
 impl api::Client for Syspass {
-    fn search_account(&self, search: Vec<(&str, String)>, usage: bool) -> Result<Vec<Account>, api::ApiError> {
+    fn search_account(&self, search: AccountSearchParams, usage: bool) -> Result<Vec<Account>, api::ApiError> {
         self.forge_and_send("account/search", Some(search), false).map(|result| {
-            let usage_data = &Config::get_usage_data(None);
             let list = serde_json::from_value::<Vec<Account>>(result.result)
                 .expect("Invalid response")
                 .into_iter();
 
             if usage {
+                let usage_data = &Config::get_usage_data(None);
                 list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
             } else {
                 list.collect()

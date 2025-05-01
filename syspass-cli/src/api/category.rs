@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::error;
 use miette::{Result, miette};
-use owo_colors::{OwoColorize, Stream::Stdout};
 use serde::Deserialize;
 
 use crate::api;
@@ -12,7 +11,7 @@ use crate::prompt::ask_prompt;
 
 const ID_EMPTY: &str = "Id should not be empty";
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     id: Option<u32>,
@@ -23,6 +22,14 @@ pub struct Category {
 impl Category {
     pub const fn new(id: Option<u32>, name: String, description: Option<String>) -> Self {
         Self { id, name, description }
+    }
+
+    pub fn new_from_asking() -> Self {
+        Self::new(
+            None,
+            ask_prompt("Category name", true, ""),
+            Some(ask_prompt("Category description", false, "")),
+        )
     }
 
     pub fn name(&self) -> &str {
@@ -58,6 +65,13 @@ impl Entity for Category {
     }
 }
 
+fn save_category(new_category: Category, api_client: &dyn api::Client) -> Result<u32> {
+    match api_client.save_category(new_category) {
+        Ok(client) => Ok(client.id.expect(ID_EMPTY)),
+        Err(error) => Err(miette!("Failed to save category: {error}")),
+    }
+}
+
 pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
     let categories = api_client
         .get_categories()
@@ -70,21 +84,15 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
         .interact_opt()
         .map_err(|e| miette!("{e}: Failed to list categories"))?
         .map_or_else(
-            || loop {
-                let new_category = Category {
-                    id: None,
-                    name: ask_prompt("Category name", true, ""),
-                    description: Some(ask_prompt("Category description", false, "")),
-                };
+            || {
+                loop {
+                    let new_category = Category::new_from_asking();
 
-                match api_client.save_category(new_category) {
-                    Ok(client) => break Ok(client.id.expect(ID_EMPTY)),
-                    Err(error) => {
-                        error!(
-                            "{} Failed to save category: {}",
-                            "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
-                            error
-                        );
+                    match save_category(new_category, api_client) {
+                        Ok(id) => break Ok(id),
+                        Err(e) => {
+                            error!("{e}");
+                        }
                     }
                 }
             },
@@ -94,38 +102,63 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::api::category::Category;
+    use crate::api::{ApiError, MockClient};
 
     #[test]
     fn test_display_category() {
         assert_eq!(
             "1. name",
-            Category {
-                id: Some(1),
-                name: "name".to_string(),
-                description: Some("desc".to_string()),
-            }
-            .to_string()
+            Category::new(Some(1), "name".to_string(), Some("desc".to_string())).to_string()
         );
 
         assert_eq!(
             "1. looooooooooooooooooooooooooooooooooooooooong name",
-            Category {
-                id: Some(1),
-                name: "looooooooooooooooooooooooooooooooooooooooong name".to_string(),
-                description: Some("desc".to_string()),
-            }
+            Category::new(
+                Some(1),
+                "looooooooooooooooooooooooooooooooooooooooong name".to_string(),
+                Some("desc".to_string())
+            )
             .to_string()
         );
 
         assert_eq!(
             "0. name",
-            Category {
-                id: None,
-                name: "name".to_string(),
-                description: Some("desc".to_string()),
-            }
-            .to_string()
+            Category::new(None, "name".to_string(), Some("desc".to_string())).to_string()
         );
+    }
+
+    #[test]
+    fn test_save_category_success() {
+        let mut mock_client = MockClient::new();
+        let category = Category::new(None, "Test Category".to_string(), Some("Test Description".to_string()));
+        let saved_category = Category::new(
+            Some(1),
+            "Test Category".to_string(),
+            Some("Test Description".to_string()),
+        );
+
+        mock_client
+            .expect_save_category()
+            .withf(|c| c.name == "Test Category")
+            .returning(move |_| Ok(saved_category.clone()));
+
+        let result = save_category(category, &mock_client);
+        assert!(result.is_ok());
+        assert_eq!(result.expect("Failed"), 1);
+    }
+
+    #[test]
+    fn test_save_category_failed() {
+        let mut mock_client = MockClient::new();
+        let category = Category::new(None, "Test Category".to_string(), Some("Test Description".to_string()));
+
+        mock_client
+            .expect_save_category()
+            .returning(|_| Err(ApiError::BadResponse("testing".to_string())));
+
+        let result = save_category(category, &mock_client);
+        assert!(result.is_err());
     }
 }

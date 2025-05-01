@@ -11,9 +11,9 @@ use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
 use term_table::{Table, TableStyle};
 
-use crate::api::Client;
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
+use crate::api::{AccountSearchParams, Client};
 use crate::config::Config;
 use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE, api};
 
@@ -63,7 +63,7 @@ pub fn command_helper() -> Command {
 
 fn get_accounts_list(
     api_client: &dyn Client,
-    search_string: Vec<(&str, String)>,
+    search_string: AccountSearchParams,
     usage_disabled: bool,
 ) -> Result<Vec<Account>> {
     api_client

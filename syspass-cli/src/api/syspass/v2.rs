@@ -1,8 +1,8 @@
 use crate::api;
-use crate::api::ApiErrorResponse;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
+use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
 use miette::Result;
@@ -198,7 +198,7 @@ impl From<Config> for Syspass {
 impl api::Client for Syspass {
     fn search_account(
         &self,
-        search: Vec<(&str, String)>,
+        search: AccountSearchParams,
         usage: bool,
     ) -> Result<Vec<api::account::Account>, api::ApiError> {
         self.forge_and_send("getAccountSearch", Some(search), false)

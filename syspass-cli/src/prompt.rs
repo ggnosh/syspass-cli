@@ -1,10 +1,6 @@
-use std::process;
-
 use chrono::{NaiveDate, NaiveDateTime};
 use clap::ArgMatches;
 use dialoguer::{Input, Password, theme::ColorfulTheme};
-use log::warn;
-use passwords::{analyzer, scorer};
 
 pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
     Input::with_theme(&ColorfulTheme::default())
@@ -12,7 +8,7 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
         .allow_empty(!required)
         .with_initial_text(default.to_string())
         .interact_text()
-        .unwrap_or_else(|_| process::exit(1))
+        .expect("Failed to get input")
 }
 
 pub fn get_match_string(
@@ -60,10 +56,10 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
         Password::with_theme(&theme)
             .with_prompt(prompt)
             .validate_with(|input: &String| -> Result<(), &str> {
-                warn!(
-                    "Password strength: {}",
-                    password_strength(scorer::score(&analyzer::analyze(input)))
-                );
+                if input.is_empty() {
+                    return Err("Password can not be empty.");
+                }
+
                 Ok(())
             });
 
@@ -74,38 +70,9 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
     password.interact().expect("Failed to get password")
 }
 
-pub fn password_strength(strength: f64) -> &'static str {
-    match strength {
-        0.0..=19.9 => "Very dangerous",
-        20.0..=39.9 => "Dangerous",
-        40.0..=59.9 => "Very weak",
-        60.0..=79.9 => "Weak",
-        80.0..=89.9 => "Good",
-        90.0..=94.9 => "Strong",
-        95.0..=98.9 => "Very strong",
-        _ => "Heat death",
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use test_case::test_case;
-
-    use crate::prompt::{get_match_string, password_strength};
-
-    #[test_case("Very dangerous", 0.0)]
-    #[test_case("Very dangerous", 19.0)]
-    #[test_case("Dangerous", 39.0)]
-    #[test_case("Very weak", 59.0)]
-    #[test_case("Weak", 70.0)]
-    #[test_case("Good", 89.0)]
-    #[test_case("Strong", 94.0)]
-    #[test_case("Very strong", 98.0)]
-    #[test_case("Heat death", 100.0)]
-    #[test_case("Heat death", 1000.0)]
-    pub fn test_password_strength(text: &str, strength: f64) {
-        assert_eq!(text, password_strength(strength));
-    }
+    use crate::prompt::get_match_string;
 
     #[test]
     fn test_get_match_string_default() {

@@ -1,25 +1,3 @@
-#![forbid(unsafe_code, non_ascii_idents)]
-#![warn(
-    clippy::all,
-    clippy::pedantic,
-    clippy::correctness,
-    clippy::suspicious,
-    clippy::cargo,
-    clippy::style,
-    clippy::complexity,
-    clippy::perf,
-    clippy::pedantic,
-    clippy::unwrap_used,
-    clippy::nursery,
-    clippy::style,
-    deprecated_in_future,
-    future_incompatible,
-    nonstandard_style,
-    trivial_casts,
-    trivial_numeric_casts
-)]
-#![allow(clippy::multiple_crate_versions)]
-
 use std::error::Error;
 use std::io;
 use std::process::ExitCode;

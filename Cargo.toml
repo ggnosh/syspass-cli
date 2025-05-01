@@ -9,3 +9,24 @@ strip = true
 lto = true
 panic = "abort"
 codegen-units = 1
+
+[workspace.lints.clippy]
+all = { level = "warn" }
+pedantic = { level = "warn" }
+correctness = { level = "warn" }
+suspicious = { level = "warn" }
+cargo = { level = "warn" }
+style = { level = "warn" }
+complexity = { level = "warn" }
+perf = { level = "warn" }
+unwrap_used = { level = "warn" }
+nursery = { level = "warn" }
+
+[workspace.lints.rust]
+unsafe_code = { level = "forbid", priority = -1 }
+non_ascii_idents = { level = "forbid", priority = -1 }
+deprecated_in_future = { level = "warn" }
+future_incompatible = { level = "warn" }
+nonstandard_style = { level = "warn" }
+trivial_casts = { level = "warn" }
+trivial_numeric_casts = { level = "warn" }

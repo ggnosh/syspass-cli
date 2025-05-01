@@ -1,19 +1,13 @@
 use miette::{Result, miette};
-use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
 
+use crate::api::account::{Account, ChangePassword};
+use crate::prompt::{ask_for_date, ask_for_password};
 use chrono::{NaiveDateTime, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
 use dialoguer::{Select, theme::ColorfulTheme};
-use itertools::Itertools;
 use log::{info, warn};
 use owo_colors::{OwoColorize, Stream::Stdout};
-use passwords::PasswordGenerator;
-use passwords::analyzer;
-use passwords::scorer;
-
-use crate::api::account::{Account, ChangePassword};
-use crate::prompt::{ask_for_date, ask_for_password, password_strength};
+use rand::Rng;
 
 pub const COMMAND_NAME: &str = "password";
 
@@ -117,72 +111,21 @@ fn get_args(matches: &ArgMatches, quiet: bool) -> ChangeAccountArgs {
     args
 }
 
-struct PasswordData {
-    password: String,
-    strength: String,
-    strength_value: f64,
-}
-
-impl Display for PasswordData {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{: <25} {}({})",
-            self.password,
-            String::new().if_supports_color(Stdout, |text| text.yellow()),
-            self.strength.if_supports_color(Stdout, |text| text.yellow())
-        )
+fn generate_passwords(random_count: usize) -> Vec<String> {
+    let mut passwords = Vec::new();
+    for _ in 0..random_count {
+        let password: String = rand::rng()
+            .sample_iter(&rand::distr::Alphanumeric)
+            .take(30)
+            .map(char::from)
+            .collect();
+        passwords.push(password);
     }
-}
-
-struct GeneratorParams(usize, bool, bool);
-
-fn generate_passwords(random_count: usize) -> Vec<PasswordData> {
-    let params = [
-        GeneratorParams(25, true, true),
-        GeneratorParams(25, false, true),
-        GeneratorParams(20, true, true),
-        GeneratorParams(16, true, true),
-        GeneratorParams(16, false, true),
-        GeneratorParams(10, true, true),
-        GeneratorParams(8, false, true),
-        GeneratorParams(8, false, false),
-    ];
-
-    params
-        .iter()
-        .flat_map(|flags| {
-            PasswordGenerator::new()
-                .length(flags.0)
-                .symbols(flags.1)
-                .numbers(flags.2)
-                .exclude_similar_characters(true)
-                .strict(true)
-                .spaces(false)
-                .lowercase_letters(true)
-                .uppercase_letters(true)
-                .generate(random_count)
-                .expect("Password generator failed")
-        })
-        .map(|password| {
-            let score = scorer::score(&analyzer::analyze(&password));
-            PasswordData {
-                password: password.replace('<', ""),
-                strength_value: score,
-                strength: password_strength(score).to_owned(),
-            }
-        })
-        .sorted_by(|a, b| {
-            if b.strength_value == 0.0 {
-                return Ordering::Greater;
-            }
-            b.strength_value.total_cmp(&a.strength_value)
-        })
-        .collect()
+    passwords
 }
 
 pub fn get_password(prompt: &str) -> String {
-    let pairs: Vec<PasswordData> = generate_passwords(5);
+    let pairs: Vec<String> = generate_passwords(8);
     Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose password (Press ESC to enter your own):")
         .default(0)
@@ -191,51 +134,17 @@ pub fn get_password(prompt: &str) -> String {
         .max_length(10)
         .interact_opt()
         .expect("Failed to select password")
-        .map_or_else(
-            || ask_for_password(prompt, true),
-            |choice| pairs[choice].password.clone(),
-        )
+        .map_or_else(|| ask_for_password(prompt, true), |choice| pairs[choice].clone())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::edit::edit_password::{PasswordData, generate_passwords};
+    use crate::edit::edit_password::generate_passwords;
 
     #[test]
     fn test_generate_passwords() {
         let passwords = generate_passwords(5);
 
-        assert_eq!(5 * 8, passwords.len());
-
-        let own = passwords.first().expect("Failed to get generated password");
-        assert!(
-            (own.strength_value - 100.0).abs() < f64::EPSILON,
-            "left: {:?} not equal right: {:?}",
-            100.0,
-            own.strength_value
-        );
-    }
-
-    #[test]
-    fn test_display_password() {
-        assert_eq!(
-            "pass                      (str)",
-            PasswordData {
-                password: "pass".to_string(),
-                strength: "str".to_string(),
-                strength_value: 0.0,
-            }
-            .to_string()
-        );
-
-        assert_eq!(
-            "very long pass.....that.....just.....keeps.....going (str)",
-            PasswordData {
-                password: "very long pass.....that.....just.....keeps.....going".to_string(),
-                strength: "str".to_string(),
-                strength_value: 0.0,
-            }
-            .to_string()
-        );
+        assert_eq!(5, passwords.len());
     }
 }

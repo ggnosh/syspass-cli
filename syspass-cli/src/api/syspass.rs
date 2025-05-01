@@ -127,7 +127,6 @@ mod tests {
     use std::path::Path;
 
     use mockito::{Mock, ServerGuard};
-    use passwords::PasswordGenerator;
     use reqwest::blocking::ClientBuilder;
 
     use crate::api::syspass::Syspass;
@@ -140,18 +139,7 @@ mod tests {
         status: usize,
         api_version: &str,
     ) -> CreatedServer {
-        let path = "/".to_string()
-            + &PasswordGenerator::new()
-                .length(20)
-                .symbols(false)
-                .numbers(true)
-                .exclude_similar_characters(false)
-                .strict(true)
-                .spaces(false)
-                .lowercase_letters(true)
-                .uppercase_letters(false)
-                .generate_one()
-                .expect("Failed to generated password");
+        let path = "/brr".to_string();
 
         let response = crate::tests::create_server_response(response, status, "POST", &path);
 

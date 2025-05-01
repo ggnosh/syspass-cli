@@ -17,6 +17,9 @@ exclude = [
     "resources"
 ]
 
+[lints]
+workspace = true
+
 [dependencies]
 arboard = { version = "3.4", default-features = false, features = ["wayland-data-control"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -24,7 +27,6 @@ clap = { version = "4.5", features = ["cargo", "wrap_help", "color", "suggestion
 clap_complete = { version = "4.5", features = ["default"] }
 home = { version = "0.5" }
 log = { version = "0.4", features = ["release_max_level_error"] }
-passwords = { version = "3.1" }
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
@@ -37,6 +39,8 @@ miette = { version = "7.5" }
 thiserror = "2.0"
 owo-colors = { version = "4.2", features = ["supports-colors"] }
 itertools = "0.14"
+rand = "0.9"
+mockall = "0.13.1"
 
 [dev-dependencies]
 assert_cmd = "2.0"
