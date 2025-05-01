@@ -21,6 +21,7 @@ complexity = { level = "warn" }
 perf = { level = "warn" }
 unwrap_used = { level = "warn" }
 nursery = { level = "warn" }
+multiple_crate_versions = { level = "allow", priority = 2 }
 
 [workspace.lints.rust]
 unsafe_code = { level = "forbid", priority = -1 }

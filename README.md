@@ -1,11 +1,9 @@
-<div align="center">
-    <a href="https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml"><img src="https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml/badge.svg" /></a>
-    <a href="https://github.com/ggnosh/syspass-cli/actions/workflows/audit.yml"><img src="https://github.com/ggnosh/syspass-cli/actions/workflows/audit.yml/badge.svg" /></a>
-    <a href="https://crates.io/crates/syspass-cli"><img src="https://img.shields.io/crates/v/syspass-cli.svg" /></a>
-    <a href="https://github.com/ggnosh/syspass-cli"><img src="https://img.shields.io/badge/GitHub-Repo?color=%23336699" /></a>
-</div>
-
 # syspass-cli
+
+[![crates.io](https://img.shields.io/crates/v/syspass-cli.svg)](https://crates.io/crates/syspass-cli)
+[![MIT/Apache-2 licensed](https://img.shields.io/crates/l/syspass-cli.svg)](./LICENSE)
+[![Tests](https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml/badge.svg)](https://github.com/ggnosh/syspass-cli/actions/workflows/rust.yml)
+[![Audit](https://github.com/ggnosh/syspass-cli/actions/workflows/audit.yml/badge.svg)](https://github.com/ggnosh/syspass-cli/actions/workflows/audit.yml)
 
 A simple command line tool to interact with sysPass databases.
 
