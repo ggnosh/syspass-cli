@@ -1,9 +1,9 @@
-use std::fmt::{Display, Formatter, Result};
-
 use owo_colors::{OwoColorize, Stream::Stdout};
 use serde::Deserialize;
+use std::fmt::{Display, Formatter, Result};
+use std::sync::atomic::Ordering;
 
-use crate::TERMINAL_SIZE;
+use crate::TERMINAL_WIDTH;
 use crate::api::entity::Entity;
 
 #[derive(Deserialize, Default, Clone, Debug)]
@@ -91,7 +91,7 @@ impl Display for Account {
         .collect::<Vec<_>>()
         .join(" ");
 
-        let line = truncate(&row, TERMINAL_SIZE.lock().expect("Failed to get terminal size").0 - 5);
+        let line = truncate(&row, TERMINAL_WIDTH.load(Ordering::Relaxed) - 5);
 
         write!(f, "{line}")
     }

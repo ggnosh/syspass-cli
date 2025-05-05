@@ -5,6 +5,7 @@ use log::warn;
 use miette::{Result, miette};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{cmp, env, process, thread};
 use term_table::row::Row;
@@ -15,7 +16,7 @@ use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AccountSearchParams, Client};
 use crate::config::Config;
-use crate::{DEFAULT_TERMINAL_SIZE, TERMINAL_SIZE, api};
+use crate::{TERMINAL_WIDTH, api};
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -190,14 +191,14 @@ fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: 
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     let mut table = Table::new();
-    let terminal_width = TERMINAL_SIZE.try_lock().map_or(DEFAULT_TERMINAL_SIZE.0, |size| size.0);
-    let widths = [
-        terminal_width * 7 / 100,
-        terminal_width * 29 / 100,
-        cmp::max(terminal_width * 30 / 100, terminal_width - (terminal_width * 69 / 100)),
-    ];
+    let width = TERMINAL_WIDTH.load(Ordering::Relaxed);
 
-    table.max_column_widths = HashMap::from([(0, widths[0]), (1, widths[1]), (2, widths[2]), (3, widths[1])]);
+    table.max_column_widths = HashMap::from([
+        (0, width * 7 / 100),
+        (1, width * 29 / 100),
+        (2, cmp::max(width * 30 / 100, width - (width * 69 / 100))),
+        (3, width * 29 / 100),
+    ]);
     table.style = TableStyle::rounded();
 
     let cells = vec![
@@ -226,11 +227,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.add_row(Row::new(vec![
         TableCell::new(data.account.id().expect("Id should not be empty")),
         TableCell::new(data.account.login()),
-        TableCell::new(if show {
-            data.password.clone()
-        } else {
-            "Copied to clipboard".to_string()
-        }),
+        TableCell::new(if show { &data.password } else { "Copied to clipboard" }),
         TableCell::new(data.account.url().unwrap_or_default()),
     ]));
 

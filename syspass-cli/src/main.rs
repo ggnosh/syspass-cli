@@ -2,7 +2,7 @@ use std::error::Error;
 use std::io;
 use std::process::ExitCode;
 use std::str::FromStr;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clap::{
     ArgAction, ArgMatches, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser,
@@ -11,12 +11,9 @@ use clap_complete::aot::{Generator, Shell, generate};
 use log::{LevelFilter, error};
 use miette::miette;
 use owo_colors::{OwoColorize, Stream::Stdout};
-use terminal_size::{Height, Width, terminal_size};
+use terminal_size::{Width, terminal_size};
 
-use crate::{
-    api::{Api, Client},
-    config::Config,
-};
+use crate::{api::Api, config::Config};
 
 mod api;
 mod config;
@@ -29,24 +26,31 @@ mod update;
 
 struct SimpleLogger;
 
-const DEFAULT_TERMINAL_SIZE: (usize, usize) = (80, 25);
-
 impl log::Log for SimpleLogger {
+    #[inline]
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         metadata.level() <= log::max_level()
     }
 
+    #[inline]
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             println!("{}", record.args());
         }
     }
 
+    #[inline]
     fn flush(&self) {}
 }
 
 static LOGGER: SimpleLogger = SimpleLogger;
-static TERMINAL_SIZE: Mutex<(usize, usize)> = Mutex::new(DEFAULT_TERMINAL_SIZE);
+static TERMINAL_WIDTH: AtomicUsize = AtomicUsize::new(80);
+
+fn set_terminal_size() {
+    if let Some((Width(w), _)) = terminal_size() {
+        TERMINAL_WIDTH.store(w as usize, Ordering::Relaxed);
+    }
+}
 
 #[allow(clippy::cognitive_complexity)]
 fn get_command() -> Command {
@@ -108,29 +112,22 @@ fn main() -> ExitCode {
     }
 
     let config = Config::from(&matches);
-    let api_client_box: Box<dyn Client> = Api::from_str(config.api_version.as_deref().unwrap_or(""))
+    let api_client = Api::from_str(config.api_version.as_deref().unwrap_or(""))
         .unwrap_or_else(|()| panic!("No such API is supported"))
         .get(config);
 
-    let api_client = api_client_box.as_ref();
-
     set_log_level(&matches);
-
-    if let Some((Width(w), Height(h))) = terminal_size() {
-        *TERMINAL_SIZE.lock().expect("Failed to lock terminal size") = (w as usize, h as usize);
-    }
+    set_terminal_size();
 
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, api_client).map(|_| 0),
-        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, api_client).map(|()| 0),
-        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, api_client).map(|()| 0),
-        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, api_client).map(|()| 0),
+        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client).map(|_| 0),
+        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client).map(|()| 0),
+        Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
+        Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, &*api_client).map(|()| 0),
         Some((update::COMMAND_NAME, matches)) => update::command(matches).map(|()| 0),
         _ => {
             let mut cmd = get_command();
             cmd.print_help().expect("Failed to print help");
-            println!();
-
             Err(miette!(CommandError::NotFound))
         }
     }

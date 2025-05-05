@@ -68,7 +68,8 @@ pub struct Syspass {
 
 impl Syspass {
     fn get_params(&self, args: RequestArguments, needs_password: bool) -> HashMap<String, String> {
-        let mut params: HashMap<String, String> = HashMap::from([("authToken".to_owned(), self.config.token.clone())]);
+        let mut params = HashMap::with_capacity(args.as_ref().map_or(1, |a| a.len() + 1));
+        params.insert("authToken".to_owned(), self.config.token.clone());
 
         if needs_password {
             params.insert(
@@ -82,11 +83,11 @@ impl Syspass {
         }
 
         if let Some(args) = args {
-            for arg in args {
-                if !arg.0.is_empty() && !arg.1.is_empty() {
-                    params.insert(arg.0.to_owned(), arg.1.clone());
-                }
-            }
+            params.extend(
+                args.into_iter()
+                    .filter(|(k, v)| !k.is_empty() && !v.is_empty())
+                    .map(|(k, v)| (k.to_owned(), v)),
+            );
         }
 
         params
@@ -95,19 +96,18 @@ impl Syspass {
     fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> miette::Result<T, api::ApiError> {
         debug!("Sending request to {request_url}:\n{req:#?}\n");
 
-        get_response(&self.client, request_url, req).and_then(|result| {
-            if result.status() == 403 {
-                return Err(api::ApiError::BadResponse("Invalid token".to_string()));
-            }
+        let response = get_response(&self.client, request_url, req)?;
+        if response.status() == 403 {
+            return Err(api::ApiError::BadResponse("Invalid token".to_string()));
+        }
 
-            let json: Value = result
-                .json()
-                .map_err(|_| api::ApiError::ParseError("Server response did not contain JSON".to_string()))?;
+        let json: Value = response
+            .json()
+            .map_err(|_| api::ApiError::ParseError("Server response did not contain JSON".to_string()))?;
 
-            debug!("Received response:\n{json:#?}\n");
+        debug!("Received response:\n{json:#?}\n");
 
-            serde_json::from_value::<T>(json).map_err(|e| api::ApiError::ParseError(e.to_string()))
-        })
+        serde_json::from_value::<T>(json).map_err(|e| api::ApiError::ParseError(e.to_string()))
     }
 }
 
