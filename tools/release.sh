@@ -12,7 +12,7 @@ sed -i "3s/.*/version = \"${version}\"/" ../syspass-cli/Cargo.toml
 echo "Adding changelog line to CHANGELOG.md..."
 sed -i "s/^# CHANGELOG/# CHANGELOG\n\n## ${version} - $(date +'%Y-%m-%d')/" ../CHANGELOG.md
 
-./build.sh
+just build
 
 echo "Commit changes..."
 git commit -a -m "Version bump"
