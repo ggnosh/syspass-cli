@@ -1,5 +1,8 @@
 # CHANGELOG
 
+- Update depdencies
+- Fix a bug with the `--password` flag
+
 ## 0.8.0 - 2025-04-16
 
 - Switch to 2024 edition
