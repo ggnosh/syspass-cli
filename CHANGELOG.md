@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.8.1 - 2025-05-13
+
 - Update depdencies
 - Fix a bug with the `--password` flag
 
