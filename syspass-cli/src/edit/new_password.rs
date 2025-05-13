@@ -12,6 +12,7 @@ use crate::{api, helper};
 pub const COMMAND_NAME: &str = "password";
 
 #[allow(clippy::cognitive_complexity)]
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .visible_alias("account")
@@ -40,6 +41,7 @@ pub fn command_helper() -> Command {
         .arg(arg!(-p --password <PASSWORD> "Password").value_hint(ValueHint::Other))
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
     let category_id = helper::get_numeric_input(

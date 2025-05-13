@@ -10,6 +10,7 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 pub const COMMAND_NAME: &str = "client";
 
 #[allow(clippy::cognitive_complexity)]
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Edit client")
@@ -27,6 +28,7 @@ pub fn command_helper() -> Command {
         )
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Client> {
     let quiet = matches.get_flag("quiet");
     let id = helper::get_numeric_input(

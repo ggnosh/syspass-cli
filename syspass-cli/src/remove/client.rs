@@ -6,10 +6,12 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub const COMMAND_NAME: &str = "client";
 
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME).about("Remove client")
 }
 
+#[inline]
 pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
     match api_client.delete_client(id) {
         Ok(true) => {

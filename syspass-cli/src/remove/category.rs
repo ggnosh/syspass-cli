@@ -6,10 +6,12 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub const COMMAND_NAME: &str = "category";
 
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME).about("Remove category").short_flag('a')
 }
 
+#[inline]
 pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
     match api_client.delete_category(id) {
         Ok(true) => {

@@ -46,6 +46,7 @@ impl log::Log for SimpleLogger {
 static LOGGER: SimpleLogger = SimpleLogger;
 static TERMINAL_WIDTH: AtomicUsize = AtomicUsize::new(80);
 
+#[inline]
 fn set_terminal_size() {
     if let Some((Width(w), _)) = terminal_size() {
         TERMINAL_WIDTH.store(w as usize, Ordering::Relaxed);
@@ -81,10 +82,12 @@ fn get_command() -> Command {
         ])
 }
 
+#[inline]
 fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
     generate(generator, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
+#[inline]
 fn set_log_level(matches: &ArgMatches) {
     let _ = log::set_logger(&LOGGER);
 

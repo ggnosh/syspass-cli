@@ -12,6 +12,7 @@ mod new_password;
 pub const COMMAND_NAME_EDIT: &str = "edit";
 pub const COMMAND_NAME_NEW: &str = "new";
 
+#[inline]
 pub fn command_helper_edit() -> Command {
     Command::new(COMMAND_NAME_EDIT)
         .short_flag('e')
@@ -26,6 +27,7 @@ pub fn command_helper_edit() -> Command {
 }
 
 #[allow(clippy::module_name_repetitions)]
+#[inline]
 pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
     let subcommand = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
     match subcommand.0 {
@@ -36,6 +38,7 @@ pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client) -> Result<()>
     }
 }
 
+#[inline]
 pub fn command_helper_new() -> Command {
     Command::new(COMMAND_NAME_NEW)
         .visible_alias("add")
@@ -50,6 +53,7 @@ pub fn command_helper_new() -> Command {
         ])
 }
 
+#[inline]
 pub fn command_new(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
     let subcommand = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
     match subcommand.0 {

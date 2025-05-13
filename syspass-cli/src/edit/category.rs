@@ -11,6 +11,7 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 pub const COMMAND_NAME: &str = "category";
 
 #[allow(clippy::cognitive_complexity)]
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Edit category")
@@ -29,6 +30,7 @@ pub fn command_helper() -> Command {
         )
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Category> {
     let quiet = matches.get_flag("quiet");
     let id = helper::get_numeric_input(

@@ -31,6 +31,7 @@ impl ChangeAccountArgs {
 }
 
 #[allow(clippy::cognitive_complexity)]
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Change account password. Requires permissions: [Edit Account Password]")
@@ -54,6 +55,7 @@ pub fn command_helper() -> Command {
         )
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
     let args: ChangeAccountArgs = get_args(matches, quiet);

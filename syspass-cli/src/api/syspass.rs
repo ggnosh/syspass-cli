@@ -34,6 +34,7 @@ struct JsonReq {
     id: u8,
 }
 
+#[inline]
 fn get_builder(config: &Config) -> ClientBuilder {
     ClientBuilder::new().danger_accept_invalid_certs(!config.verify_host)
 }

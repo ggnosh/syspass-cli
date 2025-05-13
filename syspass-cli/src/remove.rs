@@ -9,6 +9,7 @@ mod client;
 
 pub const COMMAND_NAME: &str = "remove";
 
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .visible_alias("delete")
@@ -24,6 +25,7 @@ pub fn command_helper() -> Command {
         .subcommands([client::command_helper(), category::command_helper(), account::command_helper()])
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
     let quiet = matches.get_flag("quiet");
     let id = helper::get_numeric_input::<fn() -> Result<u32>>(

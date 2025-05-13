@@ -16,12 +16,14 @@ const USER_AGENT_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub const COMMAND_NAME: &str = "check-update";
 
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME).about("Update syspass-cli")
 }
 
 const GITHUB_RELEASE_PAGE: &str = "https://api.github.com/repos/ggnosh/syspass-cli/releases/latest";
 
+#[inline]
 pub fn command(_matches: &ArgMatches) -> Result<()> {
     let client = create_client()?;
     let release = get_github_release(&client, GITHUB_RELEASE_PAGE)?;
@@ -35,6 +37,7 @@ fn create_client() -> Result<Client> {
         .map_err(|e| miette!("{e}: Failed to create client"))
 }
 
+#[inline]
 fn get_version() -> Result<Version<'static>> {
     Version::from(env!("CARGO_PKG_VERSION")).ok_or_else(|| miette!(FAILED_TO_GET_VERSION))
 }

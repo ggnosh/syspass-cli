@@ -57,10 +57,12 @@ impl Syspass {
             .ok_or_else(|| api::ApiError::InvalidResponse(response.error.expect("Should have an error")))
     }
 
+    #[inline]
     fn create_or_edit(id: Option<&u32>) -> &str {
         id.filter(|&&id| id != 0).map_or(Self::CREATE, |_| Self::EDIT)
     }
 
+    #[inline]
     fn delete_request(&self, method: &str, id: u32) -> Result<bool, api::ApiError> {
         self.forge_and_send(method, Some(vec![("id", id.to_string())]), false)
             .map(|result| result.result_code == 0)

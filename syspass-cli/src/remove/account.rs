@@ -5,6 +5,7 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub const COMMAND_NAME: &str = "password";
 
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .visible_aliases(["account", "pass"])
@@ -12,6 +13,7 @@ pub fn command_helper() -> Command {
         .about("Remove account")
 }
 
+#[inline]
 pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
     match api_client.delete_account(id) {
         Ok(true) => {

@@ -21,6 +21,7 @@ use crate::{TERMINAL_WIDTH, api};
 pub const COMMAND_NAME: &str = "search";
 
 #[allow(clippy::cognitive_complexity)]
+#[inline]
 pub fn command_helper() -> Command {
     Command::new(COMMAND_NAME)
         .about("Search for account password")
@@ -87,6 +88,7 @@ fn clear_clipboard(timeout: u64, immediate: bool) -> Result<()> {
     Ok(())
 }
 
+#[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<ViewPassword>> {
     let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
