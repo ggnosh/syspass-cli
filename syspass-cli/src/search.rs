@@ -145,12 +145,19 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
                 .as_path()
                 .to_str()
             {
-                process::Command::new(path)
-                    .args(["search", "--clear"])
-                    .spawn()
-                    .map_err(|e| miette!("{e}: Failed to start child process"))?
-                    .wait()
-                    .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
+                if cfg!(test) {
+                    process::Command::new(path)
+                        .args(["search", "--clear"])
+                        .spawn()
+                        .map_err(|e| miette!("{e}: Failed to start child process"))?
+                        .wait()
+                        .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
+                } else {
+                    process::Command::new(path)
+                        .args(["search", "--clear"])
+                        .spawn()
+                        .map_err(|e| miette!("{e}: Failed to start child process"))?;
+                }
             }
         }
     }
