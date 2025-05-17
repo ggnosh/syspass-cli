@@ -338,7 +338,7 @@ impl api::Client for Syspass {
                 ("pass", account.pass().expect("Password given").to_owned()),
                 ("login", account.login().to_owned()),
                 ("url", account.url().unwrap_or_default().to_owned()),
-                ("notes", account.notes().unwrap_or_default().to_owned()),
+                ("notes", account.notes().unwrap_or("").to_owned()),
             ]),
         )
         .and_then(|id| self.view_account(id))
