@@ -46,10 +46,10 @@ impl Account {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name.as_str()
     }
-    pub fn login(&self) -> &str {
+    pub const fn login(&self) -> &str {
         self.login.as_str()
     }
     pub fn url(&self) -> Option<&str> {

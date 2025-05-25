@@ -33,7 +33,7 @@ impl Client {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name.as_str()
     }
     pub fn description(&self) -> Option<&str> {
