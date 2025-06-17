@@ -248,9 +248,9 @@ mod tests {
     type CreatedServer = (Mock, Syspass, ServerGuard);
 
     fn create_server_response(response: Option<impl AsRef<Path>>, status: usize) -> CreatedServer {
-        let response = crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
+        let (server, api, guard) = crate::api::syspass::tests::create_server_response(response, status, "SyspassV3");
 
-        (response.0, Syspass { syspass: response.1 }, response.2)
+        (server, Syspass { syspass: api }, guard)
     }
 
     fn create_test_client() -> Syspass {
@@ -271,8 +271,9 @@ mod tests {
     #[test_case(201)]
     #[test_case(202)]
     fn test_ok_server(status: usize) {
-        let test = create_server_response(None::<String>, status);
-        assert!(test.1.search_account(vec![], false).is_err());
+        let (mock, api, _guard) = create_server_response(None::<String>, status);
+        assert!(api.search_account(vec![], false).is_err());
+        mock.assert();
     }
 
     //noinspection DuplicatedCode
@@ -281,13 +282,13 @@ mod tests {
     #[test_case(404)]
     #[test_case(500)]
     fn test_bad_server(status: usize) {
-        let test = create_server_response(None::<String>, status);
-        let response = test.1.search_account(vec![], false);
+        let (mock, api, _guard) = create_server_response(None::<String>, status);
+        let response = api.search_account(vec![], false);
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
         assert!(response.expect_err("Err was not set").to_string().contains(search.as_str()));
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test_case(400)]
@@ -295,43 +296,46 @@ mod tests {
     #[test_case(404)]
     #[test_case(500)]
     fn test_search_account_error_response(status: usize) {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), status);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), status);
 
-        let accounts = test.1.search_account(vec![], false);
+        let accounts = api.search_account(vec![], false);
 
         assert!(accounts.is_err());
         let search = format!("Server responded with code {status}");
         assert!(accounts.expect_err("Err should be set").to_string().contains(search.as_str()));
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
     fn test_search_account_empty() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_search_empty.json"), 200);
 
-        let accounts = test.1.search_account(vec![], false);
+        let accounts = api.search_account(vec![], false);
 
         accounts.map_or_else(
             |_| panic!("Accounts should not have failed"),
             |accounts| assert_eq!(0, accounts.len()),
         );
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
     fn test_search_account_list() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/accounts_search_results.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/accounts_search_results.json"), 200);
 
-        let accounts = test.1.search_account(vec![], false);
+        let accounts = api.search_account(vec![], false);
 
         accounts.map_or_else(
             |_| panic!("Accounts should not have failed"),
             |accounts| assert_ne!(0, accounts.len()),
         );
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
@@ -358,28 +362,31 @@ mod tests {
 
     #[test]
     fn test_change_account_password() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_change_password.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_change_password.json"), 200);
         let change = ChangePassword {
             id: 1,
             pass: "<NEW PASSWORD>".to_owned(),
             expire_date: 1_689_091_943,
         };
 
-        let response = test.1.change_password(&change);
+        let response = api.change_password(&change);
 
         assert_eq!(
             "test account",
             response.expect("Response should not have failed").name()
         );
+        mock.assert();
     }
 
     #[test]
     fn test_get_password() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_view_password.json"), 200);
+        let (_mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_view_password.json"), 200);
         let mut account = Account::default();
         account.set_id(1);
 
-        let response = test.1.get_password(&account);
+        let response = api.get_password(&account);
 
         match response {
             Ok(response) => {
@@ -393,8 +400,8 @@ mod tests {
 
     #[test]
     fn test_remove_account() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_delete.json"), 200);
-        let response = test.1.delete_account(1);
+        let (_mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/account_delete.json"), 200);
+        let response = api.delete_account(1);
 
         response.map_or_else(
             |_| panic!("Request should not have failed"),
@@ -406,8 +413,9 @@ mod tests {
 
     #[test]
     fn test_remove_account_not_found() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_delete_not_found.json"), 200);
-        let response = test.1.delete_account(1);
+        let (_mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_delete_not_found.json"), 200);
+        let response = api.delete_account(1);
 
         match response {
             Ok(_) => {
@@ -433,37 +441,37 @@ mod tests {
 
     #[test]
     fn test_get_categories() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/category_list.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/category_list.json"), 200);
 
-        let categories = test.1.get_categories();
+        let categories = api.get_categories();
 
         categories.map_or_else(
             |_| panic!("Category should not have failed"),
             |categories| assert_eq!(2, categories.len()),
         );
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
     fn test_get_clients() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/client_list.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/client_list.json"), 200);
 
-        let clients = test.1.get_clients();
+        let clients = api.get_clients();
 
         clients.map_or_else(
             |_| panic!("Category should not have failed"),
             |clients| assert_eq!(2, clients.len()),
         );
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
     fn test_view_account() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/view_account.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/view_account.json"), 200);
 
-        let account = test.1.view_account(1);
+        let account = api.view_account(1);
 
         account.map_or_else(
             |_| panic!("Account should not have failed"),
@@ -476,100 +484,113 @@ mod tests {
             },
         );
 
-        test.0.assert();
+        mock.assert();
     }
 
     #[test]
     fn test_save_account() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_add.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/account_add.json"), 200);
 
         let account = get_test_account();
-        let result = test.1.save_account(account);
+        let result = api.save_account(account);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_save_account_failed() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/account_add_failed.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/account_add_failed.json"), 200);
 
         let account = get_test_account();
-        let result = test.1.save_account(account);
+        let result = api.save_account(account);
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
+        mock.assert();
     }
 
     #[test]
     fn test_save_category() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/category_add.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/category_add.json"), 200);
 
         let category = get_test_category();
-        let result = test.1.save_category(category);
+        let result = api.save_category(category);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_save_category_failed() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/category_add_failed.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/category_add_failed.json"), 200);
 
         let category = get_test_category();
-        let result = test.1.save_category(category);
+        let result = api.save_category(category);
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add category"));
+        mock.assert();
     }
 
     #[test]
     fn test_get_client() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/client_view.json"), 200);
-        let result = test.1.get_client(17);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/client_view.json"), 200);
+        let result = api.get_client(17);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_get_category() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/category_view.json"), 200);
-        let result = test.1.get_category(17);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/category_view.json"), 200);
+        let result = api.get_category(17);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_save_client() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/client_add.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/client_add.json"), 200);
 
         let client = get_test_client();
-        let result = test.1.save_client(client);
+        let result = api.save_client(client);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_save_client_failed() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/client_add_failed.json"), 200);
+        let (mock, api, _guard) =
+            create_server_response(Some("tests/responses/syspass/v3/client_add_failed.json"), 200);
 
         let client = get_test_client();
-        let result = test.1.save_client(client);
+        let result = api.save_client(client);
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add client"));
+        mock.assert();
     }
 
     #[test]
     fn test_delete_client() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/client_delete.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/client_delete.json"), 200);
 
-        let result = test.1.delete_client(17);
+        let result = api.delete_client(17);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 
     #[test]
     fn test_delete_category() {
-        let test = create_server_response(Some("tests/responses/syspass/v3/category_delete.json"), 200);
+        let (mock, api, _guard) = create_server_response(Some("tests/responses/syspass/v3/category_delete.json"), 200);
 
-        let result = test.1.delete_category(17);
+        let result = api.delete_category(17);
 
         assert!(result.is_ok());
+        mock.assert();
     }
 }

@@ -141,23 +141,19 @@ mod tests {
         api_version: &str,
     ) -> CreatedServer {
         let path = "/brr".to_string();
-
-        let response = crate::tests::create_server_response(response, status, "POST", &path);
-
-        let url = response.1.url();
-
+        let (mock, response) = crate::tests::create_server_response(response, status, "POST", &path);
         let client = Syspass::from(Config {
-            host: url + &path,
+            host: response.url() + &path,
             token: "1234".to_owned(),
             password: "<PASSWORD>".to_owned(),
             verify_host: false,
             api_version: Option::from(api_version.to_owned()),
             password_timeout: None,
             no_clipboard: false,
-            no_shell: false,
+            no_shell: true,
         });
 
-        (response.0, client, response.1)
+        (mock, client, response)
     }
 
     #[test]

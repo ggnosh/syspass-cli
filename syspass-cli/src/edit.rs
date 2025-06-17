@@ -29,11 +29,11 @@ pub fn command_helper_edit() -> Command {
 #[allow(clippy::module_name_repetitions)]
 #[inline]
 pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
-    let subcommand = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
-    match subcommand.0 {
-        edit_password::COMMAND_NAME => edit_password::command(subcommand.1, api_client).map(|_| ()),
-        category::COMMAND_NAME => category::command(subcommand.1, api_client, false).map(|_| ()),
-        client::COMMAND_NAME => client::command(subcommand.1, api_client, false).map(|_| ()),
+    let (subcommand, sub_arguments) = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
+    match subcommand {
+        edit_password::COMMAND_NAME => edit_password::command(sub_arguments, api_client).map(|_| ()),
+        category::COMMAND_NAME => category::command(sub_arguments, api_client, false).map(|_| ()),
+        client::COMMAND_NAME => client::command(sub_arguments, api_client, false).map(|_| ()),
         _ => Err(miette!(CommandError::NotFound)),
     }
 }
@@ -55,11 +55,11 @@ pub fn command_helper_new() -> Command {
 
 #[inline]
 pub fn command_new(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
-    let subcommand = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
-    match subcommand.0 {
-        new_password::COMMAND_NAME => new_password::command(subcommand.1, api_client).map(|_| ()),
-        category::COMMAND_NAME => category::command(subcommand.1, api_client, true).map(|_| ()),
-        client::COMMAND_NAME => client::command(subcommand.1, api_client, true).map(|_| ()),
+    let (subcommand, sub_arguments) = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
+    match subcommand {
+        new_password::COMMAND_NAME => new_password::command(sub_arguments, api_client).map(|_| ()),
+        category::COMMAND_NAME => category::command(sub_arguments, api_client, true).map(|_| ()),
+        client::COMMAND_NAME => client::command(sub_arguments, api_client, true).map(|_| ()),
         _ => Err(miette!(CommandError::NotFound)),
     }
 }

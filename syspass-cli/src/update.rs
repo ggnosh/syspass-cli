@@ -152,13 +152,13 @@ mod tests {
 
     #[test]
     fn test_get_github_release() {
-        let test = crate::tests::create_server_response(
+        let (_mock, guard) = crate::tests::create_server_response(
             Some("tests/responses/github-release.json"),
             200,
             "GET",
             "/repos/ggnosh/syspass-cli/releases/latest",
         );
-        let url = test.1.url() + "/repos/ggnosh/syspass-cli/releases/latest";
+        let url = guard.url() + "/repos/ggnosh/syspass-cli/releases/latest";
 
         let client = ClientBuilder::new().build().expect("Failed to create client");
         let response = get_github_release(&client, &url);
@@ -175,13 +175,13 @@ mod tests {
 
     #[test]
     fn test_get_github_release_bad() {
-        let test = crate::tests::create_server_response(
+        let (_mock, guard) = crate::tests::create_server_response(
             Some("tests/responses/github-release-bad.json"),
             200,
             "GET",
             "/repos/ggnosh/syspass-cli/releases/latest",
         );
-        let url = test.1.url() + "/repos/ggnosh/syspass-cli/releases/latest";
+        let url = guard.url() + "/repos/ggnosh/syspass-cli/releases/latest";
 
         let client = ClientBuilder::new().build().expect("Failed to create client");
         let response = get_github_release(&client, &url);
