@@ -1,5 +1,7 @@
 # CHANGELOG
 
+- Fix log level...
+
 ## 0.8.1 - 2025-05-13
 
 - Update depdencies
