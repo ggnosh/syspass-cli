@@ -1,4 +1,9 @@
-use arboard::{Clipboard, SetExtLinux};
+#[cfg(target_os = "linux")]
+use arboard::SetExtLinux;
+#[cfg(target_os = "linux")]
+use std::time::Instant;
+
+use arboard::Clipboard;
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::warn;
@@ -6,7 +11,7 @@ use miette::{Result, miette};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{cmp, env, process, thread};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
@@ -77,19 +82,38 @@ fn clear_clipboard(timeout: u64) -> Result<()> {
     if timeout > 0 {
         thread::sleep(Duration::from_secs(timeout));
 
-        Clipboard::new()
-            .map_err(|_| miette!("Could not clear clipboard"))?
-            .set()
-            .exclude_from_history()
-            .wait_until(Instant::now() + Duration::from_secs(1))
-            .text("")
-            .map_err(|_| miette!("Failed to clear clipboard"))?;
+        set_clipboard_text("")?;
 
         Clipboard::new()
             .map_err(|_| miette!("Could not clear clipboard"))?
             .clear()
             .map_err(|_| miette!("Failed to clear clipboard"))?;
     }
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub fn set_clipboard_text(text: &str) -> Result<()> {
+    Clipboard::new()
+        .map_err(|_| miette!("Could not open clipboard"))?
+        .set()
+        .exclude_from_history()
+        .wait_until(Instant::now() + Duration::from_millis(15))
+        .text(text)
+        .expect("Failed to set clipboard value");
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn set_clipboard_text(text: &str) -> Result<()> {
+    Clipboard::new()
+        .map_err(|_| miette!("Could not open clipboard"))?
+        .set_text(text)
+        .expect("Failed to set clipboard value");
+
+    thread::sleep(Duration::from_millis(15));
 
     Ok(())
 }
@@ -140,14 +164,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     };
 
     if !show {
-        if let Ok(mut clipboard) = Clipboard::new() {
-            clipboard
-                .set()
-                .exclude_from_history()
-                .wait_until(Instant::now() + Duration::from_millis(15))
-                .text(&account.password)
-                .expect("Couldn't set password");
-        }
+        set_clipboard_text(&account.password)?;
 
         if config.password_timeout.unwrap_or(10) > 0 {
             if let Some(path) = env::current_exe()
@@ -261,12 +278,10 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
-
-    use arboard::{Clipboard, SetExtLinux};
+    use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::search::{clear_clipboard, print_table_for_account};
+    use crate::search::{clear_clipboard, print_table_for_account, set_clipboard_text};
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
@@ -309,12 +324,9 @@ mod tests {
     #[ignore = "This test requires a running X11 session with clipboard access"]
     fn test_clear_clipboard() {
         let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
-        clipboard
-            .set()
-            .exclude_from_history()
-            .wait_until(Instant::now() + Duration::from_millis(10))
-            .text("testing")
-            .expect("Failed to set clipboard value");
+
+        set_clipboard_text("testing").expect("Failed to set clipboard value");
+
         assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
         clear_clipboard(1).expect("Failed to clear clipboard");
         assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
