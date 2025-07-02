@@ -6,7 +6,7 @@ use miette::{Result, miette};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{cmp, env, process, thread};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
@@ -73,11 +73,17 @@ fn get_accounts_list(
         .map_err(|error| miette!("Error while searching: {error}"))
 }
 
-fn clear_clipboard(timeout: u64, immediate: bool) -> Result<()> {
+fn clear_clipboard(timeout: u64) -> Result<()> {
     if timeout > 0 {
-        if !immediate {
-            thread::sleep(Duration::from_secs(timeout));
-        }
+        thread::sleep(Duration::from_secs(timeout));
+
+        Clipboard::new()
+            .map_err(|_| miette!("Could not clear clipboard"))?
+            .set()
+            .exclude_from_history()
+            .wait_until(Instant::now() + Duration::from_secs(1))
+            .text("")
+            .map_err(|_| miette!("Failed to clear clipboard"))?;
 
         Clipboard::new()
             .map_err(|_| miette!("Could not clear clipboard"))?
@@ -98,7 +104,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     let show = matches.get_flag("show-password") || config.no_clipboard;
 
     if matches.get_flag("clear") {
-        clear_clipboard(config.password_timeout.unwrap_or(10), false)?;
+        clear_clipboard(config.password_timeout.unwrap_or(10))?;
         return Ok(None);
     }
 
@@ -138,9 +144,9 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
             clipboard
                 .set()
                 .exclude_from_history()
+                .wait_until(Instant::now() + Duration::from_millis(15))
                 .text(&account.password)
                 .expect("Couldn't set password");
-            thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         }
 
         if config.password_timeout.unwrap_or(10) > 0 {
@@ -149,16 +155,22 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
                 .as_path()
                 .to_str()
             {
+                let mut args = vec!["search", "--clear"];
+                if let Some(config) = matches.get_one::<String>("config") {
+                    args.push("--config");
+                    args.push(config);
+                }
+
                 if cfg!(test) {
                     process::Command::new(path)
-                        .args(["search", "--clear"])
+                        .args(args)
                         .spawn()
                         .map_err(|e| miette!("{e}: Failed to start child process"))?
                         .wait()
                         .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
                 } else {
                     process::Command::new(path)
-                        .args(["search", "--clear"])
+                        .args(args)
                         .spawn()
                         .map_err(|e| miette!("{e}: Failed to start child process"))?;
                 }
@@ -249,8 +261,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use arboard::{Clipboard, SetExtLinux};
 
@@ -301,11 +312,11 @@ mod tests {
         clipboard
             .set()
             .exclude_from_history()
+            .wait_until(Instant::now() + Duration::from_millis(10))
             .text("testing")
             .expect("Failed to set clipboard value");
-        thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
-        clear_clipboard(1, true).expect("Failed to clear clipboard");
+        clear_clipboard(1).expect("Failed to clear clipboard");
         assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
     }
 }

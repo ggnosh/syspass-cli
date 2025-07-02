@@ -21,7 +21,7 @@ fn run_help_without_arguments() {
 
 #[test_case("../test_config.json"; "syspass-v3")]
 #[test_case("../test_config_v2.json"; "syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_search_with_no_results(version: &str) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
@@ -38,7 +38,7 @@ fn run_search_with_no_results(version: &str) {
 
 #[test_case("../test_config.json"; "syspass-v3")]
 #[test_case("../test_config_v2.json"; "syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_search_with_results(version: &str) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
@@ -55,7 +55,7 @@ fn run_search_with_results(version: &str) {
 
 #[test_case("../test_config.json", true; "syspass-v3")]
 #[test_case("../test_config_v2.json", false; "syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_change_with_data(version: &str, success: bool) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
@@ -84,7 +84,7 @@ fn run_change_with_data(version: &str, success: bool) {
 #[test_case("../test_config_v2.json", "category", false; "category syspass-v2")]
 #[test_case("../test_config.json", "client", true; "client syspass-v3")]
 #[test_case("../test_config_v2.json", "client", false; "client syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_edit_category_client(version: &str, category_client: &str, success: bool) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
@@ -115,7 +115,7 @@ fn run_edit_category_client(version: &str, category_client: &str, success: bool)
 #[test_case("../test_config_v2.json", "category", true; "category syspass-v2")]
 #[test_case("../test_config.json", "client", true; "client syspass-v3")]
 #[test_case("../test_config_v2.json", "client", true; "client syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_create_delete_category_client(version: &str, category_client: &str, success: bool) {
     let id = create_new_category_client(version, category_client).to_string();
 
@@ -170,7 +170,7 @@ fn create_new_category_client(version: &str, category_client: &str) -> u32 {
 
 #[test_case("../test_config.json", true; "syspass-v3")]
 #[test_case("../test_config_v2.json", true; "syspass-v2")]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_new_delete_password(version: &str, success: bool) {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd
@@ -227,7 +227,7 @@ fn run_new_delete_password(version: &str, success: bool) {
 }
 
 #[test]
-#[ignore]
+#[ignore = "Integration test, requires a real environment"]
 fn run_check_update() {
     let mut cmd = Command::cargo_bin("syspass-cli").expect("Command should not have failed");
     let assert = cmd.args(["check-update"]).assert();

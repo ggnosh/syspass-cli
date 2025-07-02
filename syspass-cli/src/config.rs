@@ -10,7 +10,7 @@ use std::path::Path;
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 
-#[derive(Deserialize, Default, Serialize)]
+#[derive(Deserialize, Default, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub host: String,
@@ -105,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "Integration test, requires a real environment"]
     fn test_get_config_file_or_write() {
         let temp = create_temp_dir();
         let temp_str = temp.to_str();
