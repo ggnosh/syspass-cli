@@ -1,10 +1,14 @@
 # CHANGELOG
 
 - Fix log level...
+- Fix clipboard clearing
+- Updated arboard to 3.6.0 and enabled excluding data from clipboard history on Linux.
+- Clipboard clearing was not consistent across platforms.
+- Clipboard clearing was not consistent when using multiple config files.
 
 ## 0.8.1 - 2025-05-13
 
-- Update depdencies
+- Update dependencies
 - Fix a bug with the `--password` flag
 
 ## 0.8.0 - 2025-04-16
