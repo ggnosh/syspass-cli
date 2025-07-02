@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.9.0 - 2025-07-03
+
 - Fix log level...
 - Fix clipboard clearing
 - Updated arboard to 3.6.0 and enabled excluding data from clipboard history on Linux.
