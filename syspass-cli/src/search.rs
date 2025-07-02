@@ -1,4 +1,4 @@
-use arboard::Clipboard;
+use arboard::{Clipboard, SetExtLinux};
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::warn;
@@ -135,7 +135,11 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
 
     if !show {
         if let Ok(mut clipboard) = Clipboard::new() {
-            clipboard.set_text(&account.password).expect("Couldn't set password");
+            clipboard
+                .set()
+                .exclude_from_history()
+                .text(&account.password)
+                .expect("Couldn't set password");
             thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         }
 
@@ -248,7 +252,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use arboard::Clipboard;
+    use arboard::{Clipboard, SetExtLinux};
 
     use crate::api::account::{Account, ViewPassword};
     use crate::search::{clear_clipboard, print_table_for_account};
@@ -291,10 +295,14 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "This test requires a running X11 session with clipboard access"]
     fn test_clear_clipboard() {
         let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
-        clipboard.set_text("testing").expect("Failed to set clipboard value");
+        clipboard
+            .set()
+            .exclude_from_history()
+            .text("testing")
+            .expect("Failed to set clipboard value");
         thread::sleep(Duration::from_millis(10)); // KDE / Wayland clipboard fix
         assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
         clear_clipboard(1, true).expect("Failed to clear clipboard");
