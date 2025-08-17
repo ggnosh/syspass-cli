@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::io;
+use std::io::Write;
 use std::process::ExitCode;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -58,6 +59,7 @@ fn get_command() -> Command {
     Command::new(crate_name!())
         .about(crate_description!())
         .version(crate_version!())
+        .subcommand_required(false)
         .arg_required_else_help(true)
         .arg(
             arg!(-c --config <FILE> "Sets a custom config file")
@@ -83,8 +85,8 @@ fn get_command() -> Command {
 }
 
 #[inline]
-fn print_completions<G: Generator>(generator: G, cmd: &mut Command) {
-    generate(generator, cmd, cmd.get_name().to_string(), &mut io::stdout());
+fn print_completions<G: Generator>(generator: G, cmd: &mut Command, out: &mut dyn Write) {
+    generate(generator, cmd, cmd.get_name().to_string(), out);
 }
 
 #[inline]
@@ -107,10 +109,11 @@ fn set_log_level(matches: &ArgMatches) {
 
 fn main() -> ExitCode {
     let matches = get_command().get_matches();
+    set_log_level(&matches);
 
     if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
         let mut commands = get_command();
-        print_completions(generator, &mut commands);
+        print_completions(generator, &mut commands, &mut io::stdout());
         return ExitCode::SUCCESS;
     }
 
@@ -119,7 +122,6 @@ fn main() -> ExitCode {
         .unwrap_or_else(|()| panic!("No such API is supported"))
         .get(config);
 
-    set_log_level(&matches);
     set_terminal_size();
 
     match matches.subcommand() {
@@ -164,8 +166,9 @@ impl Error for CommandError {}
 mod tests {
     use std::path::Path;
 
-    use crate::{get_command, set_log_level};
+    use crate::{get_command, print_completions, set_log_level};
     use assert_cmd::Command;
+    use clap_complete::Shell;
     use log::LevelFilter;
     use mockito::{Mock, Server, ServerGuard};
 
@@ -218,16 +221,30 @@ mod tests {
 
     #[test]
     fn test_logger_initialization() {
-        let matches = get_command().get_matches_from(vec!["--version", "--debug"]);
+        let matches = get_command().get_matches_from(vec!["", "--completions", "zsh"]);
+        set_log_level(&matches);
+        assert_eq!(log::max_level(), LevelFilter::Warn);
+
+        let matches = get_command().get_matches_from(vec!["", "--completions", "zsh", "--debug"]);
         set_log_level(&matches);
         assert_eq!(log::max_level(), LevelFilter::Debug);
 
-        let matches = get_command().get_matches_from(vec!["--version", "--verbose"]);
+        let matches = get_command().get_matches_from(vec!["", "--completions", "bash", "--verbose"]);
         set_log_level(&matches);
         assert_eq!(log::max_level(), LevelFilter::Info);
 
         let matches = get_command().get_matches_from(vec!["--version", "--quiet"]);
         set_log_level(&matches);
         assert_eq!(log::max_level(), LevelFilter::Off);
+    }
+
+    #[test]
+    fn test_print_completions() {
+        let mut commands = get_command();
+        let mut output = Vec::<u8>::new();
+        print_completions(Shell::Zsh, &mut commands, &mut output);
+
+        let output_str = String::from_utf8(output).expect("Failed to convert output to String");
+        assert!(output_str.contains("compdef _syspass-cli syspass-cli"));
     }
 }

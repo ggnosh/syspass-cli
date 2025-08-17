@@ -166,31 +166,30 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     if !show {
         set_clipboard_text(&account.password)?;
 
-        if config.password_timeout.unwrap_or(10) > 0 {
-            if let Some(path) = env::current_exe()
+        if config.password_timeout.unwrap_or(10) > 0
+            && let Some(path) = env::current_exe()
                 .map_err(|e| miette!("{e}: Failed to get current executable path"))?
                 .as_path()
                 .to_str()
-            {
-                let mut args = vec!["search", "--clear"];
-                if let Some(config) = matches.get_one::<String>("config") {
-                    args.push("--config");
-                    args.push(config);
-                }
+        {
+            let mut args = vec!["search", "--clear"];
+            if let Some(config) = matches.get_one::<String>("config") {
+                args.push("--config");
+                args.push(config);
+            }
 
-                if cfg!(test) {
-                    process::Command::new(path)
-                        .args(args)
-                        .spawn()
-                        .map_err(|e| miette!("{e}: Failed to start child process"))?
-                        .wait()
-                        .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
-                } else {
-                    process::Command::new(path)
-                        .args(args)
-                        .spawn()
-                        .map_err(|e| miette!("{e}: Failed to start child process"))?;
-                }
+            if cfg!(test) {
+                process::Command::new(path)
+                    .args(args)
+                    .spawn()
+                    .map_err(|e| miette!("{e}: Failed to start child process"))?
+                    .wait()
+                    .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
+            } else {
+                process::Command::new(path)
+                    .args(args)
+                    .spawn()
+                    .map_err(|e| miette!("{e}: Failed to start child process"))?;
             }
         }
     }

@@ -205,6 +205,24 @@ mod tests {
         let version = Version::from("v0.2.0").expect("Failed to get current version");
         let result = process_release(&release, &version);
         assert!(result.is_ok());
+
+        let release = GithubRelease {
+            html_url: "https://github.com/ggnosh/syspass-cli/releases/tag/v0.2.0".to_string(),
+            tag_name: "v0.1.1".to_string(),
+            published_at: "2023-08-07T15:10:28Z".to_string(),
+        };
+        let version = Version::from("v0.2.0").expect("Failed to get current version");
+        let result = process_release(&release, &version);
+        assert!(result.is_ok());
+
+        let release = GithubRelease {
+            html_url: "https://github.com/ggnosh/syspass-cli/releases/tag/v0.2.0".to_string(),
+            tag_name: "v0.2.1".to_string(),
+            published_at: "invalid".to_string(),
+        };
+        let result = process_release(&release, &version);
+
+        assert!(result.is_err());
     }
 
     #[test]

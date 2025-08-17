@@ -114,6 +114,7 @@ impl std::fmt::Display for ApiErrorResponse {
 mod tests {
     use crate::api;
     use crate::api::{Api, ApiError, ApiErrorResponse};
+    use crate::config::Config;
     use std::str::FromStr;
     use test_case::test_case;
 
@@ -145,7 +146,7 @@ mod tests {
     #[test_case("Invalid-version", false)]
     fn test_from_str(version: &str, expected: bool) {
         let api = Api::from_str(version);
-        assert!(!((expected && api.is_err()) || (!expected && api.is_ok())));
+        assert_eq!(expected, api.is_ok());
     }
 
     #[test]
@@ -166,5 +167,11 @@ mod tests {
 
         let miette_error: miette::Error = error_response.into();
         assert_eq!(miette_error.to_string(), "Test does not exist");
+    }
+
+    #[test]
+    fn test_api_get() {
+        let _client = Api::get(&Api::SyspassV3, Config::default());
+        let _client = Api::get(&Api::SyspassV2, Config::default());
     }
 }

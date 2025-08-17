@@ -173,5 +173,21 @@ mod tests {
             }
             .to_string()
         );
+
+        assert_eq!(
+            "0. - ()",
+            Account {
+                id: None,
+                name: String::new(),
+                login: String::new(),
+                url: None,
+                notes: None,
+                category_id: 0,
+                client_id: 0,
+                pass: None,
+                client_name: None,
+            }
+            .to_string()
+        );
     }
 }
