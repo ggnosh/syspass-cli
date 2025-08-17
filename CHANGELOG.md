@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.9.1 - 2025-08-17
+
+- Update libraries
+
 ## 0.9.0 - 2025-07-03
 
 - Fix log level...
