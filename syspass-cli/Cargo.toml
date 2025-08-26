@@ -34,7 +34,7 @@ shellexpand = { version = "3.1", default-features = false, features = ["base-0",
 term-table = "1.3"
 terminal_size = "0.4"
 version-compare = "0.2"
-dialoguer = { version = "0.11", features = ["fuzzy-select", "password"] }
+dialoguer = { version = "0.12", features = ["fuzzy-select", "password"] }
 miette = { version = "7.5" }
 thiserror = "2.0"
 owo-colors = { version = "4.2", features = ["supports-colors"] }
