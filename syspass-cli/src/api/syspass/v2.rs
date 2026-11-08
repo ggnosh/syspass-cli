@@ -461,6 +461,21 @@ mod tests {
         mock.assert();
     }
 
+    #[test]
+    fn test_bad_token_response() {
+        let (mock, api, _guard) = create_server_response(None::<String>, 403);
+        let response = api.search_account(vec![], false);
+        assert!(response.is_err());
+        assert!(
+            response
+                .expect_err("Err was not set")
+                .to_string()
+                .contains("bad token or not enough access given")
+        );
+
+        mock.assert();
+    }
+
     #[test_case(400)]
     #[test_case(403)]
     #[test_case(404)]

@@ -4,6 +4,7 @@ use crate::api::entity::Entity;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
 use log::debug;
+use reqwest::StatusCode;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -52,6 +53,8 @@ fn get_response(
         .and_then(|r| {
             if r.status().is_success() {
                 Ok(r)
+            } else if r.status() == StatusCode::FORBIDDEN {
+                Err(api::ApiError::Unauthorized(r.status().as_u16()))
             } else {
                 Err(api::ApiError::BadResponse(format!(
                     "Server responded with code {}",
@@ -101,9 +104,6 @@ impl Syspass {
         debug!("Sending request to {request_url}:\n{req:#?}\n");
 
         let response = get_response(&self.client, request_url, req)?;
-        if response.status() == 403 {
-            return Err(api::ApiError::BadResponse("Invalid token".to_string()));
-        }
 
         let json: Value = response
             .json()
