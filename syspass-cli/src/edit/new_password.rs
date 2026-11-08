@@ -73,7 +73,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
         Some(matches.get_one::<String>("password").map_or_else(
             || {
                 if quiet {
-                    warn!("Could not ask for client");
+                    warn!("Could not ask for password");
                     return Err(miette!("Password input required but not provided"));
                 }
                 get_password("Password: ")
