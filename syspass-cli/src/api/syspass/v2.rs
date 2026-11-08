@@ -28,7 +28,7 @@ pub struct ApiResponse {
 
 #[derive(Deserialize, Debug, Serialize)]
 struct ApiResponseEntity {
-    id: u8,
+    id: u32,
     jsonrpc: String,
     result: Value,
     error: Option<ApiErrorResponse>,

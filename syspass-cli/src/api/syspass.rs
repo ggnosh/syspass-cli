@@ -31,7 +31,7 @@ struct JsonReq {
     jsonrpc: String,
     method: String,
     params: HashMap<String, String>,
-    id: u8,
+    id: u32,
 }
 
 #[inline]
@@ -63,7 +63,7 @@ fn get_response(
 
 pub struct Syspass {
     client: reqwest::blocking::Client,
-    request_number: Cell<u8>,
+    request_number: Cell<u32>,
     config: Config,
 }
 
