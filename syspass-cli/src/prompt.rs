@@ -25,6 +25,10 @@ pub fn get_match_string(
     }
 
     if quiet {
+        if required && default.is_empty() {
+            return Err(miette!("Field '{match_id}' is required but no value was given"));
+        }
+
         Ok(default.to_owned())
     } else {
         ask_prompt(prompt_text, required, default)
@@ -87,5 +91,15 @@ mod tests {
         let result = get_match_string(&matches, true, "name", "Enter name:", "default", false)
             .expect("Failed to get match string");
         assert_eq!(result, "default", "Should return the default value");
+    }
+
+    #[test]
+    fn test_get_match_string_required_in_quiet_mode() {
+        let matches = clap::Command::new("test")
+            .arg(clap::arg!(--"name" <NAME> "Name argument"))
+            .get_matches_from(vec!["test"]);
+
+        let result = get_match_string(&matches, true, "name", "Enter name:", "", true);
+        assert!(result.is_err(), "Required field should error when no value is given");
     }
 }
