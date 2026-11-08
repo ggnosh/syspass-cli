@@ -137,7 +137,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     } else if name.is_empty() {
         return Err(miette!("Name or id is required"));
     } else {
-        let mut search_string = vec![("text", name)];
+        let mut search_string = vec![("text", name.clone())];
         if category > 0 {
             search_string.push(("categoryId", category.to_string()));
         }
@@ -145,7 +145,11 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     };
 
     if accounts.len() > 1 && quiet {
-        return Ok(None);
+        return Err(miette!(
+            "Ambiguous match: {} accounts found for '{}'. Use -i <id> to select one.",
+            accounts.len(),
+            name
+        ));
     }
 
     let account: ViewPassword = {
