@@ -40,10 +40,10 @@ thiserror = { version = "2.0" }
 owo-colors = { version = "4.4", features = ["supports-colors"] }
 itertools = "0.15"
 rand = "0.10"
-mockall = "0.15"
 
 [dev-dependencies]
 assert_cmd = "2.2"
+mockall = "0.15"
 mockito = { version = "1.7", features = [] }
 predicates = "3.1"
 test-case = "3.4"
