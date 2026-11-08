@@ -1,5 +1,7 @@
 # CHANGELOG
 
+## 0.10.0 - 2026-11-08
+
 ## 0.9.1 - 2025-08-17
 
 - Update libraries
