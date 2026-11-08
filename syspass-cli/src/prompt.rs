@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{NaiveDate, NaiveTime};
 use clap::ArgMatches;
 use dialoguer::{Input, Password, theme::ColorfulTheme};
 
@@ -37,7 +37,7 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
         .with_prompt(prompt)
         .with_initial_text(date.format("%Y-%m-%d").to_string())
         .validate_with(|input: &String| {
-            if input.is_empty() || NaiveDateTime::parse_from_str(input, "%Y-%m-%d").is_ok() {
+            if input.is_empty() || NaiveDate::parse_from_str(input, "%Y-%m-%d").is_ok() {
                 Ok(())
             } else {
                 Err("Please enter a valid date in YYYY-mm-dd format or leave it empty.")
@@ -45,8 +45,8 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
         })
         .interact_text()
         .unwrap_or_default()
-        .parse::<NaiveDateTime>()
-        .map(|dt| dt.and_utc().timestamp().to_string())
+        .parse::<NaiveDate>()
+        .map(|date| date.and_time(NaiveTime::MIN).and_utc().timestamp().to_string())
         .unwrap_or_default()
 }
 
