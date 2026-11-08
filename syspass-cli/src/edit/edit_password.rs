@@ -2,7 +2,7 @@ use miette::{Result, miette};
 
 use crate::api::account::{Account, ChangePassword};
 use crate::prompt::{ask_for_date, ask_for_password};
-use chrono::{NaiveDateTime, Utc};
+use chrono::{NaiveDate, NaiveTime, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
 use dialoguer::{Select, theme::ColorfulTheme};
 use log::{info, warn};
@@ -100,15 +100,18 @@ fn get_args(matches: &ArgMatches, quiet: bool) -> Result<ChangeAccountArgs> {
             args.expiration_date = ask_for_date("Expiration date:", date)?;
         }
     } else {
-        let expiration = args.expiration_date + "23:59:59";
-        args.expiration_date = NaiveDateTime::parse_from_str(&expiration, "%Y-%m-%d %H:%M:%S")
-            .map_err(|e| miette!("Failed to parse expiration date: {e}"))?
-            .and_utc()
-            .timestamp()
-            .to_string();
+        args.expiration_date = expiration_timestamp(&args.expiration_date)?;
     }
 
     Ok(args)
+}
+
+fn expiration_timestamp(input: &str) -> Result<String> {
+    let date =
+        NaiveDate::parse_from_str(input, "%Y-%m-%d").map_err(|e| miette!("Failed to parse expiration date: {e}"))?;
+    let end_of_day = NaiveTime::from_hms_opt(23, 59, 59).ok_or_else(|| miette!("Invalid time"))?;
+
+    Ok(date.and_time(end_of_day).and_utc().timestamp().to_string())
 }
 
 fn generate_passwords(random_count: usize) -> Vec<String> {
@@ -140,12 +143,22 @@ pub fn get_password(prompt: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::edit::edit_password::generate_passwords;
+    use crate::edit::edit_password::{expiration_timestamp, generate_passwords};
 
     #[test]
     fn test_generate_passwords() {
         let passwords = generate_passwords(5);
 
         assert_eq!(5, passwords.len());
+    }
+
+    #[test]
+    fn test_expiration_timestamp_end_of_day() {
+        assert_eq!("1704153599", expiration_timestamp("2024-01-01").unwrap());
+    }
+
+    #[test]
+    fn test_expiration_timestamp_rejects_concatenated_time() {
+        assert!(expiration_timestamp("2024-01-0123:59:59").is_err());
     }
 }
