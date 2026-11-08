@@ -24,12 +24,12 @@ impl Category {
         Self { id, name, description }
     }
 
-    pub fn new_from_asking() -> Self {
-        Self::new(
+    pub fn new_from_asking() -> Result<Self> {
+        Ok(Self::new(
             None,
-            ask_prompt("Category name", true, ""),
-            Some(ask_prompt("Category description", false, "")),
-        )
+            ask_prompt("Category name", true, "")?,
+            Some(ask_prompt("Category description", false, "")?),
+        ))
     }
 
     pub const fn name(&self) -> &str {
@@ -67,7 +67,7 @@ impl Entity for Category {
 
 fn save_category(new_category: Category, api_client: &dyn api::Client) -> Result<u32> {
     match api_client.save_category(new_category) {
-        Ok(client) => Ok(client.id.expect(ID_EMPTY)),
+        Ok(client) => client.id.ok_or_else(|| miette!(ID_EMPTY)),
         Err(error) => Err(miette!("Failed to save category: {error}")),
     }
 }
@@ -86,7 +86,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
         .map_or_else(
             || {
                 loop {
-                    let new_category = Category::new_from_asking();
+                    let new_category = Category::new_from_asking()?;
 
                     match save_category(new_category, api_client) {
                         Ok(id) => break Ok(id),
@@ -96,7 +96,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
                     }
                 }
             },
-            |choice| Ok(*categories[choice].id().expect(ID_EMPTY)),
+            |choice| Ok(*categories[choice].id().ok_or_else(|| miette!(ID_EMPTY))?),
         )
 }
 

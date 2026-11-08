@@ -55,7 +55,7 @@ impl Display for Client {
         write!(
             f,
             "{}. {}{}",
-            self.id().expect(ID_EMPTY),
+            self.id().map_or_else(|| "?".to_string(), ToString::to_string),
             self.name(),
             if *self.is_global() > 0 {
                 " (*)".to_string()
@@ -91,8 +91,8 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32
             || loop {
                 let new_client = Client {
                     id: None,
-                    name: ask_prompt("Name:", true, ""),
-                    description: Some(ask_prompt("Description:", false, "")),
+                    name: ask_prompt("Name:", true, "")?,
+                    description: Some(ask_prompt("Description:", false, "")?),
                     is_global: matches.get_one::<usize>("global").map_or_else(
                         || usize::from(Confirm::new().with_prompt("Global:").interact().unwrap_or(false)),
                         std::borrow::ToOwned::to_owned,
@@ -100,7 +100,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32
                 };
 
                 match api_client.save_client(new_client) {
-                    Ok(client) => break Ok(*client.id().expect(ID_EMPTY)),
+                    Ok(client) => break Ok(*client.id().ok_or_else(|| miette!(ID_EMPTY))?),
                     Err(error) => {
                         error!(
                             "{} Failed to save client: {}",
@@ -110,7 +110,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32
                     }
                 }
             },
-            |choice| Ok(*clients[choice].id().expect(ID_EMPTY)),
+            |choice| Ok(*clients[choice].id().ok_or_else(|| miette!(ID_EMPTY))?),
         )
 }
 

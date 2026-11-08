@@ -64,6 +64,10 @@ pub enum ApiError {
     NotFound(String),
     #[error("Did not find any {0}")]
     NoResults(String),
+    #[error("Server responded with code {0}: bad token or not enough access given")]
+    Unauthorized(u16),
+    #[error("{0}")]
+    Other(String),
 }
 
 impl From<ApiError> for miette::Error {

@@ -64,19 +64,19 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
 
     let account: Account = Account::new(
         Some(0),
-        get_match_string(matches, quiet, "name", "Name: ", "", true),
-        get_match_string(matches, quiet, "login", "Username: ", "", false),
-        Some(get_match_string(matches, quiet, "url", "Url: ", "", false)),
-        Some(get_match_string(matches, quiet, "note", "Notes: ", "", false)),
+        get_match_string(matches, quiet, "name", "Name: ", "", true)?,
+        get_match_string(matches, quiet, "login", "Username: ", "", false)?,
+        Some(get_match_string(matches, quiet, "url", "Url: ", "", false)?),
+        Some(get_match_string(matches, quiet, "note", "Notes: ", "", false)?),
         category_id,
         client_id,
         Some(matches.get_one::<String>("password").map_or_else(
             || {
                 if quiet {
-                    warn!("Could not ask for client");
+                    warn!("Could not ask for password");
                     return Err(miette!("Password input required but not provided"));
                 }
-                Ok(get_password("Password: "))
+                get_password("Password: ")
             },
             |password| Ok(password.clone()),
         )?),

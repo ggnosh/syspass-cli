@@ -52,15 +52,18 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
             .map_err(|e| miette!("{e}: Failed to retrieve client"))?
     };
 
-    client.set_name(get_match_string(matches, quiet, "name", "Name: ", client.name(), true).as_ref());
-    client.set_description(Some(get_match_string(
+    let name = get_match_string(matches, quiet, "name", "Name: ", client.name(), true)?;
+    client.set_name(&name);
+
+    let description = get_match_string(
         matches,
         quiet,
         "description",
         "Description: ",
         client.description().unwrap_or_default(),
         false,
-    )));
+    )?;
+    client.set_description(Some(description));
 
     info!("Trying to edit client");
 

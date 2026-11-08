@@ -7,10 +7,12 @@ use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, s
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
+use log::warn;
 use miette::Result;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::collections::HashMap;
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
 #[derive(Deserialize)]
@@ -44,7 +46,7 @@ impl Syspass {
         let req = JsonReq {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
-            params: self.syspass.get_params(args, needs_password),
+            params: self.syspass.get_params(args, needs_password)?,
             id: self.syspass.request_number.get(),
         };
 
@@ -52,9 +54,11 @@ impl Syspass {
 
         let response = self.syspass.send_request::<ApiResponse>(&self.syspass.config.host, &req)?;
 
-        response
-            .result
-            .ok_or_else(|| api::ApiError::InvalidResponse(response.error.expect("Should have an error")))
+        match (response.result, response.error) {
+            (Some(result), _) => Ok(result),
+            (None, Some(error)) => Err(api::ApiError::InvalidResponse(error)),
+            (None, None) => Err(api::ApiError::BadResponse("No result in response".to_string())),
+        }
     }
 
     #[inline]
@@ -79,10 +83,16 @@ impl Syspass {
             args.get_or_insert_with(Vec::new).push(("id", id.to_string()));
         }
 
-        self.forge_and_send(&method, args, true).map(|result| {
-            let mut entity: T = serde_json::from_value(result.result).expect("Failed to convert to entity");
-            entity.set_id(result.item_id.expect("Id should be set"));
-            entity
+        self.forge_and_send(&method, args, true).and_then(|result| {
+            let mut entity: T =
+                serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string()))?;
+            let id = result
+                .item_id
+                .ok_or(api::ApiError::ParseError("No id in response".to_string()))?;
+
+            entity.set_id(id);
+
+            Ok(entity)
         })
     }
 }
@@ -97,16 +107,20 @@ impl From<Config> for Syspass {
 
 impl api::Client for Syspass {
     fn search_account(&self, search: AccountSearchParams, usage: bool) -> Result<Vec<Account>, api::ApiError> {
-        self.forge_and_send("account/search", Some(search), false).map(|result| {
+        self.forge_and_send("account/search", Some(search), false).and_then(|result| {
             let list = serde_json::from_value::<Vec<Account>>(result.result)
-                .expect("Invalid response")
+                .map_err(|e| api::ApiError::ParseError(e.to_string()))?
                 .into_iter();
 
             if usage {
-                let usage_data = &Config::get_usage_data(None);
-                list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
+                let usage_data = Config::get_usage_data(None).unwrap_or_else(|e| {
+                    warn!("Could not read usage data: {e}");
+                    HashMap::new()
+                });
+
+                Ok(list.sorted_by(|a, b| sort_accounts(a, b, &usage_data)).collect())
             } else {
-                list.collect()
+                Ok(list.collect())
             }
         })
     }
@@ -114,37 +128,45 @@ impl api::Client for Syspass {
     fn get_password(&self, account: &Account) -> Result<ViewPassword, api::ApiError> {
         self.forge_and_send(
             "account/viewPass",
-            Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
+            Some(vec![(
+                "id",
+                account
+                    .id()
+                    .ok_or(api::ApiError::ParseError("Id should not be empty".to_string()))?
+                    .to_string(),
+            )]),
             true,
         )
-        .map(|result| ViewPassword {
-            account: account.clone(),
-            password: result
+        .and_then(|result| {
+            let password = result
                 .result
                 .get("password")
                 .and_then(Value::as_str)
-                .expect("Failed to get password")
-                .to_string(),
+                .ok_or(api::ApiError::NoPassword)?
+                .to_string();
+
+            Ok(ViewPassword {
+                account: account.clone(),
+                password,
+            })
         })
     }
 
     fn get_clients(&self) -> Result<Vec<Client>, api::ApiError> {
-        self.forge_and_send("client/search", None, false).map(|result| {
-            serde_json::from_value::<Vec<Client>>(result.result)
-                .expect("Invalid response")
-                .into_iter()
-                .sorted_by(|a, b| a.id().cmp(&b.id()))
-                .collect()
+        self.forge_and_send("client/search", None, false).and_then(|result| {
+            let clients = serde_json::from_value::<Vec<Client>>(result.result)
+                .map_err(|e| api::ApiError::ParseError(e.to_string()))?;
+
+            Ok(clients.into_iter().sorted_by(|a, b| a.id().cmp(&b.id())).collect())
         })
     }
 
     fn get_categories(&self) -> Result<Vec<Category>, api::ApiError> {
-        self.forge_and_send("category/search", None, false).map(|result| {
-            serde_json::from_value::<Vec<Category>>(result.result)
-                .expect("Invalid response")
-                .into_iter()
-                .sorted_by(|a, b| a.id().cmp(&b.id()))
-                .collect()
+        self.forge_and_send("category/search", None, false).and_then(|result| {
+            let categories = serde_json::from_value::<Vec<Category>>(result.result)
+                .map_err(|e| api::ApiError::ParseError(e.to_string()))?;
+
+            Ok(categories.into_iter().sorted_by(|a, b| a.id().cmp(&b.id())).collect())
         })
     }
 
@@ -179,7 +201,7 @@ impl api::Client for Syspass {
                 ("name", account.name().to_owned()),
                 ("categoryId", account.category_id().to_string()),
                 ("clientId", account.client_id().to_string()),
-                ("pass", account.pass().expect("Password is required").to_owned()),
+                ("pass", account.pass().ok_or(api::ApiError::NoPassword)?.to_owned()),
                 ("login", account.login().to_owned()),
                 ("url", account.url().unwrap_or_default().to_owned()),
                 ("notes", account.notes().unwrap_or_default().to_owned()),
@@ -197,7 +219,7 @@ impl api::Client for Syspass {
             ]),
             true,
         )
-        .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
+        .and_then(|result| serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string())))
     }
 
     fn delete_client(&self, id: u32) -> Result<bool, api::ApiError> {
@@ -214,17 +236,23 @@ impl api::Client for Syspass {
 
     fn view_account(&self, id: u32) -> Result<Account, api::ApiError> {
         self.forge_and_send("account/view", Some(vec![("id", id.to_string())]), true)
-            .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
+            .and_then(|result| {
+                serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string()))
+            })
     }
 
     fn get_category(&self, id: u32) -> Result<Category, api::ApiError> {
         self.forge_and_send("category/view", Some(vec![("id", id.to_string())]), true)
-            .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
+            .and_then(|result| {
+                serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string()))
+            })
     }
 
     fn get_client(&self, id: u32) -> Result<Client, api::ApiError> {
         self.forge_and_send("client/view", Some(vec![("id", id.to_string())]), true)
-            .map(|result| serde_json::from_value(result.result).expect("Invalid response"))
+            .and_then(|result| {
+                serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string()))
+            })
     }
 
     fn get_config(&self) -> &Config {

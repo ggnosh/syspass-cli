@@ -91,7 +91,7 @@ impl Display for Account {
         .collect::<Vec<_>>()
         .join(" ");
 
-        let line = truncate(&row, TERMINAL_WIDTH.load(Ordering::Relaxed) - 5);
+        let line = truncate(&row, TERMINAL_WIDTH.load(Ordering::Relaxed).saturating_sub(5));
 
         write!(f, "{line}")
     }

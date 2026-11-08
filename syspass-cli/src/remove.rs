@@ -34,8 +34,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
         false,
         Err(miette!("Invalid ID provided")),
         quiet,
-    )
-    .expect("Could not get ID");
+    )?;
 
     match matches.subcommand() {
         Some((account::COMMAND_NAME, matches)) => account::command(matches, api_client, id),

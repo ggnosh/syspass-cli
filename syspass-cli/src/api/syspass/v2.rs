@@ -5,6 +5,7 @@ use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
+use log::warn;
 use miette::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,7 @@ pub struct ApiResponse {
 
 #[derive(Deserialize, Debug, Serialize)]
 struct ApiResponseEntity {
-    id: u8,
+    id: u32,
     jsonrpc: String,
     result: Value,
     error: Option<ApiErrorResponse>,
@@ -42,15 +43,21 @@ struct Client {
     customer_name: String,
 }
 
-impl From<Client> for api::client::Client {
-    fn from(value: Client) -> Self {
-        Self::new(
-            Some(value.customer_id.parse::<u32>().expect("Customer id is required")),
+impl TryFrom<Client> for api::client::Client {
+    type Error = api::ApiError;
+
+    fn try_from(value: Client) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            Some(parse_id(&value.customer_id)?),
             value.customer_name,
             value.customer_description,
             0,
-        )
+        ))
     }
+}
+
+fn parse_id(value: &str) -> Result<u32, api::ApiError> {
+    value.parse::<u32>().map_err(|e| api::ApiError::ParseError(e.to_string()))
 }
 
 #[derive(Deserialize, Debug)]
@@ -83,29 +90,33 @@ struct Category {
     category_name: String,
 }
 
-impl From<Category> for api::category::Category {
-    fn from(value: Category) -> Self {
-        Self::new(
-            Some(value.category_id.parse::<u32>().expect("Category id is required")),
+impl TryFrom<Category> for api::category::Category {
+    type Error = api::ApiError;
+
+    fn try_from(value: Category) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            Some(parse_id(&value.category_id)?),
             value.category_name.clone(),
             value.category_description.clone(),
-        )
+        ))
     }
 }
 
-impl From<Account> for api::account::Account {
-    fn from(value: Account) -> Self {
-        Self::new(
-            Some(value.account_id.parse::<u32>().expect("Account id is required")),
+impl TryFrom<Account> for api::account::Account {
+    type Error = api::ApiError;
+
+    fn try_from(value: Account) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            Some(parse_id(&value.account_id)?),
             value.account_name.clone(),
             value.account_login.clone(),
             value.account_url.clone(),
             value.account_notes.clone(),
-            value.account_categoryId.parse().expect("Category id is required"),
-            value.account_customerId.parse().expect("Customer id id is required"),
+            parse_id(&value.account_categoryId)?,
+            parse_id(&value.account_customerId)?,
             Some(value.account_pass.clone()),
             Some(value.customer_name.clone()),
-        )
+        ))
     }
 }
 
@@ -119,7 +130,7 @@ impl Syspass {
         let req = JsonReq {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
-            params: self.syspass.get_params(args, needs_password),
+            params: self.syspass.get_params(args, needs_password)?,
             id: self.syspass.request_number.get(),
         };
 
@@ -133,7 +144,13 @@ impl Syspass {
             .and_then(|result| {
                 if let ApiResponseResult::Code(result) = result {
                     result.error.map_or_else(
-                        || Ok(result.result.expect("Invalid response").result_code == 0),
+                        || {
+                            let api_result = result
+                                .result
+                                .ok_or(api::ApiError::BadResponse("Invalid response".to_string()))?;
+
+                            Ok(api_result.result_code == 0)
+                        },
                         |error| Err(api::ApiError::InvalidResponse(error)),
                     )
                 } else {
@@ -143,43 +160,61 @@ impl Syspass {
     }
 
     fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::ApiError> {
-        if id.filter(|&&new_id| new_id > 0).is_some() {
+        if id.is_some_and(|new_id| *new_id > 0) {
             return Err(api::ApiError::NotSupported);
         }
 
         self.forge_and_send(path, args, true).and_then(|result| match result {
-            ApiResponseResult::Code(result) => match result.error {
-                Some(error) => Err(api::ApiError::InvalidResponse(error)),
-                _ => Ok(result
-                    .result
-                    .expect("Invalid response")
-                    .item_id
-                    .expect("Entity was not created")
-                    .parse::<u32>()
-                    .expect("Invalid id")),
-            },
+            ApiResponseResult::Code(result) => {
+                if let Some(error) = result.error {
+                    Err(api::ApiError::InvalidResponse(error))
+                } else {
+                    let api_result = result
+                        .result
+                        .ok_or(api::ApiError::BadResponse("Invalid response".to_string()))?;
+
+                    parse_id(
+                        &api_result
+                            .item_id
+                            .ok_or(api::ApiError::ParseError("Entity was not created".to_string()))?,
+                    )
+                }
+            }
             ApiResponseResult::Entity(result) => {
                 if let Some(error) = result.error {
                     Err(api::ApiError::InvalidResponse(error))
                 } else {
-                    let item_id = result.result.get("itemId").expect("No password set").to_string();
-                    Ok(item_id.parse::<u32>().expect("Invalid id"))
+                    result.result.get("itemId").map_or_else(
+                        || Err(api::ApiError::ParseError("No id in response".to_string())),
+                        Self::parse_entity_id,
+                    )
                 }
             }
         })
     }
 
-    fn fix_result_object<T: DeserializeOwned>(result: &Value) -> Vec<T> {
-        result
-            .as_object()
-            .map(|obj| {
-                obj.iter()
-                    .filter_map(|(key, value)| {
-                        key.parse::<u32>().ok().and_then(|_| serde_json::from_value(value.clone()).ok())
-                    })
-                    .collect()
+    fn parse_entity_id(value: &Value) -> Result<u32, api::ApiError> {
+        value
+            .as_u64()
+            .and_then(|id| u32::try_from(id).ok())
+            .map(Ok)
+            .or_else(|| {
+                value.as_str().map(|s| {
+                    s.parse::<u32>()
+                        .map_err(|e| api::ApiError::ParseError(format!("Invalid id: {e}")))
+                })
             })
-            .unwrap_or_default()
+            .unwrap_or_else(|| Err(api::ApiError::ParseError("Invalid id in response".to_string())))
+    }
+
+    fn fix_result_object<T: DeserializeOwned>(result: &Value) -> Vec<T> {
+        result.as_object().map_or_default(|obj| {
+            obj.iter()
+                .filter_map(|(key, value)| {
+                    key.parse::<u32>().ok().and_then(|_| serde_json::from_value(value.clone()).ok())
+                })
+                .collect()
+        })
     }
 }
 
@@ -208,18 +243,20 @@ impl api::Client for Syspass {
                         serde_json::from_value(result.result).map_err(api::ApiError::SerdeJson)?;
 
                     let usage_data = if usage {
-                        Config::get_usage_data(None)
+                        Config::get_usage_data(None).unwrap_or_else(|e| {
+                            warn!("Could not read usage data: {e}");
+                            HashMap::new()
+                        })
                     } else {
                         HashMap::new()
                     };
 
                     let list: Vec<api::account::Account> = accounts
                         .into_iter()
-                        .map(api::account::Account::from)
-                        .sorted_by(|a, b| sort_accounts(a, b, &usage_data))
-                        .collect();
+                        .map(api::account::Account::try_from)
+                        .collect::<Result<Vec<_>, api::ApiError>>()?;
 
-                    Ok(list)
+                    Ok(list.into_iter().sorted_by(|a, b| sort_accounts(a, b, &usage_data)).collect())
                 }
                 ApiResponseResult::Code(_) => Err(api::ApiError::BadResponse(format!(
                     "Unexpected response format: {response:?}"
@@ -230,7 +267,13 @@ impl api::Client for Syspass {
     fn get_password(&self, account: &api::account::Account) -> Result<ViewPassword, api::ApiError> {
         self.forge_and_send(
             "getAccountPassword",
-            Some(vec![("id", account.id().expect("Should not be empty").to_string())]),
+            Some(vec![(
+                "id",
+                account
+                    .id()
+                    .ok_or(api::ApiError::ParseError("Id should not be empty".to_string()))?
+                    .to_string(),
+            )]),
             true,
         )
         .and_then(|response| {
@@ -258,11 +301,10 @@ impl api::Client for Syspass {
                 ApiResponseResult::Entity(result) => {
                     let list: Vec<api::client::Client> = Self::fix_result_object::<Client>(&result.result)
                         .into_iter()
-                        .map(api::client::Client::from)
-                        .sorted_by(|a, b| a.id().cmp(&b.id()))
-                        .collect();
+                        .map(api::client::Client::try_from)
+                        .collect::<Result<Vec<_>, api::ApiError>>()?;
 
-                    Ok(list)
+                    Ok(list.into_iter().sorted_by(|a, b| a.id().cmp(&b.id())).collect())
                 }
                 ApiResponseResult::Code(result) => result.error.map_or_else(
                     || Err(api::ApiError::BadResponse("Unexpected response format".to_owned())),
@@ -275,13 +317,12 @@ impl api::Client for Syspass {
         self.forge_and_send("getCategories", None, false)
             .and_then(|response| match response {
                 ApiResponseResult::Entity(result) => {
-                    let list = Self::fix_result_object::<Category>(&result.result)
+                    let list: Vec<api::category::Category> = Self::fix_result_object::<Category>(&result.result)
                         .into_iter()
-                        .map(api::category::Category::from)
-                        .sorted_by(|a, b| a.id().cmp(&b.id()))
-                        .collect();
+                        .map(api::category::Category::try_from)
+                        .collect::<Result<Vec<_>, api::ApiError>>()?;
 
-                    Ok(list)
+                    Ok(list.into_iter().sorted_by(|a, b| a.id().cmp(&b.id())).collect())
                 }
                 ApiResponseResult::Code(result) => result.error.map_or_else(
                     || Err(api::ApiError::BadResponse("Unexpected response format".to_owned())),
@@ -335,7 +376,7 @@ impl api::Client for Syspass {
                 ("name", account.name().to_owned()),
                 ("categoryId", account.category_id().to_string()),
                 ("customerId", account.client_id().to_string()),
-                ("pass", account.pass().expect("Password given").to_owned()),
+                ("pass", account.pass().ok_or(api::ApiError::NoPassword)?.to_owned()),
                 ("login", account.login().to_owned()),
                 ("url", account.url().unwrap_or_default().to_owned()),
                 ("notes", account.notes().unwrap_or("").to_owned()),
@@ -364,8 +405,8 @@ impl api::Client for Syspass {
         self.forge_and_send("getAccountData", Some(vec![("id", id.to_string())]), true)
             .and_then(|response| match response {
                 ApiResponseResult::Entity(result) => serde_json::from_value::<Account>(result.result)
-                    .map(api::account::Account::from)
-                    .map_err(|error| api::ApiError::ParseError(error.to_string())),
+                    .map_err(|error| api::ApiError::ParseError(error.to_string()))
+                    .and_then(api::account::Account::try_from),
                 ApiResponseResult::Code(_) => Err(api::ApiError::NotFound("Account".to_owned())),
             })
     }
@@ -441,6 +482,21 @@ mod tests {
         assert!(response.is_err());
         let search = format!("Server responded with code {status}");
         assert!(response.expect_err("Err was not set").to_string().contains(search.as_str()));
+
+        mock.assert();
+    }
+
+    #[test]
+    fn test_bad_token_response() {
+        let (mock, api, _guard) = create_server_response(None::<String>, 403);
+        let response = api.search_account(vec![], false);
+        assert!(response.is_err());
+        assert!(
+            response
+                .expect_err("Err was not set")
+                .to_string()
+                .contains("bad token or not enough access given")
+        );
 
         mock.assert();
     }
@@ -590,7 +646,7 @@ mod tests {
             customer_name: "Customer name".to_owned(),
         };
 
-        let converted = api::client::Client::from(client.clone());
+        let converted = api::client::Client::try_from(client.clone()).expect("Failed to convert");
 
         assert_eq!(
             client.customer_description.unwrap_or_default(),
@@ -611,7 +667,7 @@ mod tests {
             category_name: "Category name".to_owned(),
         };
 
-        let converted = api::category::Category::from(category.clone());
+        let converted = api::category::Category::try_from(category.clone()).expect("Failed to convert");
 
         assert_eq!(
             category.category_description.unwrap_or_default(),
@@ -639,7 +695,7 @@ mod tests {
             customer_name: "customer".to_owned(),
         };
 
-        let converted = api::account::Account::from(account.clone());
+        let converted = api::account::Account::try_from(account.clone()).expect("Failed to convert");
 
         assert_eq!(
             account.account_categoryId.parse::<u32>().expect("Failed to read id"),
@@ -753,5 +809,17 @@ mod tests {
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
         mock.assert();
+    }
+
+    #[test]
+    fn test_parse_entity_id() {
+        use serde_json::json;
+
+        assert!(matches!(Syspass::parse_entity_id(&json!(38)), Ok(38)));
+        assert!(matches!(Syspass::parse_entity_id(&json!("1337")), Ok(1337)));
+        assert!(matches!(
+            Syspass::parse_entity_id(&json!("abc")),
+            Err(api::ApiError::ParseError(_))
+        ));
     }
 }
