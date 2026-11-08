@@ -326,7 +326,13 @@ mod tests {
     #[test]
     #[ignore = "This test requires a running X11 session with clipboard access"]
     fn test_clear_clipboard() {
-        let mut clipboard = Clipboard::new().expect("Failed to open clipboard");
+        let mut clipboard = match Clipboard::new() {
+            Ok(c) => c,
+            Err(e) => {
+                println!("No clipboard available, skipping: {e}");
+                return;
+            }
+        };
 
         set_clipboard_text("testing").expect("Failed to set clipboard value");
 
