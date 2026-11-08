@@ -39,6 +39,7 @@ thiserror = { version = "2.0" }
 owo-colors = { version = "4.4", features = ["supports-colors"] }
 itertools = "0.15"
 rand = "0.10"
+sha2 = "0.11.1"
 
 [dev-dependencies]
 assert_cmd = "2.2"

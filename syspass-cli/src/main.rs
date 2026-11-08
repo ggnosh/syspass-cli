@@ -1,3 +1,4 @@
+use std::env;
 use std::error::Error;
 use std::io;
 use std::io::Write;
@@ -9,7 +10,7 @@ use clap::{
     ArgAction, ArgMatches, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser,
 };
 use clap_complete::aot::{Generator, Shell, generate};
-use log::{LevelFilter, error};
+use log::{LevelFilter, error, warn};
 use miette::miette;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use terminal_size::{Width, terminal_size};
@@ -111,6 +112,19 @@ fn main() -> ExitCode {
     let matches = get_command().get_matches();
     set_log_level(&matches);
 
+    if let Some((search::COMMAND_NAME, sub)) = matches.subcommand()
+        && let Some(timeout) = sub.get_one::<u64>("clear")
+    {
+        let hash = env::var(search::CLEAR_HASH_ENV).ok();
+
+        if let Err(e) = search::clear_clipboard(*timeout, hash.as_deref()) {
+            warn!("Could not clear clipboard: {e}");
+            return ExitCode::FAILURE;
+        }
+
+        return ExitCode::SUCCESS;
+    }
+
     if let Some(generator) = matches.get_one::<Shell>("completions").copied() {
         let mut commands = get_command();
         print_completions(generator, &mut commands, &mut io::stdout());
@@ -204,6 +218,16 @@ mod tests {
             .arg("--help")
             .assert()
             .success();
+    }
+
+    #[test]
+    fn test_clear_timeout_is_parsed_from_argv() {
+        let matches = get_command()
+            .try_get_matches_from(vec!["syspass-cli", "search", "--clear", "12"])
+            .expect("Failed to parse args");
+        let (_, sub) = matches.subcommand().expect("Expected a search subcommand");
+
+        assert_eq!(sub.get_one::<u64>("clear"), Some(&12));
     }
 
     #[test]

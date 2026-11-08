@@ -9,7 +9,9 @@ use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::warn;
 use miette::{Result, miette};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{cmp, env, process, thread};
@@ -65,7 +67,14 @@ pub fn command_helper() -> Command {
                 .long("disable-usage")
                 .help("Do not sort account list by usage and do not track usage history"),
         )
-        .arg(arg!(--clear "Clear clipboard").hide(true).value_hint(ValueHint::Unknown))
+        .arg(
+            Arg::new("clear")
+                .long("clear")
+                .value_name("SECONDS")
+                .value_parser(clap::value_parser!(u64))
+                .help("Clear the clipboard after SECONDS if it still holds what we copied")
+                .hide(true),
+        )
 }
 
 fn get_accounts_list(
@@ -78,17 +87,40 @@ fn get_accounts_list(
         .map_err(|error| miette!("Error while searching: {error}"))
 }
 
-fn clear_clipboard(timeout: u64) -> Result<()> {
-    if timeout > 0 {
-        thread::sleep(Duration::from_secs(timeout));
+// The hash travels to the child in the environment rather than in argv, so it stays out of `ps`.
+// It is still readable through /proc/<pid>/environ by same-uid processes, and a plain digest of a
+// guessable password is dictionary-reversible. A keyed digest would need the key in the child as
+// well, which lands in the same environment, so it gains nothing here; only fork() would remove
+// the crossing. Accepted: a same-uid process can read the clipboard directly anyway.
+pub const CLEAR_HASH_ENV: &str = "SYPASS_CLEAR_HASH";
 
-        set_clipboard_text("")?;
-
-        Clipboard::new()
-            .map_err(|_| miette!("Could not clear clipboard"))?
-            .clear()
-            .map_err(|_| miette!("Failed to clear clipboard"))?;
+pub fn clear_clipboard(timeout: u64, expected_hash: Option<&str>) -> Result<()> {
+    if timeout == 0 {
+        return Ok(());
     }
+
+    thread::sleep(Duration::from_secs(timeout));
+
+    let mut clipboard = Clipboard::new().map_err(|_| miette!("Could not open clipboard"))?;
+
+    // Accepted race: anything copied between the read and the clear is wiped along with it.
+    let actual = match clipboard.get_text() {
+        Ok(text) => Some(text),
+        Err(e) => {
+            warn!("Could not read clipboard: {e}");
+            None
+        }
+    };
+
+    // Without a hash we cannot tell whose content is in the clipboard, so clear it.
+    let ours = expected_hash.is_none_or(|hash| should_clear(hash, actual.as_deref()));
+
+    if !ours {
+        warn!("Clipboard holds something else, leaving it alone");
+        return Ok(());
+    }
+
+    clipboard.clear().map_err(|_| miette!("Failed to clear clipboard"))?;
 
     Ok(())
 }
@@ -127,11 +159,6 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
     let config = api_client.get_config();
     let show = matches.get_flag("show-password") || config.no_clipboard;
 
-    if matches.get_flag("clear") {
-        clear_clipboard(config.password_timeout.unwrap_or(10))?;
-        return Ok(None);
-    }
-
     let accounts = if id > 0 {
         vec![api_client.view_account(id)?]
     } else if name.is_empty() {
@@ -168,33 +195,35 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
 
     maybe_record_usage(account.account.id(), matches.get_flag("disable-usage"), None);
 
+    let timeout = config.password_timeout.unwrap_or(10);
+
     if !show {
         set_clipboard_text(&account.password)?;
 
-        if config.password_timeout.unwrap_or(10) > 0
+        if timeout > 0
             && let Some(path) = env::current_exe()
                 .map_err(|e| miette!("{e}: Failed to get current executable path"))?
                 .as_path()
                 .to_str()
         {
-            let mut args = vec!["search", "--clear"];
-            if let Some(config) = matches.get_one::<String>("config") {
-                args.push("--config");
-                args.push(config);
+            let mut args = vec!["search".to_string(), "--clear".to_string(), timeout.to_string()];
+
+            for flag in ["quiet", "verbose", "debug"] {
+                if matches.get_flag(flag) {
+                    args.push(format!("--{flag}"));
+                }
             }
 
+            let mut cmd = process::Command::new(path);
+            cmd.args(&args).env(CLEAR_HASH_ENV, sha256_hex(&account.password));
+
             if cfg!(test) {
-                process::Command::new(path)
-                    .args(args)
-                    .spawn()
+                cmd.spawn()
                     .map_err(|e| miette!("{e}: Failed to start child process"))?
                     .wait()
                     .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
             } else {
-                process::Command::new(path)
-                    .args(args)
-                    .spawn()
-                    .map_err(|e| miette!("{e}: Failed to start child process"))?;
+                cmd.spawn().map_err(|e| miette!("{e}: Failed to start child process"))?;
             }
         }
     }
@@ -305,13 +334,32 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.render()
 }
 
+fn should_clear(expected_hash: &str, actual: Option<&str>) -> bool {
+    // A failed read means we cannot prove the content is someone else's, so assume it is still ours.
+    actual.is_none_or(|text| sha256_hex(text) == expected_hash || sha256_hex(text.trim()) == expected_hash)
+}
+
+fn sha256_hex(text: &str) -> String {
+    let digest = Sha256::digest(text);
+    let mut hex = String::with_capacity(digest.len() * 2);
+
+    for byte in &digest {
+        let _ = write!(&mut hex, "{byte:02x}");
+    }
+
+    hex
+}
+
 #[cfg(test)]
 mod tests {
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
     use crate::config::Config;
-    use crate::search::{clear_clipboard, maybe_record_usage, open_shell, print_table_for_account, set_clipboard_text};
+    use crate::search::{
+        clear_clipboard, maybe_record_usage, open_shell, print_table_for_account, set_clipboard_text, sha256_hex,
+        should_clear,
+    };
     use tempfile::tempdir;
 
     fn get_test_account_data() -> ViewPassword {
@@ -382,6 +430,38 @@ mod tests {
     }
 
     #[test]
+    fn test_should_clear_clears_content_we_copied() {
+        assert!(should_clear(
+            "f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7",
+            Some("hunter2"),
+        ));
+    }
+
+    #[test]
+    fn test_should_clear_skips_content_we_do_not_own() {
+        assert!(!should_clear(
+            "f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7",
+            Some("not-ours"),
+        ));
+    }
+
+    #[test]
+    fn test_should_clear_accepts_compositor_normalisation() {
+        assert!(should_clear(
+            "f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7",
+            Some("hunter2\n"),
+        ));
+    }
+
+    #[test]
+    fn test_should_clear_clears_when_content_is_unavailable() {
+        assert!(should_clear(
+            "f52fbd32b2b3b86ff88ef6c490628285f482af15ddcb29541f94bcf526a3f6c7",
+            None,
+        ));
+    }
+
+    #[test]
     fn test_print_table_for_account_with_password() {
         let account = get_test_account_data();
         let output = print_table_for_account(&account, true);
@@ -403,7 +483,7 @@ mod tests {
 
     #[test]
     #[ignore = "This test requires a running X11 session with clipboard access"]
-    fn test_clear_clipboard() {
+    fn test_clear_clipboard_clears_content_we_copied() {
         let mut clipboard = match Clipboard::new() {
             Ok(c) => c,
             Err(e) => {
@@ -415,7 +495,25 @@ mod tests {
         set_clipboard_text("testing").expect("Failed to set clipboard value");
 
         assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
-        clear_clipboard(1).expect("Failed to clear clipboard");
+
+        clear_clipboard(1, Some(&sha256_hex("testing"))).expect("Failed to clear clipboard");
         assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
+    }
+
+    #[test]
+    #[ignore = "This test requires a running X11 session with clipboard access"]
+    fn test_clear_clipboard_leaves_content_we_do_not_own() {
+        let mut clipboard = match Clipboard::new() {
+            Ok(c) => c,
+            Err(e) => {
+                println!("No clipboard available, skipping: {e}");
+                return;
+            }
+        };
+
+        set_clipboard_text("testing").expect("Failed to set clipboard value");
+
+        clear_clipboard(1, Some(&sha256_hex("something-else"))).expect("Failed to clear clipboard");
+        assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
     }
 }
