@@ -143,7 +143,7 @@ impl Syspass {
     }
 
     fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::ApiError> {
-        if id.filter(|&&new_id| new_id > 0).is_some() {
+        if id.is_some_and(|new_id| *new_id > 0) {
             return Err(api::ApiError::NotSupported);
         }
 

@@ -238,7 +238,7 @@ mod tests {
         let version_string = "v".to_string() + version.as_str();
         let release = GithubRelease {
             html_url: "https://github.com/ggnosh/syspass-cli/releases/tag/".to_string() + version_string.as_ref(),
-            tag_name: version_string.to_string(),
+            tag_name: version_string.clone(),
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 
@@ -251,7 +251,7 @@ mod tests {
         let version_string = "v".to_string() + version.as_str();
         let release = GithubRelease {
             html_url: "https://github.com/ggnosh/syspass-cli/releases/tag/".to_string() + version_string.as_ref(),
-            tag_name: version_string.to_string(),
+            tag_name: version_string.clone(),
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 

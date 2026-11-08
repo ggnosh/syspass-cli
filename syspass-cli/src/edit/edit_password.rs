@@ -7,7 +7,7 @@ use clap::{ArgMatches, Command, ValueHint, arg};
 use dialoguer::{Select, theme::ColorfulTheme};
 use log::{info, warn};
 use owo_colors::{OwoColorize, Stream::Stdout};
-use rand::Rng;
+use rand::RngExt;
 
 pub const COMMAND_NAME: &str = "password";
 
