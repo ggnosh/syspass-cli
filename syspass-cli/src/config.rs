@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+#[cfg(unix)]
 use log::warn;
 use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
@@ -181,7 +182,10 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Config, get_config_file_or_write, get_config_path, warn_on_loose_permissions};
+    use crate::config::{Config, get_config_file_or_write, get_config_path};
+
+    #[cfg(unix)]
+    use crate::config::warn_on_loose_permissions;
     use std::ffi::OsString;
     use tempfile::tempdir;
 
