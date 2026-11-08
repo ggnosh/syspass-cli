@@ -10,14 +10,14 @@ use std::path::Path;
 const CONFIG: &str = "config";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 
-#[derive(Deserialize, Default, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub host: String,
     pub token: String,
     #[serde(default)]
     pub password: String,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub verify_host: bool,
     pub api_version: Option<String>,
     #[serde(default)]
@@ -26,6 +26,25 @@ pub struct Config {
     pub no_shell: bool,
     #[serde(default)]
     pub no_clipboard: bool,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            host: String::new(),
+            token: String::new(),
+            password: String::new(),
+            verify_host: true,
+            api_version: None,
+            password_timeout: None,
+            no_shell: false,
+            no_clipboard: false,
+        }
+    }
 }
 
 fn get_config_path(file: &str, dir: Option<&str>) -> Result<OsString> {
@@ -113,7 +132,7 @@ mod tests {
         let temp = create_temp_dir();
         let temp_str = temp.to_str();
         assert_eq!(
-            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":false,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
+            "{\"host\":\"\",\"token\":\"\",\"password\":\"\",\"verifyHost\":true,\"apiVersion\":null,\"passwordTimeout\":null,\"noShell\":false,\"noClipboard\":false}",
             get_config_file_or_write("config.json", temp_str, Config::default())
                 .expect("Failed to get config file or write"),
         );
