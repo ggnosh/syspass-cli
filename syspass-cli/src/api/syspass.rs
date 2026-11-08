@@ -10,24 +10,28 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::cell::Cell;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::LazyLock;
+use std::time::Duration;
 
 pub mod v2;
 pub mod v3;
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 static PASSWORD: LazyLock<miette::Result<String>> = LazyLock::new(|| ask_for_password("API password: ", false));
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
 
 fn sort_accounts(a: &Account, b: &Account, usage_data: &HashMap<u32, u32>) -> Ordering {
-    let left = usage_data.get(a.id().expect("Id is set")).unwrap_or(&0);
-    let right = usage_data.get(b.id().expect("Id is set")).unwrap_or(&0);
+    let left = a.id().map_or(0, |id| *usage_data.get(id).unwrap_or(&0));
+    let right = b.id().map_or(0, |id| *usage_data.get(id).unwrap_or(&0));
 
-    right.cmp(left).then_with(|| a.id().cmp(&b.id()))
+    right.cmp(&left).then_with(|| a.id().cmp(&b.id()))
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize)]
 struct JsonReq {
     jsonrpc: String,
     method: String,
@@ -35,9 +39,33 @@ struct JsonReq {
     id: u32,
 }
 
+const SECRET_PARAMS: [&str; 2] = ["authToken", "tokenPass"];
+
+impl JsonReq {
+    /// Debug text with the credentials masked, so a pasted log does not carry the token.
+    fn redacted(&self) -> String {
+        let mut params: BTreeMap<&str, &str> =
+            self.params.iter().map(|(key, value)| (key.as_str(), value.as_str())).collect();
+
+        for key in SECRET_PARAMS {
+            if params.contains_key(key) {
+                params.insert(key, "[REDACTED]");
+            }
+        }
+
+        format!(
+            "JsonReq {{ jsonrpc: {:?}, method: {:?}, params: {:?}, id: {} }}",
+            self.jsonrpc, self.method, params, self.id
+        )
+    }
+}
+
 #[inline]
 fn get_builder(config: &Config) -> ClientBuilder {
-    ClientBuilder::new().danger_accept_invalid_certs(!config.verify_host)
+    ClientBuilder::new()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
+        .danger_accept_invalid_certs(!config.verify_host)
 }
 
 fn get_response(
@@ -101,7 +129,7 @@ impl Syspass {
     }
 
     fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> miette::Result<T, api::ApiError> {
-        debug!("Sending request to {request_url}:\n{req:#?}\n");
+        debug!("Sending request to {request_url}:\n{}\n", req.redacted());
 
         let response = get_response(&self.client, request_url, req)?;
 
@@ -128,15 +156,46 @@ impl From<Config> for Syspass {
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
+    use std::collections::HashMap;
     use std::path::Path;
 
     use mockito::{Mock, ServerGuard};
     use reqwest::blocking::ClientBuilder;
 
-    use crate::api::syspass::Syspass;
+    use crate::api::syspass::{JsonReq, Syspass};
     use crate::config::Config;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
+
+    #[test]
+    fn test_debug_request_masks_credentials() {
+        let mut params = HashMap::new();
+        params.insert("authToken".to_owned(), "super-secret-token".to_owned());
+        params.insert("tokenPass".to_owned(), "super-secret-pass".to_owned());
+        params.insert("text".to_owned(), "search term".to_owned());
+
+        let req = JsonReq {
+            jsonrpc: "2.0".to_owned(),
+            method: "search".to_owned(),
+            params,
+            id: 1,
+        };
+
+        let printed = req.redacted();
+
+        assert!(
+            !printed.contains("super-secret-token"),
+            "authToken must be masked: {printed}"
+        );
+        assert!(
+            !printed.contains("super-secret-pass"),
+            "tokenPass must be masked: {printed}"
+        );
+        assert!(
+            printed.contains("search term"),
+            "non-secret params should still print: {printed}"
+        );
+    }
 
     pub fn create_server_response(
         response: Option<impl AsRef<Path>>,

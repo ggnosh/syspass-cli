@@ -78,6 +78,11 @@ Otherwise, the clipboard will be cleared after given seconds unless the `--showp
 `apiVersion` defines which API to use. Supported values are `SyspassV2` and `SyspassV3`.
 If value is not defined the **syspass-cli** defaults to newest sysPass version.
 
+On Unix, files created by **syspass-cli** get private permissions: `$(HOME)/.syspass` is created as
+`0700` and `config.json` as `0600`. An existing config file that is readable by group or others only
+produces a warning with the `chmod 600` hint, so fix that yourself; permissions are not changed on
+files the tool did not create.
+
 ### Usage file
 
 Located at `$(HOME)/.syspass/usage.json`

@@ -101,7 +101,7 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
         .exclude_from_history()
         .wait_until(Instant::now() + Duration::from_millis(15))
         .text(text)
-        .expect("Failed to set clipboard value");
+        .map_err(|_| miette!("Failed to set clipboard value"))?;
 
     Ok(())
 }
@@ -111,7 +111,7 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
     Clipboard::new()
         .map_err(|_| miette!("Could not open clipboard"))?
         .set_text(text)
-        .expect("Failed to set clipboard value");
+        .map_err(|_| miette!("Failed to set clipboard value"))?;
 
     thread::sleep(Duration::from_millis(15));
 
@@ -202,20 +202,33 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
 
     if !config.no_shell && !matches.get_flag("no-shell") && account.account.url().unwrap_or_default().contains("ssh://")
     {
-        open_shell(&account.account);
+        open_shell(&account.account)?;
     }
 
     Ok(Some(account))
 }
 
-fn open_shell(account: &Account) {
-    let host = account.login().to_owned() + "@" + account.url().unwrap_or_default().replace("ssh://", "").as_str();
+fn open_shell(account: &Account) -> Result<()> {
+    let login = account.login();
+    if login.starts_with('-') {
+        return Err(miette!("Invalid login: {login}"));
+    }
+
+    let host = account.url().unwrap_or_default().replace("ssh://", "");
+    if host.is_empty() || host.starts_with('-') {
+        return Err(miette!("Invalid host: {host}"));
+    }
+
     process::Command::new("ssh")
+        .arg("-l")
+        .arg(login)
         .arg(host)
         .spawn()
-        .expect("Failed to start ssh")
+        .map_err(|e| miette!("{e}: Failed to start ssh"))?
         .wait()
-        .expect("Failed to exit ssh");
+        .map_err(|e| miette!("{e}: Failed to exit ssh"))?;
+
+    Ok(())
 }
 
 fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: bool) -> Result<ViewPassword> {
@@ -286,7 +299,7 @@ mod tests {
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::search::{clear_clipboard, print_table_for_account, set_clipboard_text};
+    use crate::search::{clear_clipboard, open_shell, print_table_for_account, set_clipboard_text};
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
@@ -303,6 +316,23 @@ mod tests {
             ),
             password: "<PASSWORD>".to_owned(),
         }
+    }
+
+    #[test]
+    fn test_open_shell_rejects_login_starting_with_dash() {
+        let account = Account::new(
+            Some(1),
+            "Test".to_owned(),
+            "-oProxyCommand=touch pwned".to_owned(),
+            Some("ssh://example.invalid".to_owned()),
+            Some("notes".to_owned()),
+            4,
+            5,
+            None,
+            Some("test_client".to_owned()),
+        );
+
+        assert!(open_shell(&account).is_err());
     }
 
     #[test]

@@ -6,7 +6,11 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 use reqwest::blocking::{Client, ClientBuilder};
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
+use std::time::Duration;
 use version_compare::Version;
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 const FAILED_TO_GET_VERSION: &str = "Failed to get version number";
 const FAILED_TO_PARSE_DATETIME: &str = "Failed to parse datetime";
@@ -33,6 +37,8 @@ pub fn command(_matches: &ArgMatches) -> Result<()> {
 
 fn create_client() -> Result<Client> {
     ClientBuilder::new()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
         .build()
         .map_err(|e| miette!("{e}: Failed to create client"))
 }
@@ -130,22 +136,22 @@ mod tests {
         let test_version = Version::from("v0.2.0").expect("Failed to get current version");
 
         release.tag_name = "v0.1.0".to_string();
-        assert!(!has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(false), has_new_release(&release, &test_version).ok());
 
         release.tag_name = "v0.1.1".to_string();
-        assert!(!has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(false), has_new_release(&release, &test_version).ok());
 
         release.tag_name = "v0.2.0".to_string();
-        assert!(!has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(false), has_new_release(&release, &test_version).ok());
 
         release.tag_name = "v1.1.0".to_string();
-        assert!(has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(true), has_new_release(&release, &test_version).ok());
 
         release.tag_name = "v2.1.1".to_string();
-        assert!(has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(true), has_new_release(&release, &test_version).ok());
 
         release.tag_name = "v0.2.3".to_string();
-        assert!(has_new_release(&release, &test_version).unwrap());
+        assert_eq!(Some(true), has_new_release(&release, &test_version).ok());
 
         let published =
             NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT).expect(FAILED_TO_PARSE_DATETIME);
@@ -245,7 +251,7 @@ mod tests {
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 
-        assert!(!has_new_release(&release, &version).unwrap());
+        assert_eq!(Some(false), has_new_release(&release, &version).ok());
     }
 
     #[test]
@@ -258,6 +264,6 @@ mod tests {
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 
-        assert!(has_new_release(&release, &version).unwrap());
+        assert_eq!(Some(true), has_new_release(&release, &version).ok());
     }
 }

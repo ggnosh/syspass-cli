@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+use log::warn;
 use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -8,6 +9,7 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 const CONFIG: &str = "config";
+const CONFIG_FILE: &str = "config.json";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -63,20 +65,83 @@ fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> Resul
 where
     T: Serialize,
 {
-    let path = get_config_path(file, dir)?;
-    fs::read_to_string(&path).or_else(|error| {
-        if error.kind() == ErrorKind::NotFound {
-            let data = serde_json::to_string(&value).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
-            if let Some(parent) = Path::new(&path).parent() {
-                fs::create_dir_all(parent).map_err(|e| miette::miette!("Failed to create directories: {}", e))?;
+    let path_os = get_config_path(file, dir)?;
+    let path = Path::new(&path_os);
+
+    match fs::read_to_string(path) {
+        Ok(data) => {
+            if file == CONFIG_FILE {
+                warn_on_loose_permissions(path);
             }
-            fs::write(&path, &data).map_err(|e| miette::miette!("Failed to write data: {}", e))?;
+
             Ok(data)
-        } else {
-            Err(miette::miette!("Couldn't read config file: {}", error))
         }
-    })
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            let data = serde_json::to_string(&value).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
+
+            if let Some(parent) = path.parent() {
+                create_private_dir(parent)?;
+            }
+
+            fs::write(path, &data).map_err(|e| miette::miette!("Failed to write data: {}", e))?;
+            set_private_permissions(path)?;
+
+            Ok(data)
+        }
+        Err(error) => Err(miette::miette!("Couldn't read config file: {}", error)),
+    }
 }
+
+#[cfg(unix)]
+fn set_private_permissions(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .map_err(|e| miette!("Failed to set permissions: {}", e))
+}
+
+#[cfg(unix)]
+fn create_private_dir(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::create_dir_all(path).map_err(|e| miette!("Failed to create directories: {}", e))?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+        .map_err(|e| miette!("Failed to set permissions: {}", e))
+}
+
+#[cfg(unix)]
+fn warn_on_loose_permissions(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mode = match fs::metadata(path) {
+        Ok(metadata) => metadata.permissions().mode(),
+        Err(e) => {
+            warn!("Could not read permissions for {}: {}", path.display(), e);
+            return;
+        }
+    };
+
+    if mode & 0o077 != 0 {
+        warn!(
+            "Config file {} is readable by group or others (mode {:o}). Run chmod 600 on it.",
+            path.display(),
+            mode & 0o777
+        );
+    }
+}
+
+#[cfg(not(unix))]
+fn set_private_permissions(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn create_private_dir(path: &Path) -> Result<()> {
+    fs::create_dir_all(path).map_err(|e| miette!("Failed to create directories: {}", e))
+}
+
+#[cfg(not(unix))]
+fn warn_on_loose_permissions(_path: &Path) {}
 
 impl Config {
     pub fn from_matches(value: &ArgMatches) -> Result<Self> {
@@ -116,7 +181,7 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{Config, get_config_file_or_write, get_config_path};
+    use crate::config::{Config, get_config_file_or_write, get_config_path, warn_on_loose_permissions};
     use std::ffi::OsString;
     use tempfile::tempdir;
 
@@ -139,6 +204,40 @@ mod tests {
         );
 
         cleanup_temp_dir(temp_str);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_new_config_file_is_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = create_temp_dir();
+        let temp_str = temp.to_str();
+
+        get_config_file_or_write("config.json", temp_str, Config::default()).expect("Failed to write config");
+
+        let path = std::path::Path::new(&temp).join(".syspass").join("config.json");
+        let mode = std::fs::metadata(&path).expect("Failed to read metadata").permissions().mode();
+
+        assert_eq!(mode & 0o777, 0o600);
+
+        cleanup_temp_dir(temp_str);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_loose_permission_check_continues_when_metadata_fails() {
+        let temp = tempdir().expect("Failed to create temp dir");
+        let path = temp.path().join("dangling.json");
+
+        std::os::unix::fs::symlink("does-not-exist", &path).expect("Failed to create symlink");
+
+        // fs::metadata fails here (ENOENT). The check must warn and return so the caller keeps its data.
+        warn_on_loose_permissions(&path);
+        assert!(
+            path.symlink_metadata().is_ok(),
+            "the check must not consume the read result"
+        );
     }
 
     fn cleanup_temp_dir(temp: Option<&str>) {

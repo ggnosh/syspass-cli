@@ -67,7 +67,7 @@ impl Entity for Category {
 
 fn save_category(new_category: Category, api_client: &dyn api::Client) -> Result<u32> {
     match api_client.save_category(new_category) {
-        Ok(client) => Ok(client.id.expect(ID_EMPTY)),
+        Ok(client) => client.id.ok_or_else(|| miette!(ID_EMPTY)),
         Err(error) => Err(miette!("Failed to save category: {error}")),
     }
 }
@@ -96,7 +96,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
                     }
                 }
             },
-            |choice| Ok(*categories[choice].id().expect(ID_EMPTY)),
+            |choice| Ok(*categories[choice].id().ok_or_else(|| miette!(ID_EMPTY))?),
         )
 }
 

@@ -4,7 +4,6 @@ version = "0.9.1"
 edition = "2024"
 description = "A CLI client for Syspass"
 repository = "https://github.com/ggnosh/syspass-cli"
-homepage = "https://github.com/ggnosh/syspass-cli"
 keywords = ["syspass", "cli"]
 license = "MIT"
 readme = "../README.md"
