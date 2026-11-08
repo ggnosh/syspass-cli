@@ -94,22 +94,23 @@ impl Config {
 }
 
 impl Config {
-    pub fn get_usage_data(dir: Option<&str>) -> HashMap<u32, u32> {
-        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new())
-            .expect("Failed to get or write config file");
+    pub fn get_usage_data(dir: Option<&str>) -> Result<HashMap<u32, u32>> {
+        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new())?;
 
-        serde_json::from_str::<HashMap<u32, u32>>(&data).expect("JSON does not have correct format.")
+        serde_json::from_str::<HashMap<u32, u32>>(&data).map_err(|e| miette!("Failed to read usage data: {e}"))
     }
 
-    pub fn record_usage(id: u32, dir: Option<&str>) {
-        let mut usage = Self::get_usage_data(dir);
+    pub fn record_usage(id: u32, dir: Option<&str>) -> Result<()> {
+        let mut usage = Self::get_usage_data(dir)?;
         *usage.entry(id).or_insert(0) += 1;
 
         fs::write(
-            get_config_path("usage.json", dir).expect("Failed to get config path"),
-            serde_json::to_string(&usage).expect("Serialization failed") + "\n",
+            get_config_path("usage.json", dir)?,
+            serde_json::to_string(&usage).map_err(|e| miette!("Serialization failed: {e}"))? + "\n",
         )
-        .expect("Unable to write file");
+        .map_err(|e| miette!("Unable to write file: {e}"))?;
+
+        Ok(())
     }
 }
 
@@ -162,20 +163,32 @@ mod tests {
         let temp = create_temp_dir();
         let temp_str = temp.to_str();
 
-        let usage = Config::get_usage_data(temp_str);
+        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
         assert_eq!(usage.get(&31337), None);
 
-        Config::record_usage(31337, temp_str);
-        let usage = Config::get_usage_data(temp_str);
+        Config::record_usage(31337, temp_str).expect("Failed to record usage");
+        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
         assert_eq!(usage.get(&31337), Some(&1));
 
-        Config::record_usage(31337, temp_str);
-        let usage = Config::get_usage_data(temp_str);
+        Config::record_usage(31337, temp_str).expect("Failed to record usage");
+        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
         assert_eq!(usage.get(&31337), Some(&2));
 
-        let usage = Config::get_usage_data(temp_str);
-        assert_eq!(usage.get(&31337), Some(&2));
-        assert_eq!(usage.get(&31337), Some(&2));
+        cleanup_temp_dir(temp_str);
+    }
+
+    #[test]
+    fn test_get_usage_data_corrupt_file() {
+        let temp = create_temp_dir();
+        let temp_str = temp.to_str();
+
+        std::fs::write(
+            temp_str.expect("Failed to get path").to_string() + "/.syspass/usage.json",
+            "not json",
+        )
+        .expect("Failed to write file");
+
+        assert!(Config::get_usage_data(temp_str).is_err());
 
         cleanup_temp_dir(temp_str);
     }

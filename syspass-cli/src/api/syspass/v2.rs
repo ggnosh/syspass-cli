@@ -5,6 +5,7 @@ use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
+use log::warn;
 use miette::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -224,7 +225,10 @@ impl api::Client for Syspass {
                         serde_json::from_value(result.result).map_err(api::ApiError::SerdeJson)?;
 
                     let usage_data = if usage {
-                        Config::get_usage_data(None)
+                        Config::get_usage_data(None).unwrap_or_else(|e| {
+                            warn!("Could not read usage data: {e}");
+                            HashMap::new()
+                        })
                     } else {
                         HashMap::new()
                     };

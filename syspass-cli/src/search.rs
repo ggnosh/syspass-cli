@@ -227,8 +227,10 @@ fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: 
         .interact()
         .map_err(|err| miette!(err))
         .and_then(|choice| {
-            if !disable_usage {
-                Config::record_usage(*accounts[choice].id().expect("Id should be set"), None);
+            if !disable_usage
+                && let Err(e) = Config::record_usage(*accounts[choice].id().expect("Id should be set"), None)
+            {
+                warn!("Could not record usage: {e}");
             }
             api_client.get_password(&accounts[choice]).map_err(|err| miette!(err))
         })

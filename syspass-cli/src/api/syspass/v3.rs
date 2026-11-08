@@ -7,10 +7,12 @@ use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, s
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
 use itertools::Itertools;
+use log::warn;
 use miette::Result;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::collections::HashMap;
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
 #[derive(Deserialize)]
@@ -103,8 +105,11 @@ impl api::Client for Syspass {
                 .into_iter();
 
             if usage {
-                let usage_data = &Config::get_usage_data(None);
-                list.sorted_by(|a, b| sort_accounts(a, b, usage_data)).collect()
+                let usage_data = Config::get_usage_data(None).unwrap_or_else(|e| {
+                    warn!("Could not read usage data: {e}");
+                    HashMap::new()
+                });
+                list.sorted_by(|a, b| sort_accounts(a, b, &usage_data)).collect()
             } else {
                 list.collect()
             }
