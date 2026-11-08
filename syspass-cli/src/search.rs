@@ -248,6 +248,9 @@ fn maybe_record_usage(id: Option<&u32>, disable_usage: bool, dir: Option<&str>) 
         return;
     }
 
+    // Stance: recording is best-effort, so a missing id is skipped rather than treated as an
+    // invariant violation. The post-save display paths (`expect("Id should be set")`) panic
+    // because an id must exist after saving; here there is simply nothing to record.
     let Some(id) = id else {
         return;
     };
