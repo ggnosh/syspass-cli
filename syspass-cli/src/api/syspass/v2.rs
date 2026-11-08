@@ -162,11 +162,27 @@ impl Syspass {
                 if let Some(error) = result.error {
                     Err(api::ApiError::InvalidResponse(error))
                 } else {
-                    let item_id = result.result.get("itemId").expect("No password set").to_string();
-                    Ok(item_id.parse::<u32>().expect("Invalid id"))
+                    result.result.get("itemId").map_or_else(
+                        || Err(api::ApiError::ParseError("No id in response".to_string())),
+                        Self::parse_entity_id,
+                    )
                 }
             }
         })
+    }
+
+    fn parse_entity_id(value: &Value) -> Result<u32, api::ApiError> {
+        value
+            .as_u64()
+            .and_then(|id| u32::try_from(id).ok())
+            .map(Ok)
+            .or_else(|| {
+                value.as_str().map(|s| {
+                    s.parse::<u32>()
+                        .map_err(|e| api::ApiError::ParseError(format!("Invalid id: {e}")))
+                })
+            })
+            .unwrap_or_else(|| Err(api::ApiError::ParseError("Invalid id in response".to_string())))
     }
 
     fn fix_result_object<T: DeserializeOwned>(result: &Value) -> Vec<T> {
@@ -753,5 +769,17 @@ mod tests {
 
         assert!(result.is_err_and(|x| x.to_string() == "Failed to add account"));
         mock.assert();
+    }
+
+    #[test]
+    fn test_parse_entity_id() {
+        use serde_json::json;
+
+        assert!(matches!(Syspass::parse_entity_id(&json!(38)), Ok(38)));
+        assert!(matches!(Syspass::parse_entity_id(&json!("1337")), Ok(1337)));
+        assert!(matches!(
+            Syspass::parse_entity_id(&json!("abc")),
+            Err(api::ApiError::ParseError(_))
+        ));
     }
 }
