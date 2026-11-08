@@ -18,15 +18,12 @@ struct ChangeAccountArgs {
 }
 
 impl ChangeAccountArgs {
-    fn new(matches: &ArgMatches) -> Self {
-        Self {
-            id: matches
-                .get_one::<u32>("id")
-                .map(std::borrow::ToOwned::to_owned)
-                .expect("Id is required"),
-            password: matches.get_one::<String>("password").map_or("", String::as_str).to_owned(),
-            expiration_date: matches.get_one::<String>("expiration").map_or("", |s| s.as_str()).to_owned(),
-        }
+    fn new(matches: &ArgMatches) -> Result<Self> {
+        Ok(Self {
+            id: matches.get_one::<u32>("id").copied().ok_or_else(|| miette!("Id is required"))?,
+            password: matches.get_one::<String>("password").cloned().unwrap_or_default(),
+            expiration_date: matches.get_one::<String>("expiration").cloned().unwrap_or_default(),
+        })
     }
 }
 
@@ -58,7 +55,7 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
-    let args: ChangeAccountArgs = get_args(matches, quiet);
+    let args: ChangeAccountArgs = get_args(matches, quiet)?;
 
     if args.password.is_empty() {
         Err(miette!("Password can't be empty"))?;
@@ -86,31 +83,32 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Res
     }
 }
 
-fn get_args(matches: &ArgMatches, quiet: bool) -> ChangeAccountArgs {
-    let mut args: ChangeAccountArgs = ChangeAccountArgs::new(matches);
+fn get_args(matches: &ArgMatches, quiet: bool) -> Result<ChangeAccountArgs> {
+    let mut args: ChangeAccountArgs = ChangeAccountArgs::new(matches)?;
 
     if args.password.is_empty() && !quiet {
-        args.password = get_password("New password:");
+        args.password = get_password("New password:")?;
     }
 
     if args.expiration_date.is_empty() {
         if !quiet {
             let date = Utc::now()
                 .checked_add_months(chrono::Months::new(18))
-                .map_or_else(|| panic!("Could not modify date"), |date| date.date_naive());
+                .ok_or_else(|| miette!("Could not modify date"))?
+                .date_naive();
 
-            args.expiration_date = ask_for_date("Expiration date:", date);
+            args.expiration_date = ask_for_date("Expiration date:", date)?;
         }
     } else {
         let expiration = args.expiration_date + "23:59:59";
         args.expiration_date = NaiveDateTime::parse_from_str(&expiration, "%Y-%m-%d %H:%M:%S")
-            .expect("Failed to parse expiration date")
+            .map_err(|e| miette!("Failed to parse expiration date: {e}"))?
             .and_utc()
             .timestamp()
             .to_string();
     }
 
-    args
+    Ok(args)
 }
 
 fn generate_passwords(random_count: usize) -> Vec<String> {
@@ -126,17 +124,18 @@ fn generate_passwords(random_count: usize) -> Vec<String> {
     passwords
 }
 
-pub fn get_password(prompt: &str) -> String {
+pub fn get_password(prompt: &str) -> Result<String> {
     let pairs: Vec<String> = generate_passwords(8);
-    Select::with_theme(&ColorfulTheme::default())
+    let choice = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose password (Press ESC to enter your own):")
         .default(0)
         .items(&pairs)
         .report(false)
         .max_length(10)
         .interact_opt()
-        .expect("Failed to select password")
-        .map_or_else(|| ask_for_password(prompt, true), |choice| pairs[choice].clone())
+        .map_err(|e| miette!("Failed to select password: {e}"))?;
+
+    choice.map_or_else(|| ask_for_password(prompt, true), |choice| Ok(pairs[choice].clone()))
 }
 
 #[cfg(test)]

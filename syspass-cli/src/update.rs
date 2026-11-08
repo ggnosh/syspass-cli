@@ -43,7 +43,7 @@ fn get_version() -> Result<Version<'static>> {
 }
 
 fn process_release(release: &GithubRelease, version: &Version) -> Result<()> {
-    if has_new_release(release, version) {
+    if has_new_release(release, version)? {
         let published = NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT)
             .map_err(|_| miette!(FAILED_TO_PARSE_DATETIME))?;
         warn!(
@@ -74,8 +74,11 @@ fn get_github_release(client: &Client, url: &str) -> Result<GithubRelease> {
         .map_or_else(|_| Err(miette!(COULD_NOT_PARSE_RELEASE_INFO)), Ok)
 }
 
-fn has_new_release(release: &GithubRelease, compare_to: &Version) -> bool {
-    *compare_to < Version::from(&release.tag_name).expect("Failed to get new version")
+fn has_new_release(release: &GithubRelease, compare_to: &Version) -> Result<bool> {
+    let release_version =
+        Version::from(&release.tag_name).ok_or_else(|| miette!("Invalid release tag: {}", release.tag_name))?;
+
+    Ok(*compare_to < release_version)
 }
 
 #[derive(Deserialize)]
@@ -127,22 +130,22 @@ mod tests {
         let test_version = Version::from("v0.2.0").expect("Failed to get current version");
 
         release.tag_name = "v0.1.0".to_string();
-        assert!(!has_new_release(&release, &test_version));
+        assert!(!has_new_release(&release, &test_version).unwrap());
 
         release.tag_name = "v0.1.1".to_string();
-        assert!(!has_new_release(&release, &test_version));
+        assert!(!has_new_release(&release, &test_version).unwrap());
 
         release.tag_name = "v0.2.0".to_string();
-        assert!(!has_new_release(&release, &test_version));
+        assert!(!has_new_release(&release, &test_version).unwrap());
 
         release.tag_name = "v1.1.0".to_string();
-        assert!(has_new_release(&release, &test_version));
+        assert!(has_new_release(&release, &test_version).unwrap());
 
         release.tag_name = "v2.1.1".to_string();
-        assert!(has_new_release(&release, &test_version));
+        assert!(has_new_release(&release, &test_version).unwrap());
 
         release.tag_name = "v0.2.3".to_string();
-        assert!(has_new_release(&release, &test_version));
+        assert!(has_new_release(&release, &test_version).unwrap());
 
         let published =
             NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT).expect(FAILED_TO_PARSE_DATETIME);
@@ -242,7 +245,7 @@ mod tests {
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 
-        assert!(!has_new_release(&release, &version));
+        assert!(!has_new_release(&release, &version).unwrap());
     }
 
     #[test]
@@ -255,6 +258,6 @@ mod tests {
             published_at: "2023-08-07T15:10:28Z".to_string(),
         };
 
-        assert!(has_new_release(&release, &version));
+        assert!(has_new_release(&release, &version).unwrap());
     }
 }

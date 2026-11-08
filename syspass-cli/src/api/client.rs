@@ -91,8 +91,8 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32
             || loop {
                 let new_client = Client {
                     id: None,
-                    name: ask_prompt("Name:", true, ""),
-                    description: Some(ask_prompt("Description:", false, "")),
+                    name: ask_prompt("Name:", true, "")?,
+                    description: Some(ask_prompt("Description:", false, "")?),
                     is_global: matches.get_one::<usize>("global").map_or_else(
                         || usize::from(Confirm::new().with_prompt("Global:").interact().unwrap_or(false)),
                         std::borrow::ToOwned::to_owned,

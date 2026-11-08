@@ -54,7 +54,7 @@ fn edit_category(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, qu
             .map_err(|e| miette!("{e}: Failed to retrieve category"))?
     };
 
-    update_category_fields(matches, &mut category, quiet);
+    update_category_fields(matches, &mut category, quiet)?;
 
     info!("Trying to edit category");
 
@@ -71,16 +71,21 @@ fn edit_category(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, qu
         })
 }
 
-fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: bool) {
-    category.set_name(get_match_string(matches, quiet, "name", "Name: ", category.name(), true).as_ref());
-    category.set_description(Some(get_match_string(
+fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: bool) -> Result<()> {
+    let name = get_match_string(matches, quiet, "name", "Name: ", category.name(), true)?;
+    category.set_name(&name);
+
+    let description = get_match_string(
         matches,
         quiet,
         "description",
         "Description: ",
         category.description().unwrap_or_default(),
         false,
-    )));
+    )?;
+    category.set_description(Some(description));
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -106,7 +111,7 @@ mod tests {
             .expect("Failure");
 
         let mut category = Category::default();
-        update_category_fields(&matches, &mut category, false);
+        update_category_fields(&matches, &mut category, false).expect("Failed to update category fields");
 
         assert_eq!(category.name(), "New Category");
         assert_eq!(

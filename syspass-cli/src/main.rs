@@ -117,10 +117,15 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let config = Config::from(&matches);
-    let api_client = Api::from_str(config.api_version.as_deref().unwrap_or(""))
-        .unwrap_or_else(|()| panic!("No such API is supported"))
-        .get(config);
+    let config = match Config::from_matches(&matches) {
+        Ok(config) => config,
+        Err(e) => return print_error(&e),
+    };
+
+    let Ok(api) = Api::from_str(config.api_version.as_deref().unwrap_or("")) else {
+        return print_error(&miette!("No such API is supported"));
+    };
+    let api_client = api.get(config);
 
     set_terminal_size();
 
@@ -136,17 +141,16 @@ fn main() -> ExitCode {
             Err(miette!(CommandError::NotFound))
         }
     }
-    .map_or_else(
-        |e| {
-            error!(
-                "{} {}",
-                "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
-                e
-            );
-            ExitCode::FAILURE
-        },
-        |_| ExitCode::SUCCESS,
-    )
+    .map_or_else(|e| print_error(&e), |_| ExitCode::SUCCESS)
+}
+
+fn print_error(e: &dyn std::fmt::Display) -> ExitCode {
+    error!(
+        "{} {}",
+        "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
+        e
+    );
+    ExitCode::FAILURE
 }
 
 #[derive(Debug)]

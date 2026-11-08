@@ -15,7 +15,7 @@ use std::sync::LazyLock;
 pub mod v2;
 pub mod v3;
 
-static PASSWORD: LazyLock<String> = LazyLock::new(|| ask_for_password("API password: ", false));
+static PASSWORD: LazyLock<miette::Result<String>> = LazyLock::new(|| ask_for_password("API password: ", false));
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
 
@@ -68,19 +68,22 @@ pub struct Syspass {
 }
 
 impl Syspass {
-    fn get_params(&self, args: RequestArguments, needs_password: bool) -> HashMap<String, String> {
+    fn get_params(
+        &self,
+        args: RequestArguments,
+        needs_password: bool,
+    ) -> miette::Result<HashMap<String, String>, api::ApiError> {
         let mut params = HashMap::with_capacity(args.as_ref().map_or(1, |a| a.len() + 1));
         params.insert("authToken".to_owned(), self.config.token.clone());
 
         if needs_password {
-            params.insert(
-                "tokenPass".to_owned(),
-                if self.config.password.is_empty() {
-                    PASSWORD.to_string()
-                } else {
-                    self.config.password.clone()
-                },
-            );
+            let password = if self.config.password.is_empty() {
+                (*PASSWORD).as_ref().map_err(|e| api::ApiError::Other(e.to_string()))?.clone()
+            } else {
+                self.config.password.clone()
+            };
+
+            params.insert("tokenPass".to_owned(), password);
         }
 
         if let Some(args) = args {
@@ -91,7 +94,7 @@ impl Syspass {
             );
         }
 
-        params
+        Ok(params)
     }
 
     fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> miette::Result<T, api::ApiError> {
@@ -168,7 +171,9 @@ mod tests {
             },
         };
 
-        let params = syspass.get_params(Some(vec![("id", "some id".to_owned())]), false);
+        let params = syspass
+            .get_params(Some(vec![("id", "some id".to_owned())]), false)
+            .expect("Failed to get params");
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 
@@ -179,7 +184,9 @@ mod tests {
 
         assert_eq!(None, params.get("tokenPass"));
 
-        let params = syspass.get_params(Some(vec![("id", "some id".to_owned())]), true);
+        let params = syspass
+            .get_params(Some(vec![("id", "some id".to_owned())]), true)
+            .expect("Failed to get params");
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
 

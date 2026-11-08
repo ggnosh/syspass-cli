@@ -44,7 +44,7 @@ impl Syspass {
         let req = JsonReq {
             jsonrpc: "2.0".to_string(),
             method: method.to_string(),
-            params: self.syspass.get_params(args, needs_password),
+            params: self.syspass.get_params(args, needs_password)?,
             id: self.syspass.request_number.get(),
         };
 

@@ -24,12 +24,12 @@ impl Category {
         Self { id, name, description }
     }
 
-    pub fn new_from_asking() -> Self {
-        Self::new(
+    pub fn new_from_asking() -> Result<Self> {
+        Ok(Self::new(
             None,
-            ask_prompt("Category name", true, ""),
-            Some(ask_prompt("Category description", false, "")),
-        )
+            ask_prompt("Category name", true, "")?,
+            Some(ask_prompt("Category description", false, "")?),
+        ))
     }
 
     pub const fn name(&self) -> &str {
@@ -86,7 +86,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
         .map_or_else(
             || {
                 loop {
-                    let new_category = Category::new_from_asking();
+                    let new_category = Category::new_from_asking()?;
 
                     match save_category(new_category, api_client) {
                         Ok(id) => break Ok(id),

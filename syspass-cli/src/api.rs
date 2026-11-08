@@ -64,6 +64,8 @@ pub enum ApiError {
     NotFound(String),
     #[error("Did not find any {0}")]
     NoResults(String),
+    #[error("{0}")]
+    Other(String),
 }
 
 impl From<ApiError> for miette::Error {

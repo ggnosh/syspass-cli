@@ -1,14 +1,15 @@
 use chrono::{NaiveDate, NaiveTime};
 use clap::ArgMatches;
 use dialoguer::{Input, Password, theme::ColorfulTheme};
+use miette::{Result, miette};
 
-pub fn ask_prompt(text: &str, required: bool, default: &str) -> String {
+pub fn ask_prompt(text: &str, required: bool, default: &str) -> Result<String> {
     Input::with_theme(&ColorfulTheme::default())
         .with_prompt(text)
         .allow_empty(!required)
         .with_initial_text(default.to_string())
         .interact_text()
-        .expect("Failed to get input")
+        .map_err(|e| miette!("Failed to get input: {e}"))
 }
 
 pub fn get_match_string(
@@ -18,22 +19,20 @@ pub fn get_match_string(
     prompt_text: &str,
     default: &str,
     required: bool,
-) -> String {
-    matches
-        .get_one::<String>(match_id)
-        .filter(|desc| !desc.is_empty() || quiet)
-        .cloned()
-        .unwrap_or_else(|| {
-            if quiet {
-                default.to_owned()
-            } else {
-                ask_prompt(prompt_text, required, default)
-            }
-        })
+) -> Result<String> {
+    if let Some(value) = matches.get_one::<String>(match_id).filter(|desc| !desc.is_empty() || quiet) {
+        return Ok(value.clone());
+    }
+
+    if quiet {
+        Ok(default.to_owned())
+    } else {
+        ask_prompt(prompt_text, required, default)
+    }
 }
 
-pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
-    Input::with_theme(&ColorfulTheme::default())
+pub fn ask_for_date(prompt: &str, date: NaiveDate) -> Result<String> {
+    let input = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(prompt)
         .with_initial_text(date.format("%Y-%m-%d").to_string())
         .validate_with(|input: &String| {
@@ -44,13 +43,18 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> String {
             }
         })
         .interact_text()
-        .unwrap_or_default()
-        .parse::<NaiveDate>()
+        .map_err(|e| miette!("Failed to get input: {e}"))?;
+
+    if input.is_empty() {
+        return Ok(String::new());
+    }
+
+    NaiveDate::parse_from_str(&input, "%Y-%m-%d")
         .map(|date| date.and_time(NaiveTime::MIN).and_utc().timestamp().to_string())
-        .unwrap_or_default()
+        .map_err(|e| miette!("Failed to parse date: {e}"))
 }
 
-pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
+pub fn ask_for_password(prompt: &str, confirm: bool) -> Result<String> {
     let theme = ColorfulTheme::default();
     let mut password =
         Password::with_theme(&theme)
@@ -67,7 +71,7 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> String {
         password = password.with_confirmation("Repeat password", "Passwords don't match.");
     }
 
-    password.interact().expect("Failed to get password")
+    password.interact().map_err(|e| miette!("Failed to get password: {e}"))
 }
 
 #[cfg(test)]
@@ -80,7 +84,8 @@ mod tests {
             .arg(clap::arg!(--"name" <NAME> "Name argument"))
             .get_matches_from(vec!["test"]);
 
-        let result = get_match_string(&matches, true, "name", "Enter name:", "default", false);
+        let result = get_match_string(&matches, true, "name", "Enter name:", "default", false)
+            .expect("Failed to get match string");
         assert_eq!(result, "default", "Should return the default value");
     }
 }

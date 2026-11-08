@@ -1,5 +1,5 @@
 use clap::ArgMatches;
-use miette::Result;
+use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -28,21 +28,23 @@ pub struct Config {
     pub no_clipboard: bool,
 }
 
-fn get_config_path(file: &str, dir: Option<&str>) -> OsString {
-    let mut path = dir.map_or_else(
-        || home::home_dir().expect("Unable to get home directory").into_os_string(),
-        OsString::from,
-    );
+fn get_config_path(file: &str, dir: Option<&str>) -> Result<OsString> {
+    let mut path = match dir {
+        Some(dir) => OsString::from(dir),
+        None => home::home_dir()
+            .ok_or_else(|| miette!("Unable to get home directory"))?
+            .into_os_string(),
+    };
 
     path.push(DEFAULT_CONFIG_DIR.to_owned() + file);
-    path
+    Ok(path)
 }
 
 fn get_config_file_or_write<T>(file: &str, dir: Option<&str>, value: T) -> Result<String>
 where
     T: Serialize,
 {
-    let path = get_config_path(file, dir);
+    let path = get_config_path(file, dir)?;
     fs::read_to_string(&path).or_else(|error| {
         if error.kind() == ErrorKind::NotFound {
             let data = serde_json::to_string(&value).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
@@ -57,17 +59,18 @@ where
     })
 }
 
-impl From<&ArgMatches> for Config {
-    fn from(value: &ArgMatches) -> Self {
+impl Config {
+    pub fn from_matches(value: &ArgMatches) -> Result<Self> {
         let config_file = value.get_one::<String>(CONFIG).unwrap_or(&String::new()).to_owned();
 
         let data = if config_file.is_empty() {
-            get_config_file_or_write("config.json", None, Self::default()).expect("Failed to get or write config file")
+            get_config_file_or_write("config.json", None, Self::default())?
         } else {
-            fs::read_to_string(shellexpand::tilde(&config_file).to_string()).expect("Unable to read file")
+            fs::read_to_string(shellexpand::tilde(&config_file).to_string())
+                .map_err(|e| miette!("Unable to read config file: {}", e))?
         };
 
-        serde_json::from_str(&data).expect("JSON does not have correct format.")
+        serde_json::from_str(&data).map_err(|e| miette!("JSON does not have correct format: {}", e))
     }
 }
 
@@ -84,7 +87,7 @@ impl Config {
         *usage.entry(id).or_insert(0) += 1;
 
         fs::write(
-            get_config_path("usage.json", dir),
+            get_config_path("usage.json", dir).expect("Failed to get config path"),
             serde_json::to_string(&usage).expect("Serialization failed") + "\n",
         )
         .expect("Unable to write file");
@@ -126,7 +129,7 @@ mod tests {
     fn test_get_config_path() {
         let temp = create_temp_dir();
         let temp_str = temp.to_str();
-        let path = get_config_path("config.json", temp_str);
+        let path = get_config_path("config.json", temp_str).expect("Failed to get config path");
         assert_eq!(
             temp_str.expect("Failed to get path").to_string() + "/.syspass/config.json",
             path.to_str().expect("Failed to convert path")
