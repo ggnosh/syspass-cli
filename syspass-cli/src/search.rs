@@ -154,8 +154,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
 
     let account: ViewPassword = {
         if accounts.len() > 1 {
-            select_account(&accounts, api_client, matches.get_flag("disable-usage"))
-                .map_err(|error| miette!("Error while selecting account: {error}"))?
+            select_account(&accounts, api_client).map_err(|error| miette!("Error while selecting account: {error}"))?
         } else {
             let account = accounts
                 .first()
@@ -166,6 +165,8 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
                 .map_err(|error| miette!("Error while fetching password: {error}"))?
         }
     };
+
+    maybe_record_usage(account.account.id(), matches.get_flag("disable-usage"), None);
 
     if !show {
         set_clipboard_text(&account.password)?;
@@ -231,7 +232,7 @@ fn open_shell(account: &Account) -> Result<()> {
     Ok(())
 }
 
-fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: bool) -> Result<ViewPassword> {
+fn select_account(accounts: &[Account], api_client: &dyn Client) -> Result<ViewPassword> {
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right account:")
         .default(0)
@@ -239,14 +240,21 @@ fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: 
         .items(accounts)
         .interact()
         .map_err(|err| miette!(err))
-        .and_then(|choice| {
-            if !disable_usage
-                && let Err(e) = Config::record_usage(*accounts[choice].id().expect("Id should be set"), None)
-            {
-                warn!("Could not record usage: {e}");
-            }
-            api_client.get_password(&accounts[choice]).map_err(|err| miette!(err))
-        })
+        .and_then(|choice| api_client.get_password(&accounts[choice]).map_err(|err| miette!(err)))
+}
+
+fn maybe_record_usage(id: Option<&u32>, disable_usage: bool, dir: Option<&str>) {
+    if disable_usage {
+        return;
+    }
+
+    let Some(id) = id else {
+        return;
+    };
+
+    if let Err(e) = Config::record_usage(*id, dir) {
+        warn!("Could not record usage: {e}");
+    }
 }
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
@@ -299,7 +307,9 @@ mod tests {
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::search::{clear_clipboard, open_shell, print_table_for_account, set_clipboard_text};
+    use crate::config::Config;
+    use crate::search::{clear_clipboard, maybe_record_usage, open_shell, print_table_for_account, set_clipboard_text};
+    use tempfile::tempdir;
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
@@ -333,6 +343,39 @@ mod tests {
         );
 
         assert!(open_shell(&account).is_err());
+    }
+
+    #[test]
+    fn test_maybe_record_usage_records_account_id() {
+        let temp = tempdir().expect("Failed to create temp dir");
+        let dir = temp.path().to_str().expect("Failed to get path");
+
+        maybe_record_usage(Some(&1), false, Some(dir));
+
+        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
+        assert_eq!(usage.get(&1), Some(&1));
+    }
+
+    #[test]
+    fn test_maybe_record_usage_skips_when_disabled() {
+        let temp = tempdir().expect("Failed to create temp dir");
+        let dir = temp.path().to_str().expect("Failed to get path");
+
+        maybe_record_usage(Some(&2), true, Some(dir));
+
+        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
+        assert_eq!(usage.get(&2), None);
+    }
+
+    #[test]
+    fn test_maybe_record_usage_skips_account_without_id() {
+        let temp = tempdir().expect("Failed to create temp dir");
+        let dir = temp.path().to_str().expect("Failed to get path");
+
+        maybe_record_usage(None, false, Some(dir));
+
+        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
+        assert!(usage.is_empty());
     }
 
     #[test]
