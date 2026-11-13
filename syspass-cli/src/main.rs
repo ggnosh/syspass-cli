@@ -5,7 +5,6 @@ use std::io::Write;
 use std::process::ExitCode;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clap::{
     ArgAction, ArgMatches, Command, ValueHint, arg, crate_description, crate_name, crate_version, value_parser,
@@ -14,13 +13,13 @@ use clap_complete::aot::{Generator, Shell, generate};
 use log::{LevelFilter, error, warn};
 use miette::miette;
 use owo_colors::{OwoColorize, Stream::Stdout};
-use terminal_size::{Width, terminal_size};
 
 use crate::usage::{FileUsageStore, UsageStore};
 use crate::{api::Api, config::Config};
 
 mod api;
 mod config;
+mod display;
 mod edit;
 mod helper;
 mod prompt;
@@ -49,14 +48,6 @@ impl log::Log for SimpleLogger {
 }
 
 static LOGGER: SimpleLogger = SimpleLogger;
-static TERMINAL_WIDTH: AtomicUsize = AtomicUsize::new(80);
-
-#[inline]
-fn set_terminal_size() {
-    if let Some((Width(w), _)) = terminal_size() {
-        TERMINAL_WIDTH.store(w as usize, Ordering::Relaxed);
-    }
-}
 
 #[allow(clippy::cognitive_complexity)]
 fn get_command() -> Command {
@@ -148,12 +139,13 @@ fn main() -> ExitCode {
     };
 
     let api_client = api.get(config.clone(), usage.clone());
-
-    set_terminal_size();
+    let size = display::TerminalSize;
 
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client, &config, &*usage).map(|_| 0),
-        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client).map(|()| 0),
+        Some((search::COMMAND_NAME, matches)) => {
+            search::command(matches, &*api_client, &config, &*usage, &size).map(|_| 0)
+        }
+        Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client, &size).map(|()| 0),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, &*api_client).map(|()| 0),
         Some((update::COMMAND_NAME, matches)) => update::command(matches).map(|()| 0),

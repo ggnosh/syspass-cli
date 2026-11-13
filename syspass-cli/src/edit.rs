@@ -2,6 +2,7 @@ use miette::{Result, miette};
 
 use clap::{ArgMatches, Command};
 
+use crate::display::SizeSource;
 use crate::{CommandError, api::Client};
 
 mod category;
@@ -28,10 +29,10 @@ pub fn command_helper_edit() -> Command {
 
 #[allow(clippy::module_name_repetitions)]
 #[inline]
-pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
+pub fn command_edit(matches: &ArgMatches, api_client: &dyn Client, size: &dyn SizeSource) -> Result<()> {
     let (subcommand, sub_arguments) = matches.subcommand().ok_or_else(|| miette!(CommandError::NotFound))?;
     match subcommand {
-        edit_password::COMMAND_NAME => edit_password::command(sub_arguments, api_client).map(|_| ()),
+        edit_password::COMMAND_NAME => edit_password::command(sub_arguments, api_client, size).map(|_| ()),
         category::COMMAND_NAME => category::command(sub_arguments, api_client, false).map(|_| ()),
         client::COMMAND_NAME => client::command(sub_arguments, api_client, false).map(|_| ()),
         _ => Err(miette!(CommandError::NotFound)),

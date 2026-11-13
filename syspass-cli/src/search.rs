@@ -8,23 +8,17 @@ use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
 use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::warn;
 use miette::{Result, miette};
-use owo_colors::{OwoColorize, Stream::Stdout};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::fmt::Write;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
-use std::{cmp, env, process, thread};
-use term_table::row::Row;
-use term_table::table_cell::{Alignment, TableCell};
-use term_table::{Table, TableStyle};
+use std::{env, process, thread};
 
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::{AccountSearchParams, Client};
+use crate::api::{self, AccountSearchParams, Client};
 use crate::config::Config;
+use crate::display::{self, SizeSource};
 use crate::usage::UsageStore;
-use crate::{TERMINAL_WIDTH, api};
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -157,6 +151,7 @@ pub fn command(
     api_client: &dyn Client,
     config: &Config,
     usage: &dyn UsageStore,
+    size: &dyn SizeSource,
 ) -> Result<Option<ViewPassword>> {
     let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
@@ -186,7 +181,8 @@ pub fn command(
 
     let account: ViewPassword = {
         if accounts.len() > 1 {
-            select_account(&accounts, api_client).map_err(|error| miette!("Error while selecting account: {error}"))?
+            select_account(&accounts, api_client, size)
+                .map_err(|error| miette!("Error while selecting account: {error}"))?
         } else {
             let account = accounts
                 .first()
@@ -233,7 +229,7 @@ pub fn command(
         }
     }
 
-    warn!("{}", print_table_for_account(&account, show));
+    warn!("{}", display::table(&account, show, size));
 
     if !config.no_shell && !matches.get_flag("no-shell") && account.account.url().unwrap_or_default().contains("ssh://")
     {
@@ -266,12 +262,14 @@ fn open_shell(account: &Account) -> Result<()> {
     Ok(())
 }
 
-fn select_account(accounts: &[Account], api_client: &dyn Client) -> Result<ViewPassword> {
+fn select_account(accounts: &[Account], api_client: &dyn Client, size: &dyn SizeSource) -> Result<ViewPassword> {
+    let lines: Vec<String> = accounts.iter().map(|account| display::line(account, size)).collect();
+
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right account:")
         .default(0)
         .max_length(10)
-        .items(accounts)
+        .items(&lines)
         .interact()
         .map_err(|err| miette!(err))
         .and_then(|choice| api_client.get_password(&accounts[choice]).map_err(|err| miette!(err)))
@@ -283,51 +281,6 @@ fn maybe_record_usage(usage: &dyn UsageStore, id: Option<&u32>, disable_usage: b
     }
 
     usage.record(id);
-}
-
-fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
-    let mut table = Table::new();
-    let width = TERMINAL_WIDTH.load(Ordering::Relaxed);
-
-    table.max_column_widths = HashMap::from([
-        (0, width * 7 / 100),
-        (1, width * 29 / 100),
-        (2, cmp::max(width * 30 / 100, width - (width * 69 / 100))),
-        (3, width * 29 / 100),
-    ]);
-    table.style = TableStyle::rounded();
-
-    let cells = vec![
-        TableCell::new("Id".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Username".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Password".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Address".if_supports_color(Stdout, |text| text.green())),
-    ];
-
-    table.add_row(Row::new(vec![
-        TableCell::builder(data.account.name())
-            .alignment(Alignment::Center)
-            .col_span(cells.len())
-            .build(),
-    ]));
-
-    table.add_row(Row::new(vec![
-        TableCell::builder(data.account.client_name().unwrap_or(""))
-            .alignment(Alignment::Center)
-            .col_span(cells.len())
-            .build(),
-    ]));
-
-    table.add_row(Row::new(cells));
-
-    table.add_row(Row::new(vec![
-        TableCell::new(data.account.display_id()),
-        TableCell::new(data.account.login()),
-        TableCell::new(if show { &data.password } else { "Copied to clipboard" }),
-        TableCell::new(data.account.url().unwrap_or_default()),
-    ]));
-
-    table.render()
 }
 
 fn should_clear(expected_hash: &str, actual: Option<&str>) -> bool {
@@ -351,10 +304,9 @@ mod tests {
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::api::entity::Entity;
+    use crate::display::{FixedWidth, table};
     use crate::search::{
-        clear_clipboard, maybe_record_usage, open_shell, print_table_for_account, set_clipboard_text, sha256_hex,
-        should_clear,
+        clear_clipboard, maybe_record_usage, open_shell, set_clipboard_text, sha256_hex, should_clear,
     };
     use crate::usage::{MemoryUsageStore, UsageStore};
 
@@ -452,9 +404,9 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_with_password() {
+    fn test_table_shows_the_password_when_asked() {
         let account = get_test_account_data();
-        let output = print_table_for_account(&account, true);
+        let output = table(&account, true, &FixedWidth(80));
 
         assert!(output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
@@ -462,27 +414,13 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_without_password() {
+    fn test_table_hides_the_password_when_not_asked() {
         let account = get_test_account_data();
-        let output = print_table_for_account(&account, false);
+        let output = table(&account, false, &FixedWidth(80));
 
         assert!(!output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
         assert!(output.contains(account.account.url().unwrap_or_default()));
-    }
-
-    #[test]
-    fn test_print_table_for_account_without_id_does_not_panic() {
-        let account = ViewPassword {
-            account: Account::new(None, "Test".to_owned(), "test".to_owned(), None, None, 4, 5, None, None),
-            password: "<PASSWORD>".to_owned(),
-        };
-
-        assert_eq!(account.account.display_id(), "-");
-
-        let output = print_table_for_account(&account, true);
-
-        assert!(output.contains('-'), "the id cell degrades instead of panicking");
     }
 
     #[test]

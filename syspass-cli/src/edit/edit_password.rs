@@ -1,6 +1,7 @@
 use miette::{Result, miette};
 
 use crate::api::account::{Account, ChangePassword};
+use crate::display::{self, SizeSource};
 use crate::prompt::{ask_for_date, ask_for_password};
 use chrono::{NaiveDate, NaiveTime, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
@@ -53,7 +54,7 @@ pub fn command_helper() -> Command {
 }
 
 #[inline]
-pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Result<Account> {
+pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, size: &dyn SizeSource) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
     let args: ChangeAccountArgs = get_args(matches, quiet)?;
 
@@ -74,7 +75,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Res
             warn!(
                 "{} Password changed for account {}",
                 "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                format!("{account}").if_supports_color(Stdout, |text| text.green())
+                display::line(&account, size).if_supports_color(Stdout, |text| text.green())
             );
 
             Ok(account)
