@@ -22,6 +22,7 @@ use term_table::{Table, TableStyle};
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AccountSearchParams, Client};
+use crate::config::Config;
 use crate::usage::UsageStore;
 use crate::{TERMINAL_WIDTH, api};
 
@@ -151,12 +152,16 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
 }
 
 #[inline]
-pub fn command(matches: &ArgMatches, api_client: &dyn Client, usage: &dyn UsageStore) -> Result<Option<ViewPassword>> {
+pub fn command(
+    matches: &ArgMatches,
+    api_client: &dyn Client,
+    config: &Config,
+    usage: &dyn UsageStore,
+) -> Result<Option<ViewPassword>> {
     let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
     let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
     let category = matches.get_one::<u32>("category").copied().unwrap_or(0);
-    let config = api_client.get_config();
     let show = matches.get_flag("show-password") || config.no_clipboard;
 
     let accounts = if id > 0 {

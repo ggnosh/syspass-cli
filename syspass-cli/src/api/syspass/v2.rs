@@ -161,7 +161,9 @@ impl Syspass {
 
     fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::ApiError> {
         if id.is_some_and(|new_id| *new_id > 0) {
-            return Err(api::ApiError::NotSupported);
+            return Err(api::ApiError::NotSupported {
+                operation: "Updating an existing entity",
+            });
         }
 
         self.forge_and_send(path, args, true).and_then(|result| match result {
@@ -381,7 +383,9 @@ impl api::Client for Syspass {
     }
 
     fn change_password(&self, _password: &ChangePassword) -> Result<api::account::Account, api::ApiError> {
-        Err(api::ApiError::NotSupported)
+        Err(api::ApiError::NotSupported {
+            operation: "Changing a password",
+        })
     }
 
     fn delete_client(&self, id: u32) -> Result<bool, api::ApiError> {
@@ -407,15 +411,15 @@ impl api::Client for Syspass {
     }
 
     fn get_category(&self, _id: u32) -> Result<api::category::Category, api::ApiError> {
-        Err(api::ApiError::NotSupported)
+        Err(api::ApiError::NotSupported {
+            operation: "Fetching a single category",
+        })
     }
 
     fn get_client(&self, _id: u32) -> Result<api::client::Client, api::ApiError> {
-        Err(api::ApiError::NotSupported)
-    }
-
-    fn get_config(&self) -> &Config {
-        &self.syspass.config
+        Err(api::ApiError::NotSupported {
+            operation: "Fetching a single client",
+        })
     }
 }
 
@@ -584,7 +588,24 @@ mod tests {
         assert!(
             client
                 .change_password(&change)
-                .is_err_and(|error| matches!(error, api::ApiError::NotSupported))
+                .is_err_and(|error| matches!(error, api::ApiError::NotSupported { .. }))
+        );
+    }
+
+    #[test]
+    fn test_not_supported_names_the_operation() {
+        let client = get_test_client(String::new());
+        let change = ChangePassword {
+            id: 1,
+            pass: "<NEW PASSWORD>".to_owned(),
+            expire_date: 1_689_091_943,
+        };
+
+        let error = client.change_password(&change).expect_err("v2 cannot change a password");
+
+        assert_eq!(
+            error.to_string(),
+            "Changing a password is not supported by this version of the API"
         );
     }
 
@@ -762,13 +783,21 @@ mod tests {
     #[test]
     fn test_get_client() {
         let client = get_test_client(String::new());
-        assert!(client.get_client(1).is_err_and(|e| matches!(e, api::ApiError::NotSupported)));
+        assert!(
+            client
+                .get_client(1)
+                .is_err_and(|e| matches!(e, api::ApiError::NotSupported { .. }))
+        );
     }
 
     #[test]
     fn test_get_category() {
         let client = get_test_client(String::new());
-        assert!(client.get_client(1).is_err_and(|e| matches!(e, api::ApiError::NotSupported)));
+        assert!(
+            client
+                .get_category(1)
+                .is_err_and(|e| matches!(e, api::ApiError::NotSupported { .. }))
+        );
     }
 
     #[test]

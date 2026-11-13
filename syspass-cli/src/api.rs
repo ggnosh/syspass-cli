@@ -41,7 +41,6 @@ pub trait Client {
     fn view_account(&self, id: u32) -> Result<Account, ApiError>;
     fn get_category(&self, id: u32) -> Result<Category, ApiError>;
     fn get_client(&self, id: u32) -> Result<SyspassClient, ApiError>;
-    fn get_config(&self) -> &Config;
 }
 
 #[derive(Debug, Error)]
@@ -58,8 +57,8 @@ pub enum ApiError {
     ParseError(String),
     #[error("No password set")]
     NoPassword,
-    #[error("Not supported by this version of the API")]
-    NotSupported,
+    #[error("{operation} is not supported by this version of the API")]
+    NotSupported { operation: &'static str },
     #[error("Saving failed")]
     SavingFailed,
     #[error("{0} does not exist")]

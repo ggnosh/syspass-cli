@@ -12,7 +12,7 @@ const CONFIG: &str = "config";
 const CONFIG_FILE: &str = "config.json";
 const DEFAULT_CONFIG_DIR: &str = "/.syspass/";
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub host: String,
