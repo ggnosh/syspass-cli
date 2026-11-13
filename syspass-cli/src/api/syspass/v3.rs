@@ -248,10 +248,6 @@ impl api::Client for Syspass {
                 serde_json::from_value(result.result).map_err(|e| api::ApiError::ParseError(e.to_string()))
             })
     }
-
-    fn get_config(&self) -> &Config {
-        &self.syspass.config
-    }
 }
 
 #[cfg(test)]
@@ -364,21 +360,6 @@ mod tests {
         );
 
         mock.assert();
-    }
-
-    #[test]
-    fn test_set_and_get_config() {
-        let syspass = create_test_client();
-        let config = syspass.get_config();
-
-        assert_eq!("http://localhost:1/api.php", config.host);
-        assert_eq!("1234", config.token);
-        assert_eq!("<PASSWORD>", config.password);
-        assert!(!config.verify_host);
-        assert!(config.password_timeout.is_none());
-        assert!(!config.no_clipboard);
-        assert!(!config.no_shell);
-        assert_eq!("SyspassV3", config.api_version.clone().expect("Failed to get version"));
     }
 
     #[test]

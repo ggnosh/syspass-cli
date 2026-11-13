@@ -147,12 +147,12 @@ fn main() -> ExitCode {
         Err(e) => return print_error(&e),
     };
 
-    let api_client = api.get(config, usage.clone());
+    let api_client = api.get(config.clone(), usage.clone());
 
     set_terminal_size();
 
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client, &*usage).map(|_| 0),
+        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client, &config, &*usage).map(|_| 0),
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client).map(|()| 0),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, &*api_client).map(|()| 0),
