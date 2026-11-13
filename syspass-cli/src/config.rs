@@ -3,7 +3,6 @@ use clap::ArgMatches;
 use log::warn;
 use miette::{Result, miette};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind;
@@ -50,7 +49,7 @@ impl Default for Config {
     }
 }
 
-fn get_config_path(file: &str, dir: Option<&str>) -> Result<OsString> {
+pub fn get_config_path(file: &str, dir: Option<&str>) -> Result<OsString> {
     let mut path = match dir {
         Some(dir) => OsString::from(dir),
         None => home::home_dir()
@@ -67,30 +66,42 @@ where
     T: Serialize,
 {
     let path_os = get_config_path(file, dir)?;
-    let path = Path::new(&path_os);
 
+    read_or_write_json(Path::new(&path_os), &value)
+}
+
+pub fn read_or_write_json<T: Serialize>(path: &Path, default: &T) -> Result<String> {
     match fs::read_to_string(path) {
         Ok(data) => {
-            if file == CONFIG_FILE {
-                warn_on_loose_permissions(path);
-            }
+            warn_on_loose_permissions(path);
 
             Ok(data)
         }
         Err(error) if error.kind() == ErrorKind::NotFound => {
-            let data = serde_json::to_string(&value).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
+            let data = serde_json::to_string(default).map_err(|e| miette::miette!("Serialization failed: {}", e))?;
 
-            if let Some(parent) = path.parent() {
-                create_private_dir(parent)?;
-            }
-
-            fs::write(path, &data).map_err(|e| miette::miette!("Failed to write data: {}", e))?;
-            set_private_permissions(path)?;
+            write_json(path, default)?;
 
             Ok(data)
         }
         Err(error) => Err(miette::miette!("Couldn't read config file: {}", error)),
     }
+}
+
+pub fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        create_private_dir(parent)?;
+    }
+
+    fs::write(
+        path,
+        serde_json::to_string(value).map_err(|e| miette::miette!("Serialization failed: {}", e))? + "\n",
+    )
+    .map_err(|e| miette::miette!("Unable to write file: {}", e))?;
+
+    set_private_permissions(path)?;
+
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -124,7 +135,7 @@ fn warn_on_loose_permissions(path: &Path) {
 
     if mode & 0o077 != 0 {
         warn!(
-            "Config file {} is readable by group or others (mode {:o}). Run chmod 600 on it.",
+            "File {} is readable by group or others (mode {:o}). Run chmod 600 on it.",
             path.display(),
             mode & 0o777
         );
@@ -149,34 +160,13 @@ impl Config {
         let config_file = value.get_one::<String>(CONFIG).unwrap_or(&String::new()).to_owned();
 
         let data = if config_file.is_empty() {
-            get_config_file_or_write("config.json", None, Self::default())?
+            get_config_file_or_write(CONFIG_FILE, None, Self::default())?
         } else {
             fs::read_to_string(shellexpand::tilde(&config_file).to_string())
                 .map_err(|e| miette!("Unable to read config file: {}", e))?
         };
 
         serde_json::from_str(&data).map_err(|e| miette!("JSON does not have correct format: {}", e))
-    }
-}
-
-impl Config {
-    pub fn get_usage_data(dir: Option<&str>) -> Result<HashMap<u32, u32>> {
-        let data = get_config_file_or_write("usage.json", dir, HashMap::<u32, u32>::new())?;
-
-        serde_json::from_str::<HashMap<u32, u32>>(&data).map_err(|e| miette!("Failed to read usage data: {e}"))
-    }
-
-    pub fn record_usage(id: u32, dir: Option<&str>) -> Result<()> {
-        let mut usage = Self::get_usage_data(dir)?;
-        *usage.entry(id).or_insert(0) += 1;
-
-        fs::write(
-            get_config_path("usage.json", dir)?,
-            serde_json::to_string(&usage).map_err(|e| miette!("Serialization failed: {e}"))? + "\n",
-        )
-        .map_err(|e| miette!("Unable to write file: {e}"))?;
-
-        Ok(())
     }
 }
 
@@ -257,41 +247,6 @@ mod tests {
             temp_str.expect("Failed to get path").to_string() + "/.syspass/config.json",
             path.to_str().expect("Failed to convert path")
         );
-
-        cleanup_temp_dir(temp_str);
-    }
-
-    #[test]
-    fn test_record_usage() {
-        let temp = create_temp_dir();
-        let temp_str = temp.to_str();
-
-        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
-        assert_eq!(usage.get(&31337), None);
-
-        Config::record_usage(31337, temp_str).expect("Failed to record usage");
-        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
-        assert_eq!(usage.get(&31337), Some(&1));
-
-        Config::record_usage(31337, temp_str).expect("Failed to record usage");
-        let usage = Config::get_usage_data(temp_str).expect("Failed to get usage data");
-        assert_eq!(usage.get(&31337), Some(&2));
-
-        cleanup_temp_dir(temp_str);
-    }
-
-    #[test]
-    fn test_get_usage_data_corrupt_file() {
-        let temp = create_temp_dir();
-        let temp_str = temp.to_str();
-
-        std::fs::write(
-            temp_str.expect("Failed to get path").to_string() + "/.syspass/usage.json",
-            "not json",
-        )
-        .expect("Failed to write file");
-
-        assert!(Config::get_usage_data(temp_str).is_err());
 
         cleanup_temp_dir(temp_str);
     }

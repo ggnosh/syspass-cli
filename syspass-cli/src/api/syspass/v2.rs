@@ -1,16 +1,16 @@
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
 use crate::api::entity::Entity;
-use crate::api::syspass::{JsonReq, RequestArguments, sort_accounts};
+use crate::api::syspass::{JsonReq, RequestArguments};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
+use crate::usage::UsageStore;
 use itertools::Itertools;
-use log::warn;
 use miette::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::rc::Rc;
 
 // https://syspass-doc.readthedocs.io/en/2.1/application/api.html
 
@@ -222,10 +222,10 @@ pub struct Syspass {
     syspass: api::syspass::Syspass,
 }
 
-impl From<Config> for Syspass {
-    fn from(value: Config) -> Self {
+impl Syspass {
+    pub fn new(config: Config, usage: Rc<dyn UsageStore>) -> Self {
         Self {
-            syspass: api::syspass::Syspass::from(value),
+            syspass: api::syspass::Syspass::new(config, usage),
         }
     }
 }
@@ -242,21 +242,16 @@ impl api::Client for Syspass {
                     let accounts: Vec<Account> =
                         serde_json::from_value(result.result).map_err(api::ApiError::SerdeJson)?;
 
-                    let usage_data = if usage {
-                        Config::get_usage_data(None).unwrap_or_else(|e| {
-                            warn!("Could not read usage data: {e}");
-                            HashMap::new()
-                        })
-                    } else {
-                        HashMap::new()
-                    };
-
                     let list: Vec<api::account::Account> = accounts
                         .into_iter()
                         .map(api::account::Account::try_from)
                         .collect::<Result<Vec<_>, api::ApiError>>()?;
 
-                    Ok(list.into_iter().sorted_by(|a, b| sort_accounts(a, b, &usage_data)).collect())
+                    if usage {
+                        Ok(self.syspass.usage.sorted(&list))
+                    } else {
+                        Ok(list)
+                    }
                 }
                 ApiResponseResult::Code(_) => Err(api::ApiError::BadResponse(format!(
                     "Unexpected response format: {response:?}"
@@ -433,11 +428,14 @@ mod tests {
 
     use crate::api;
     use crate::api::Client as ApiClient;
+    use std::rc::Rc;
+
     use crate::api::account::ChangePassword;
     use crate::api::entity::Entity;
     use crate::api::syspass::v2::{Account, Category, Client, Syspass};
     use crate::api::tests::get_test_account;
     use crate::config::Config;
+    use crate::usage::MemoryUsageStore;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
 
@@ -448,16 +446,19 @@ mod tests {
     }
 
     fn get_test_client(url: String) -> Syspass {
-        Syspass::from(Config {
-            host: url + "/api.php",
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Option::from("Syspass".to_owned()),
-            password_timeout: None,
-            no_clipboard: false,
-            no_shell: false,
-        })
+        Syspass::new(
+            Config {
+                host: url + "/api.php",
+                token: "1234".to_owned(),
+                password: "<PASSWORD>".to_owned(),
+                verify_host: false,
+                api_version: Option::from("Syspass".to_owned()),
+                password_timeout: None,
+                no_clipboard: false,
+                no_shell: false,
+            },
+            Rc::new(MemoryUsageStore::default()),
+        )
     }
 
     //noinspection DuplicatedCode
@@ -554,16 +555,19 @@ mod tests {
 
     #[test]
     fn test_invalid_server_address() {
-        let client = Syspass::from(Config {
-            host: "http://localhost:1/api.php".to_owned(),
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Some("Syspass".to_owned()),
-            password_timeout: None,
-            no_clipboard: false,
-            no_shell: false,
-        });
+        let client = Syspass::new(
+            Config {
+                host: "http://localhost:1/api.php".to_owned(),
+                token: "1234".to_owned(),
+                password: "<PASSWORD>".to_owned(),
+                verify_host: false,
+                api_version: Some("Syspass".to_owned()),
+                password_timeout: None,
+                no_clipboard: false,
+                no_shell: false,
+            },
+            Rc::new(MemoryUsageStore::default()),
+        );
 
         assert!(client.search_account(vec![], false).is_err());
     }

@@ -75,7 +75,7 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
                 "{} Client {} ({}) saved!",
                 "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
                 client.name().if_supports_color(Stdout, |text| text.green()),
-                client.id().expect("Id should be set after saving")
+                client.display_id()
             );
         })
 }

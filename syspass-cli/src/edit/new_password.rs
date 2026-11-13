@@ -92,7 +92,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
         "{} Account {} ({}) saved!",
         "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
         saved_account.name().if_supports_color(Stdout, |text| text.green()),
-        saved_account.id().expect("Id should not be empty")
+        saved_account.display_id()
     );
 
     Ok(saved_account)

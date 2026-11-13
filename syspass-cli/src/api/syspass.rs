@@ -1,16 +1,15 @@
 use crate::api;
-use crate::api::account::Account;
-use crate::api::entity::Entity;
 use crate::config::Config;
 use crate::prompt::ask_for_password;
+use crate::usage::UsageStore;
 use log::debug;
 use reqwest::StatusCode;
 use reqwest::blocking::{ClientBuilder, Response};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::cell::Cell;
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
 use std::sync::LazyLock;
 use std::time::Duration;
 
@@ -23,13 +22,6 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 static PASSWORD: LazyLock<miette::Result<String>> = LazyLock::new(|| ask_for_password("API password: ", false));
 
 type RequestArguments<'key> = Option<Vec<(&'key str, String)>>;
-
-fn sort_accounts(a: &Account, b: &Account, usage_data: &HashMap<u32, u32>) -> Ordering {
-    let left = a.id().map_or(0, |id| *usage_data.get(id).unwrap_or(&0));
-    let right = b.id().map_or(0, |id| *usage_data.get(id).unwrap_or(&0));
-
-    right.cmp(&left).then_with(|| a.id().cmp(&b.id()))
-}
 
 #[derive(Serialize)]
 struct JsonReq {
@@ -96,9 +88,19 @@ pub struct Syspass {
     client: reqwest::blocking::Client,
     request_number: Cell<u32>,
     config: Config,
+    usage: Rc<dyn UsageStore>,
 }
 
 impl Syspass {
+    pub fn new(config: Config, usage: Rc<dyn UsageStore>) -> Self {
+        Self {
+            client: get_builder(&config).build().expect("Failed to create client"),
+            request_number: Cell::new(1),
+            config,
+            usage,
+        }
+    }
+
     fn get_params(
         &self,
         args: RequestArguments,
@@ -143,16 +145,6 @@ impl Syspass {
     }
 }
 
-impl From<Config> for Syspass {
-    fn from(value: Config) -> Self {
-        Self {
-            client: get_builder(&value).build().expect("Failed to create client"),
-            request_number: Cell::new(1),
-            config: value,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
@@ -160,10 +152,13 @@ mod tests {
     use std::path::Path;
 
     use mockito::{Mock, ServerGuard};
+    use std::rc::Rc;
+
     use reqwest::blocking::ClientBuilder;
 
     use crate::api::syspass::{JsonReq, Syspass};
     use crate::config::Config;
+    use crate::usage::MemoryUsageStore;
 
     type CreatedServer = (Mock, Syspass, ServerGuard);
 
@@ -204,16 +199,19 @@ mod tests {
     ) -> CreatedServer {
         let path = "/brr".to_string();
         let (mock, response) = crate::tests::create_server_response(response, status, "POST", &path);
-        let client = Syspass::from(Config {
-            host: response.url() + &path,
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Option::from(api_version.to_owned()),
-            password_timeout: None,
-            no_clipboard: false,
-            no_shell: true,
-        });
+        let client = Syspass::new(
+            Config {
+                host: response.url() + &path,
+                token: "1234".to_owned(),
+                password: "<PASSWORD>".to_owned(),
+                verify_host: false,
+                api_version: Option::from(api_version.to_owned()),
+                password_timeout: None,
+                no_clipboard: false,
+                no_shell: true,
+            },
+            Rc::new(MemoryUsageStore::default()),
+        );
 
         (mock, client, response)
     }
@@ -228,6 +226,7 @@ mod tests {
                 token: "test_token".to_owned(),
                 ..Default::default()
             },
+            usage: Rc::new(MemoryUsageStore::default()),
         };
 
         let params = syspass

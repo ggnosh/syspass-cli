@@ -22,7 +22,7 @@ use term_table::{Table, TableStyle};
 use crate::api::account::{Account, ViewPassword};
 use crate::api::entity::Entity;
 use crate::api::{AccountSearchParams, Client};
-use crate::config::Config;
+use crate::usage::UsageStore;
 use crate::{TERMINAL_WIDTH, api};
 
 pub const COMMAND_NAME: &str = "search";
@@ -151,7 +151,7 @@ pub fn set_clipboard_text(text: &str) -> Result<()> {
 }
 
 #[inline]
-pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<ViewPassword>> {
+pub fn command(matches: &ArgMatches, api_client: &dyn Client, usage: &dyn UsageStore) -> Result<Option<ViewPassword>> {
     let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
     let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
@@ -193,7 +193,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
         }
     };
 
-    maybe_record_usage(account.account.id(), matches.get_flag("disable-usage"), None);
+    maybe_record_usage(usage, account.account.id(), matches.get_flag("disable-usage"));
 
     let timeout = config.password_timeout.unwrap_or(10);
 
@@ -272,21 +272,12 @@ fn select_account(accounts: &[Account], api_client: &dyn Client) -> Result<ViewP
         .and_then(|choice| api_client.get_password(&accounts[choice]).map_err(|err| miette!(err)))
 }
 
-fn maybe_record_usage(id: Option<&u32>, disable_usage: bool, dir: Option<&str>) {
+fn maybe_record_usage(usage: &dyn UsageStore, id: Option<&u32>, disable_usage: bool) {
     if disable_usage {
         return;
     }
 
-    // Stance: recording is best-effort, so a missing id is skipped rather than treated as an
-    // invariant violation. The post-save display paths (`expect("Id should be set")`) panic
-    // because an id must exist after saving; here there is simply nothing to record.
-    let Some(id) = id else {
-        return;
-    };
-
-    if let Err(e) = Config::record_usage(*id, dir) {
-        warn!("Could not record usage: {e}");
-    }
+    usage.record(id);
 }
 
 fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
@@ -325,7 +316,7 @@ fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
     table.add_row(Row::new(cells));
 
     table.add_row(Row::new(vec![
-        TableCell::new(data.account.id().expect("Id should not be empty")),
+        TableCell::new(data.account.display_id()),
         TableCell::new(data.account.login()),
         TableCell::new(if show { &data.password } else { "Copied to clipboard" }),
         TableCell::new(data.account.url().unwrap_or_default()),
@@ -355,12 +346,12 @@ mod tests {
     use arboard::Clipboard;
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::config::Config;
+    use crate::api::entity::Entity;
     use crate::search::{
         clear_clipboard, maybe_record_usage, open_shell, print_table_for_account, set_clipboard_text, sha256_hex,
         should_clear,
     };
-    use tempfile::tempdir;
+    use crate::usage::{MemoryUsageStore, UsageStore};
 
     fn get_test_account_data() -> ViewPassword {
         ViewPassword {
@@ -398,35 +389,29 @@ mod tests {
 
     #[test]
     fn test_maybe_record_usage_records_account_id() {
-        let temp = tempdir().expect("Failed to create temp dir");
-        let dir = temp.path().to_str().expect("Failed to get path");
+        let store = MemoryUsageStore::default();
 
-        maybe_record_usage(Some(&1), false, Some(dir));
+        maybe_record_usage(&store, Some(&1), false);
 
-        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
-        assert_eq!(usage.get(&1), Some(&1));
+        assert_eq!(store.usage(Some(&1)), 1);
     }
 
     #[test]
     fn test_maybe_record_usage_skips_when_disabled() {
-        let temp = tempdir().expect("Failed to create temp dir");
-        let dir = temp.path().to_str().expect("Failed to get path");
+        let store = MemoryUsageStore::default();
 
-        maybe_record_usage(Some(&2), true, Some(dir));
+        maybe_record_usage(&store, Some(&2), true);
 
-        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
-        assert_eq!(usage.get(&2), None);
+        assert_eq!(store.usage(Some(&2)), 0);
     }
 
     #[test]
     fn test_maybe_record_usage_skips_account_without_id() {
-        let temp = tempdir().expect("Failed to create temp dir");
-        let dir = temp.path().to_str().expect("Failed to get path");
+        let store = MemoryUsageStore::default();
 
-        maybe_record_usage(None, false, Some(dir));
+        maybe_record_usage(&store, None, false);
 
-        let usage = Config::get_usage_data(Some(dir)).expect("Failed to read usage data");
-        assert!(usage.is_empty());
+        assert_eq!(store.usage(Some(&1)), 0, "nothing recorded for a missing id");
     }
 
     #[test]
@@ -479,6 +464,20 @@ mod tests {
         assert!(!output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
         assert!(output.contains(account.account.url().unwrap_or_default()));
+    }
+
+    #[test]
+    fn test_print_table_for_account_without_id_does_not_panic() {
+        let account = ViewPassword {
+            account: Account::new(None, "Test".to_owned(), "test".to_owned(), None, None, 4, 5, None, None),
+            password: "<PASSWORD>".to_owned(),
+        };
+
+        assert_eq!(account.account.display_id(), "-");
+
+        let output = print_table_for_account(&account, true);
+
+        assert!(output.contains('-'), "the id cell degrades instead of panicking");
     }
 
     #[test]

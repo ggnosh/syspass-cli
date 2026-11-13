@@ -51,7 +51,7 @@ impl Category {
 
 impl Display for Category {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}. {}", self.id().unwrap_or(&0_u32), self.name())
+        write!(f, "{}. {}", self.display_id(), self.name())
     }
 }
 
@@ -124,7 +124,7 @@ mod tests {
         );
 
         assert_eq!(
-            "0. name",
+            "-. name",
             Category::new(None, "name".to_string(), Some("desc".to_string())).to_string()
         );
     }

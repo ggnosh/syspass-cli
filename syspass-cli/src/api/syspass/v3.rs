@@ -3,16 +3,16 @@ use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
 use crate::api::entity::Entity;
-use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared, sort_accounts};
+use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
+use crate::usage::UsageStore;
 use itertools::Itertools;
-use log::warn;
 use miette::Result;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::rc::Rc;
 // https://syspass-doc.readthedocs.io/en/3.1/application/api.html
 
 #[derive(Deserialize)]
@@ -97,10 +97,10 @@ impl Syspass {
     }
 }
 
-impl From<Config> for Syspass {
-    fn from(value: Config) -> Self {
+impl Syspass {
+    pub fn new(config: Config, usage: Rc<dyn UsageStore>) -> Self {
         Self {
-            syspass: SyspassShared::from(value),
+            syspass: SyspassShared::new(config, usage),
         }
     }
 }
@@ -109,18 +109,12 @@ impl api::Client for Syspass {
     fn search_account(&self, search: AccountSearchParams, usage: bool) -> Result<Vec<Account>, api::ApiError> {
         self.forge_and_send("account/search", Some(search), false).and_then(|result| {
             let list = serde_json::from_value::<Vec<Account>>(result.result)
-                .map_err(|e| api::ApiError::ParseError(e.to_string()))?
-                .into_iter();
+                .map_err(|e| api::ApiError::ParseError(e.to_string()))?;
 
             if usage {
-                let usage_data = Config::get_usage_data(None).unwrap_or_else(|e| {
-                    warn!("Could not read usage data: {e}");
-                    HashMap::new()
-                });
-
-                Ok(list.sorted_by(|a, b| sort_accounts(a, b, &usage_data)).collect())
+                Ok(self.syspass.usage.sorted(&list))
             } else {
-                Ok(list.collect())
+                Ok(list)
             }
         })
     }
@@ -266,10 +260,13 @@ mod tests {
 
     use crate::api::Client;
     use crate::api::account::{Account, ChangePassword};
+    use std::rc::Rc;
+
     use crate::api::entity::Entity;
     use crate::api::syspass::v3::Syspass;
     use crate::api::tests::{get_test_account, get_test_category, get_test_client};
     use crate::config::Config;
+    use crate::usage::MemoryUsageStore;
     use mockito::{Mock, ServerGuard};
     use test_case::test_case;
 
@@ -282,16 +279,19 @@ mod tests {
     }
 
     fn create_test_client() -> Syspass {
-        Syspass::from(Config {
-            host: "http://localhost:1/api.php".to_owned(),
-            token: "1234".to_owned(),
-            password: "<PASSWORD>".to_owned(),
-            verify_host: false,
-            api_version: Some("SyspassV3".to_owned()),
-            password_timeout: None,
-            no_clipboard: false,
-            no_shell: false,
-        })
+        Syspass::new(
+            Config {
+                host: "http://localhost:1/api.php".to_owned(),
+                token: "1234".to_owned(),
+                password: "<PASSWORD>".to_owned(),
+                verify_host: false,
+                api_version: Some("SyspassV3".to_owned()),
+                password_timeout: None,
+                no_clipboard: false,
+                no_shell: false,
+            },
+            Rc::new(MemoryUsageStore::default()),
+        )
     }
 
     //noinspection DuplicatedCode
