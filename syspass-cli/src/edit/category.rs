@@ -66,7 +66,7 @@ fn edit_category(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, qu
                 "{} Category {} ({}) saved!",
                 "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
                 category.name().if_supports_color(Stdout, |text| text.green()),
-                category.id().expect("Id should be set after saving")
+                category.display_id()
             );
         })
 }

@@ -55,7 +55,7 @@ impl Display for Client {
         write!(
             f,
             "{}. {}{}",
-            self.id().map_or_else(|| "?".to_string(), ToString::to_string),
+            self.display_id(),
             self.name(),
             if *self.is_global() > 0 {
                 " (*)".to_string()

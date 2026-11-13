@@ -3,6 +3,7 @@ use std::error::Error;
 use std::io;
 use std::io::Write;
 use std::process::ExitCode;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -15,6 +16,7 @@ use miette::miette;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use terminal_size::{Width, terminal_size};
 
+use crate::usage::{FileUsageStore, UsageStore};
 use crate::{api::Api, config::Config};
 
 mod api;
@@ -25,6 +27,7 @@ mod prompt;
 mod remove;
 mod search;
 mod update;
+mod usage;
 
 struct SimpleLogger;
 
@@ -139,12 +142,17 @@ fn main() -> ExitCode {
     let Ok(api) = Api::from_str(config.api_version.as_deref().unwrap_or("")) else {
         return print_error(&miette!("No such API is supported"));
     };
-    let api_client = api.get(config);
+    let usage: Rc<dyn UsageStore> = match FileUsageStore::open(None) {
+        Ok(store) => Rc::new(store),
+        Err(e) => return print_error(&e),
+    };
+
+    let api_client = api.get(config, usage.clone());
 
     set_terminal_size();
 
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client).map(|_| 0),
+        Some((search::COMMAND_NAME, matches)) => search::command(matches, &*api_client, &*usage).map(|_| 0),
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client).map(|()| 0),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, &*api_client).map(|()| 0),

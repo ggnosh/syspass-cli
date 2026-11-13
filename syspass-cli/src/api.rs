@@ -10,6 +10,8 @@ use crate::api::client::Client as SyspassClient;
 use crate::api::syspass::v2;
 use crate::api::syspass::v3;
 use crate::config::Config;
+use crate::usage::UsageStore;
+use std::rc::Rc;
 
 pub mod account;
 pub mod category;
@@ -82,10 +84,10 @@ pub enum Api {
 }
 
 impl Api {
-    pub fn get(&self, config: Config) -> Box<dyn Client> {
+    pub fn get(&self, config: Config, usage: Rc<dyn UsageStore>) -> Box<dyn Client> {
         match self {
-            SyspassV3 => Box::new(v3::Syspass::from(config)),
-            SyspassV2 => Box::new(v2::Syspass::from(config)),
+            SyspassV3 => Box::new(v3::Syspass::new(config, usage)),
+            SyspassV2 => Box::new(v2::Syspass::new(config, usage)),
         }
     }
 }
@@ -119,6 +121,8 @@ mod tests {
     use crate::api;
     use crate::api::{Api, ApiError, ApiErrorResponse};
     use crate::config::Config;
+    use crate::usage::MemoryUsageStore;
+    use std::rc::Rc;
     use std::str::FromStr;
     use test_case::test_case;
 
@@ -175,7 +179,9 @@ mod tests {
 
     #[test]
     fn test_api_get() {
-        let _client = Api::get(&Api::SyspassV3, Config::default());
-        let _client = Api::get(&Api::SyspassV2, Config::default());
+        let usage = Rc::new(MemoryUsageStore::default());
+
+        let _client = Api::get(&Api::SyspassV3, Config::default(), usage.clone());
+        let _client = Api::get(&Api::SyspassV2, Config::default(), usage);
     }
 }
