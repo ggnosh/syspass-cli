@@ -1,0 +1,7 @@
+{
+  "apiVersion": "SyspassV3",
+  "host": "http://127.0.0.1:9/api.php",
+  "token": "harness-token",
+  "password": "harness-password",
+  "verifyHost": false
+}

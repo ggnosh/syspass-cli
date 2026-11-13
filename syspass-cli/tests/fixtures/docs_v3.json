@@ -1,0 +1,712 @@
+{
+  "version": "3.1",
+  "source": "https://syspass-doc.readthedocs.io/en/3.1/application/api.html",
+  "methods": {
+    "account/search": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "categoryId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "clientId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "tagsId",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "op",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "account/view": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "account/viewPass": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "details",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "account/editPass": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "pass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expireDate",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "account/create": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "categoryId",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "clientId",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "pass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tagsId",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "userGroupId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "parentId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "login",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "private",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "privateGroup",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "expireDate",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "account/edit": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "categoryId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "clientId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "tagsId",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "userGroupId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "parentId",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "login",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "private",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "privateGroup",
+          "type": "int",
+          "required": false
+        },
+        {
+          "name": "expireDate",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "account/delete": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "category/search": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "category/view": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "category/create": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "category/edit": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "category/delete": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "client/search": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "client/view": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "client/create": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "global",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "client/edit": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "global",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "client/delete": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "tag/search": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "tag/view": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "tag/create": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "tag/edit": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "tag/delete": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "userGroup/search": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "required": false
+        }
+      ]
+    },
+    "userGroup/view": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tokenPass",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "userGroup/create": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "usersId",
+          "type": "array",
+          "required": false
+        }
+      ]
+    },
+    "userGroup/edit": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "usersId",
+          "type": "array",
+          "required": false
+        }
+      ]
+    },
+    "userGroup/delete": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "required": true
+        }
+      ]
+    },
+    "config/backup": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "config/export": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "required": false
+        }
+      ]
+    }
+  }
+}
