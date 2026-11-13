@@ -1,0 +1,254 @@
+{
+  "version": "2.1",
+  "source": "https://syspass-doc.readthedocs.io/en/2.1/application/api.html",
+  "methods": {
+    "getAccountSearch": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "text",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "count",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "categoryId",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "customerId",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "getAccountData": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "id",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "userPass",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "getAccountPassword": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "id",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "tokenPass",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "details",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "addAccount": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "tokenPass",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "name",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "categoryId",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "customerId",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "pass",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "login",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "url",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "notes",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "deleteAccount": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "id",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "getCategories": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "name",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "count",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "addCategory": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "name",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "description",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "deleteCategory": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "id",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "getCustomers": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "name",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "count",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "addCustomer": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "name",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "description",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "deleteCustomer": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        },
+        {
+          "name": "id",
+          "type": null,
+          "required": null
+        }
+      ]
+    },
+    "backup": {
+      "params": [
+        {
+          "name": "authToken",
+          "type": null,
+          "required": null
+        }
+      ]
+    }
+  }
+}

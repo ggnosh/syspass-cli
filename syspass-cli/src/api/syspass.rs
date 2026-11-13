@@ -31,7 +31,7 @@ struct JsonReq {
     id: u32,
 }
 
-const SECRET_PARAMS: [&str; 2] = ["authToken", "tokenPass"];
+const SECRET_PARAMS: [&str; 3] = ["authToken", "tokenPass", "userPass"];
 
 impl JsonReq {
     /// Debug text with the credentials masked, so a pasted log does not carry the token.
@@ -103,6 +103,7 @@ impl Syspass {
 
     fn get_params(
         &self,
+        method: &str,
         args: RequestArguments,
         needs_password: bool,
     ) -> miette::Result<HashMap<String, String>, api::ApiError> {
@@ -116,7 +117,16 @@ impl Syspass {
                 self.config.password.clone()
             };
 
-            params.insert("tokenPass".to_owned(), password);
+            // The 2.1 docs name this param `userPass` for getAccountData and `tokenPass` for
+            // every other method. The live 2.1 server rejects `userPass` on getAccountPassword,
+            // so the name is chosen per method.
+            let name = if method == "getAccountData" {
+                "userPass"
+            } else {
+                "tokenPass"
+            };
+
+            params.insert(name.to_owned(), password);
         }
 
         if let Some(args) = args {
@@ -230,7 +240,7 @@ mod tests {
         };
 
         let params = syspass
-            .get_params(Some(vec![("id", "some id".to_owned())]), false)
+            .get_params("search", Some(vec![("id", "some id".to_owned())]), false)
             .expect("Failed to get params");
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
@@ -243,7 +253,7 @@ mod tests {
         assert_eq!(None, params.get("tokenPass"));
 
         let params = syspass
-            .get_params(Some(vec![("id", "some id".to_owned())]), true)
+            .get_params("getAccountPassword", Some(vec![("id", "some id".to_owned())]), true)
             .expect("Failed to get params");
 
         assert_eq!("some id", params.get("id").expect("Failed to find id").as_str());
@@ -256,6 +266,56 @@ mod tests {
         assert_eq!(
             "test_password",
             params.get("tokenPass").expect("Failed to find password").as_str()
+        );
+    }
+
+    #[test]
+    pub fn test_list_routes_send_only_the_documented_params() {
+        // The CLI reaches these routes through an interactive selection, so they cannot be
+        // driven from the harness. The request shape is asserted here and the reply parsing in
+        // `test_get_categories` and `test_get_clients`.
+        let (_mock, v2, _guard) = create_server_response(None::<String>, 200, "SyspassV2");
+
+        let params = v2.get_params("getCategories", None, false).expect("Failed to get params");
+
+        assert_eq!(1, params.len(), "v2 list routes send only authToken: {params:?}");
+
+        let (_mock, v3, _guard) = create_server_response(None::<String>, 200, "SyspassV3");
+
+        for method in ["category/search", "client/search"] {
+            let params = v3.get_params(method, None, false).expect("Failed to get params");
+
+            assert_eq!(1, params.len(), "v3 list routes send only authToken: {params:?}");
+        }
+    }
+
+    #[test]
+    pub fn test_password_param_name_follows_the_method() {
+        let syspass = Syspass {
+            client: ClientBuilder::new().build().expect("Failed to create client"),
+            request_number: Cell::new(0),
+            config: Config {
+                password: "test_password".to_owned(),
+                token: "test_token".to_owned(),
+                ..Default::default()
+            },
+            usage: Rc::new(MemoryUsageStore::default()),
+        };
+
+        let params = syspass.get_params("getAccountData", None, true).expect("Failed to get params");
+
+        assert_eq!(
+            "test_password",
+            params.get("userPass").expect("Failed to find userPass").as_str()
+        );
+
+        let params = syspass
+            .get_params("getAccountPassword", None, true)
+            .expect("Failed to get params");
+
+        assert_eq!(
+            "test_password",
+            params.get("tokenPass").expect("Failed to find tokenPass").as_str()
         );
     }
 }
