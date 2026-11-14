@@ -3,8 +3,8 @@ use miette::{Result, miette};
 use crate::api::account::{Account, ChangePassword};
 use crate::display::{self, SizeSource};
 use crate::input::{Field, Prompter, value};
-use crate::prompt::{ask_for_date, ask_for_password};
-use chrono::{NaiveDate, NaiveTime, Utc};
+use crate::prompt::{ask_for_date, ask_for_password, end_of_day};
+use chrono::{NaiveDate, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
 use dialoguer::{Select, theme::ColorfulTheme};
 use log::{info, warn};
@@ -67,18 +67,15 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, size: 
 
     info!("Trying to change passwords");
 
-    match api_client.change_password(&change) {
-        Ok(account) => {
-            warn!(
-                "{} Password changed for account {}",
-                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                display::line(&account, size).if_supports_color(Stdout, |text| text.green())
-            );
+    let account = api_client.change_password(&change)?;
 
-            Ok(account)
-        }
-        Err(error) => Err(error)?,
-    }
+    warn!(
+        "{} Password changed for account {}",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        display::line(&account, size).if_supports_color(Stdout, |text| text.green())
+    );
+
+    Ok(account)
 }
 
 fn get_args(matches: &ArgMatches, quiet: bool, prompter: &dyn Prompter) -> Result<ChangeAccountArgs> {
@@ -125,9 +122,8 @@ fn parse_expire_date(value: &str) -> Result<i64> {
 fn expiration_timestamp(input: &str) -> Result<String> {
     let date =
         NaiveDate::parse_from_str(input, "%Y-%m-%d").map_err(|e| miette!("Failed to parse expiration date: {e}"))?;
-    let end_of_day = NaiveTime::from_hms_opt(23, 59, 59).ok_or_else(|| miette!("Invalid time"))?;
 
-    Ok(date.and_time(end_of_day).and_utc().timestamp().to_string())
+    end_of_day(date)
 }
 
 fn generate_passwords(random_count: usize) -> Vec<String> {
