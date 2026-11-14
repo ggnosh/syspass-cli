@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.11.0 - 2026-11-15
+
+- Fixed clipboard disappearing on Linux when using Wayland.
+- General improvements and bug fixes.
+
 ## 0.10.0 - 2026-11-08
 
 ## 0.9.1 - 2025-08-17
