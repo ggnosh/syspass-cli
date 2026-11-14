@@ -70,7 +70,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
     )?;
 
     let account: Account = Account::new(
-        Some(0),
+        None,
         value(
             &Field {
                 id: "name",
