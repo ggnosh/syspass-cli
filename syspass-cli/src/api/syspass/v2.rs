@@ -1,6 +1,6 @@
 use crate::api;
 use crate::api::account::{ChangePassword, ViewPassword};
-use crate::api::entity::Entity;
+use crate::api::entity::{self, Entity};
 use crate::api::syspass::{JsonReq, RequestArguments};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
@@ -48,7 +48,7 @@ impl TryFrom<Client> for api::client::Client {
 
     fn try_from(value: Client) -> Result<Self, Self::Error> {
         Ok(Self::new(
-            Some(parse_id(&value.customer_id)?),
+            Some(entity::parse_digits(&value.customer_id)?),
             value.customer_name,
             value.customer_description,
             0,
@@ -56,12 +56,11 @@ impl TryFrom<Client> for api::client::Client {
     }
 }
 
-fn parse_id(value: &str) -> Result<u32, api::ApiFailure> {
-    value.parse::<u32>().map_err(|e| api::ApiFailure::ParseError(e.to_string()))
-}
-
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
+// The Code arm is tried first, so its field types decide which arm a response lands in.
+// `item_id` has to stay a String here: as a Value it accepts any JSON and the Code arm swallows
+// entity-shaped responses. v3 has one struct, so nothing is discriminated there.
 enum ApiResponseResult {
     Code(ApiResponse),
     Entity(ApiResponseEntity),
@@ -95,7 +94,7 @@ impl TryFrom<Category> for api::category::Category {
 
     fn try_from(value: Category) -> Result<Self, Self::Error> {
         Ok(Self::new(
-            Some(parse_id(&value.category_id)?),
+            Some(entity::parse_digits(&value.category_id)?),
             value.category_name.clone(),
             value.category_description.clone(),
         ))
@@ -107,13 +106,13 @@ impl TryFrom<Account> for api::account::Account {
 
     fn try_from(value: Account) -> Result<Self, Self::Error> {
         Ok(Self::new(
-            Some(parse_id(&value.account_id)?),
+            Some(entity::parse_digits(&value.account_id)?),
             value.account_name.clone(),
             value.account_login.clone(),
             value.account_url.clone(),
             value.account_notes.clone(),
-            parse_id(&value.account_categoryId)?,
-            parse_id(&value.account_customerId)?,
+            entity::parse_digits(&value.account_categoryId)?,
+            entity::parse_digits(&value.account_customerId)?,
             Some(value.account_pass.clone()),
             Some(value.customer_name.clone()),
         ))
@@ -160,7 +159,7 @@ impl Syspass {
     }
 
     fn save(&self, path: &str, id: Option<&u32>, args: RequestArguments) -> Result<u32, api::ApiFailure> {
-        if id.is_some_and(|new_id| *new_id > 0) {
+        if id.is_some() {
             return Err(api::ApiFailure::NotSupported {
                 operation: "Updating an existing entity",
             });
@@ -175,10 +174,9 @@ impl Syspass {
                         .result
                         .ok_or(api::ApiFailure::BadResponse("Invalid response".to_string()))?;
 
-                    parse_id(
-                        &api_result
-                            .item_id
-                            .ok_or(api::ApiFailure::ParseError("Entity was not created".to_string()))?,
+                    api_result.item_id.as_ref().map_or_else(
+                        || Err(api::ApiFailure::ParseError("Entity was not created".to_string())),
+                        |id| entity::parse_digits(id),
                     )
                 }
             }
@@ -188,7 +186,7 @@ impl Syspass {
                 } else {
                     result.result.get("itemId").map_or_else(
                         || Err(api::ApiFailure::ParseError("No id in response".to_string())),
-                        Self::parse_entity_id,
+                        entity::parse_id,
                     )
                 }
             }
@@ -203,20 +201,6 @@ impl Syspass {
                     .and_then(api::account::Account::try_from),
                 ApiResponseResult::Code(_) => Err(api::ApiFailure::NotFound("Account".to_owned())),
             })
-    }
-
-    fn parse_entity_id(value: &Value) -> Result<u32, api::ApiFailure> {
-        value
-            .as_u64()
-            .and_then(|id| u32::try_from(id).ok())
-            .map(Ok)
-            .or_else(|| {
-                value.as_str().map(|s| {
-                    s.parse::<u32>()
-                        .map_err(|e| api::ApiFailure::ParseError(format!("Invalid id: {e}")))
-                })
-            })
-            .unwrap_or_else(|| Err(api::ApiFailure::ParseError("Invalid id in response".to_string())))
     }
 
     fn fix_result_object<T: DeserializeOwned>(result: &Value) -> Vec<T> {
@@ -866,17 +850,5 @@ mod tests {
 
         assert!(result.is_err_and(|x| x.to_string() == "Could not save account: Failed to add account"));
         mock.assert();
-    }
-
-    #[test]
-    fn test_parse_entity_id() {
-        use serde_json::json;
-
-        assert!(matches!(Syspass::parse_entity_id(&json!(38)), Ok(38)));
-        assert!(matches!(Syspass::parse_entity_id(&json!("1337")), Ok(1337)));
-        assert!(matches!(
-            Syspass::parse_entity_id(&json!("abc")),
-            Err(api::ApiFailure::ParseError(_))
-        ));
     }
 }

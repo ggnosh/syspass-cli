@@ -2,7 +2,7 @@ use crate::api;
 use crate::api::account::{Account, ChangePassword, ViewPassword};
 use crate::api::category::Category;
 use crate::api::client::Client;
-use crate::api::entity::Entity;
+use crate::api::entity::{self, Entity};
 use crate::api::syspass::{JsonReq, RequestArguments, Syspass as SyspassShared};
 use crate::api::{AccountSearchParams, ApiErrorResponse};
 use crate::config::Config;
@@ -18,7 +18,7 @@ use std::rc::Rc;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiResult {
-    item_id: Option<u32>,
+    item_id: Option<Value>,
     result: Value,
     result_code: i32,
 }
@@ -63,7 +63,7 @@ impl Syspass {
 
     #[inline]
     fn create_or_edit(id: Option<&u32>) -> &str {
-        id.filter(|&&id| id != 0).map_or(Self::CREATE, |_| Self::EDIT)
+        id.map_or(Self::CREATE, |_| Self::EDIT)
     }
 
     #[inline]
@@ -79,16 +79,17 @@ impl Syspass {
         mut args: Option<AccountSearchParams>,
     ) -> Result<T, api::ApiFailure> {
         let method = format!("{}/{}", path, Self::create_or_edit(id));
-        if let Some(id) = id.filter(|&&id| id != 0) {
+        if let Some(id) = id {
             args.get_or_insert_with(Vec::new).push(("id", id.to_string()));
         }
 
         self.forge_and_send(&method, args, true).and_then(|result| {
             let mut entity: T =
                 serde_json::from_value(result.result).map_err(|e| api::ApiFailure::ParseError(e.to_string()))?;
-            let id = result
-                .item_id
-                .ok_or(api::ApiFailure::ParseError("No id in response".to_string()))?;
+            let id = result.item_id.as_ref().map_or_else(
+                || Err(api::ApiFailure::ParseError("No id in response".to_string())),
+                entity::parse_id,
+            )?;
 
             entity.set_id(id);
 
@@ -464,7 +465,8 @@ mod tests {
     fn test_create_or_edit() {
         let mut id: u32 = 0;
 
-        assert_eq!("create", Syspass::create_or_edit(Some(&id)));
+        // No id is the only way to say "new"; a zero id is an ordinary id.
+        assert_eq!("edit", Syspass::create_or_edit(Some(&id)));
         assert_eq!("create", Syspass::create_or_edit(None));
         id = 1;
         assert_eq!("edit", Syspass::create_or_edit(Some(&id)));
