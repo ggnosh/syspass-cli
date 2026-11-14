@@ -21,7 +21,7 @@ mod api;
 mod config;
 mod display;
 mod edit;
-mod helper;
+mod input;
 mod prompt;
 mod remove;
 mod search;
