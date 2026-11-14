@@ -1,4 +1,3 @@
-use std::env;
 use std::error::Error;
 use std::io;
 use std::io::Write;
@@ -18,6 +17,7 @@ use crate::usage::{FileUsageStore, UsageStore};
 use crate::{api::Api, config::Config};
 
 mod api;
+mod clipboard;
 mod config;
 mod display;
 mod edit;
@@ -109,9 +109,9 @@ fn main() -> ExitCode {
     if let Some((search::COMMAND_NAME, sub)) = matches.subcommand()
         && let Some(timeout) = sub.get_one::<u64>("clear")
     {
-        let hash = env::var(search::CLEAR_HASH_ENV).ok();
+        let deferred = clipboard::DeferredClear::from_env(*timeout);
 
-        if let Err(e) = search::clear_clipboard(*timeout, hash.as_deref()) {
+        if let Err(e) = clipboard::wait_and_clear(&deferred, &clipboard::ArboardClipboard::default()) {
             warn!("Could not clear clipboard: {e}");
             return ExitCode::FAILURE;
         }
@@ -140,10 +140,11 @@ fn main() -> ExitCode {
 
     let api_client = api.get(config.clone(), usage.clone());
     let size = display::TerminalSize;
+    let clipboard_adapter = clipboard::ArboardClipboard::default();
 
     match matches.subcommand() {
         Some((search::COMMAND_NAME, matches)) => {
-            search::command(matches, &*api_client, &config, &*usage, &size).map(|_| 0)
+            search::command(matches, &*api_client, &config, &*usage, &size, &clipboard_adapter).map(|_| 0)
         }
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client, &size).map(|()| 0),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
