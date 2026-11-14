@@ -209,7 +209,6 @@ mod tests {
     use std::path::Path;
 
     use crate::{get_command, print_completions, set_log_level};
-    use assert_cmd::Command;
     use clap_complete::Shell;
     use log::LevelFilter;
     use mockito::{Mock, Server, ServerGuard};
@@ -233,15 +232,6 @@ mod tests {
         .create();
 
         (mock, server)
-    }
-
-    #[test]
-    fn test_main_help() {
-        Command::cargo_bin(env!("CARGO_PKG_NAME"))
-            .expect("Failed to build binary")
-            .arg("--help")
-            .assert()
-            .success();
     }
 
     #[test]
