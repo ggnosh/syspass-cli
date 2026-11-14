@@ -1,5 +1,5 @@
 use arboard::Clipboard;
-use log::warn;
+use log::{debug, warn};
 use miette::{Result, miette};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -112,8 +112,12 @@ impl DeferredClear {
 
         let actual = match clipboard.read() {
             Ok(text) => Some(text),
+            // `should_clear` assumes unread content is still ours, so the clear that follows runs without
+            // proof of ownership. The level rule here: warn when something is refused, debug when acting on
+            // an assumption. Only the re-executed child gets here — the Linux forked child clears by exiting,
+            // so on Linux this level change is inert.
             Err(error) => {
-                warn!("Could not read clipboard: {error}");
+                debug!("Could not read clipboard: {error}");
                 None
             }
         };
