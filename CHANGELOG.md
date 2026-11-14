@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 0.11.1 - 2026-11-15
+
+- Fixed github build.
+
 ## 0.11.0 - 2026-11-15
 
 - Fixed clipboard disappearing on Linux when using Wayland.
