@@ -33,7 +33,7 @@ pub fn select(
     size: &dyn SizeSource,
 ) -> Result<usize> {
     if accounts.is_empty() {
-        return Err(api::ApiError::NoResults("accounts".to_string()).into());
+        return Err(api::ApiFailure::NoResults("accounts".to_string()).into());
     }
 
     // Ambiguity is only an error when nobody can be asked.

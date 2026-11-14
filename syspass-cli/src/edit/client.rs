@@ -1,6 +1,6 @@
 use clap::{ArgMatches, Command, ValueHint, arg};
 use log::{info, warn};
-use miette::{Result, miette};
+use miette::Result;
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 use crate::api;
@@ -40,11 +40,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) ->
     };
 
     let id = numeric(&field, matches, quiet, &|| {
-        if new {
-            Ok(0)
-        } else {
-            ask_for(api_client, matches).map_err(|e| miette!("{e}: Failed to get client"))
-        }
+        if new { Ok(0) } else { ask_for(api_client, matches) }
     })?;
 
     edit_client(matches, api_client, id, quiet)
@@ -55,9 +51,7 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
         warn!("Creating a new client");
         Client::default()
     } else {
-        api_client
-            .get_client(id)
-            .map_err(|e| miette!("{e}: Failed to retrieve client"))?
+        api_client.get_client(id)?
     };
 
     let name = value(
@@ -88,15 +82,14 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
 
     info!("Trying to edit client");
 
-    api_client
-        .save_client(client)
-        .map_err(|e| miette!("{e}: Could not save client"))
-        .inspect(|client| {
-            warn!(
-                "{} Client {} ({}) saved!",
-                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                client.name().if_supports_color(Stdout, |text| text.green()),
-                client.display_id()
-            );
-        })
+    let saved_client = api_client.save_client(client)?;
+
+    warn!(
+        "{} Client {} ({}) saved!",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        saved_client.name().if_supports_color(Stdout, |text| text.green()),
+        saved_client.display_id()
+    );
+
+    Ok(saved_client)
 }

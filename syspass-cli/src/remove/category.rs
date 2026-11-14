@@ -13,22 +13,21 @@ pub fn command_helper() -> Command {
 
 #[inline]
 pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
-    match api_client.delete_category(id) {
-        Ok(true) => {
+    match api_client.delete_category(id)? {
+        crate::api::DeleteOutcome::Deleted => {
             warn!(
                 "{} Category removed",
                 "\u{2714}".if_supports_color(Stdout, |text| text.bright_green())
             );
             Ok(())
         }
-        Ok(false) => Err(miette!("Failed to remove category")),
-        Err(error) => Err(miette!(error))?,
+        crate::api::DeleteOutcome::NothingDeleted => Err(miette!(crate::api::REMOVING_CATEGORY)),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::api::{ApiError, MockClient};
+    use crate::api::{ApiError, ApiFailure, DeleteOutcome, MockClient, REMOVING_CATEGORY};
     use crate::remove::category::command;
     use clap::ArgMatches;
     use test_case::test_case;
@@ -39,9 +38,12 @@ mod tests {
     fn test_remove_category(id: u32) {
         let mut mock_client = MockClient::new();
         mock_client.expect_delete_category().returning(|id| match id {
-            1 => Ok(true),
-            0 => Ok(false),
-            _ => Err(ApiError::BadResponse("testing".to_string())),
+            1 => Ok(DeleteOutcome::Deleted),
+            0 => Ok(DeleteOutcome::NothingDeleted),
+            _ => Err(ApiError::new(
+                REMOVING_CATEGORY,
+                ApiFailure::BadResponse("testing".to_string()),
+            )),
         });
 
         let matches = ArgMatches::default();

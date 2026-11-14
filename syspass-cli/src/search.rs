@@ -71,9 +71,7 @@ fn get_accounts_list(
     search_string: AccountSearchParams,
     usage_disabled: bool,
 ) -> Result<Vec<Account>> {
-    api_client
-        .search_account(search_string, usage_disabled)
-        .map_err(|error| miette!("Error while searching: {error}"))
+    Ok(api_client.search_account(search_string, usage_disabled)?)
 }
 
 #[inline]
@@ -108,9 +106,7 @@ pub fn command(
     };
 
     let index = selection::select(&accounts, &name, quiet, &FuzzyChooser, size)?;
-    let account = api_client
-        .get_password(&accounts[index])
-        .map_err(|error| miette!("Error while fetching password: {error}"))?;
+    let account = api_client.get_password(&accounts[index])?;
 
     maybe_record_usage(usage, account.account.id(), disable_usage);
 
@@ -182,7 +178,7 @@ mod tests {
     use miette::{Result, miette};
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::api::{ApiError, Client, MockClient};
+    use crate::api::{ApiError, ApiFailure, Client, MockClient, SEARCHING};
     use crate::clipboard::ClipboardAdapter;
     use crate::config::Config;
     use crate::display::FixedWidth;
@@ -460,7 +456,7 @@ mod tests {
         let mut mock_client = MockClient::new();
         mock_client
             .expect_search_account()
-            .returning(|_, _| Err(ApiError::NoResults("accounts".to_string())));
+            .returning(|_, _| Err(ApiError::new(SEARCHING, ApiFailure::NoResults("accounts".to_string()))));
 
         let clipboard = FakeClipboard::default();
         let handoff = FakeHandoff::default();

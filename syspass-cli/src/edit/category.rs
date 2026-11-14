@@ -1,6 +1,6 @@
 use clap::{ArgMatches, Command, ValueHint, arg};
 use log::{info, warn};
-use miette::{Result, miette};
+use miette::Result;
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 use crate::api;
@@ -41,11 +41,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) ->
     };
 
     let id = numeric(&field, matches, quiet, &|| {
-        if new {
-            Ok(0)
-        } else {
-            ask_for(api_client).map_err(|e| miette!("{e}: Failed to get category"))
-        }
+        if new { Ok(0) } else { ask_for(api_client) }
     })?;
 
     edit_category(matches, api_client, id, quiet)
@@ -56,26 +52,23 @@ fn edit_category(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, qu
         warn!("Creating a new category");
         Category::default()
     } else {
-        api_client
-            .get_category(id)
-            .map_err(|e| miette!("{e}: Failed to retrieve category"))?
+        api_client.get_category(id)?
     };
 
     update_category_fields(matches, &mut category, quiet)?;
 
     info!("Trying to edit category");
 
-    api_client
-        .save_category(category)
-        .map_err(|e| miette!("{e}: Could not save category"))
-        .inspect(|category| {
-            warn!(
-                "{} Category {} ({}) saved!",
-                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                category.name().if_supports_color(Stdout, |text| text.green()),
-                category.display_id()
-            );
-        })
+    let saved_category = api_client.save_category(category)?;
+
+    warn!(
+        "{} Category {} ({}) saved!",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        saved_category.name().if_supports_color(Stdout, |text| text.green()),
+        saved_category.display_id()
+    );
+
+    Ok(saved_category)
 }
 
 fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: bool) -> Result<()> {

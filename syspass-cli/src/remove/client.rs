@@ -13,22 +13,21 @@ pub fn command_helper() -> Command {
 
 #[inline]
 pub fn command(_matches: &ArgMatches, api_client: &dyn crate::api::Client, id: u32) -> Result<()> {
-    match api_client.delete_client(id) {
-        Ok(true) => {
+    match api_client.delete_client(id)? {
+        crate::api::DeleteOutcome::Deleted => {
             warn!(
                 "{} Client removed",
                 "\u{2714}".if_supports_color(Stdout, |text| text.bright_green())
             );
             Ok(())
         }
-        Ok(false) => Err(miette!("Failed to remove client")),
-        Err(error) => Err(miette!(error))?,
+        crate::api::DeleteOutcome::NothingDeleted => Err(miette!(crate::api::REMOVING_CLIENT)),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::api::{ApiError, MockClient};
+    use crate::api::{ApiError, ApiFailure, DeleteOutcome, MockClient, REMOVING_CLIENT};
     use crate::remove::client::command;
     use clap::ArgMatches;
     use test_case::test_case;
@@ -39,9 +38,12 @@ mod tests {
     fn test_remove_client(id: u32) {
         let mut mock_client = MockClient::new();
         mock_client.expect_delete_client().returning(|id| match id {
-            1 => Ok(true),
-            0 => Ok(false),
-            _ => Err(ApiError::BadResponse("testing".to_string())),
+            1 => Ok(DeleteOutcome::Deleted),
+            0 => Ok(DeleteOutcome::NothingDeleted),
+            _ => Err(ApiError::new(
+                REMOVING_CLIENT,
+                ApiFailure::BadResponse("testing".to_string()),
+            )),
         });
 
         let matches = ArgMatches::default();
