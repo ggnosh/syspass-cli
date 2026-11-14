@@ -29,9 +29,17 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> Result<String> {
         return Ok(String::new());
     }
 
-    NaiveDate::parse_from_str(&input, "%Y-%m-%d")
-        .map(|date| date.and_time(NaiveTime::MIN).and_utc().timestamp().to_string())
-        .map_err(|e| miette!("Failed to parse date: {e}"))
+    let date = NaiveDate::parse_from_str(&input, "%Y-%m-%d").map_err(|e| miette!("Failed to parse date: {e}"))?;
+
+    end_of_day(date)
+}
+
+/// A typed date means the end of that day in UTC. Both paths go through here, so the expiration
+/// flag cannot mean two different instants.
+pub fn end_of_day(date: NaiveDate) -> Result<String> {
+    let time = NaiveTime::from_hms_opt(23, 59, 59).ok_or_else(|| miette!("Invalid time"))?;
+
+    Ok(date.and_time(time).and_utc().timestamp().to_string())
 }
 
 pub fn ask_for_password(prompt: &str, confirm: bool) -> Result<String> {
@@ -52,4 +60,17 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> Result<String> {
     }
 
     password.interact().map_err(|e| miette!("Failed to get password: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prompt::end_of_day;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn test_a_typed_date_is_the_end_of_that_day() {
+        let date = NaiveDate::from_ymd_opt(2024, 1, 1).expect("valid date");
+
+        assert_eq!(Some("1704153599".to_owned()), end_of_day(date).ok());
+    }
 }

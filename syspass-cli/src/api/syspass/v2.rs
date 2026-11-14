@@ -207,7 +207,11 @@ impl Syspass {
         result.as_object().map_or_default(|obj| {
             obj.iter()
                 .filter_map(|(key, value)| {
-                    key.parse::<u32>().ok().and_then(|_| serde_json::from_value(value.clone()).ok())
+                    if key.parse::<u32>().is_ok() {
+                        serde_json::from_value(value.clone()).ok()
+                    } else {
+                        None
+                    }
                 })
                 .collect()
         })
