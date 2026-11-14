@@ -64,19 +64,19 @@ fn get_response(
     client: &reqwest::blocking::Client,
     request_url: &str,
     req: &JsonReq,
-) -> Result<Response, api::ApiError> {
+) -> Result<Response, api::ApiFailure> {
     client
         .post(request_url)
         .json(req)
         .send()
-        .map_err(api::ApiError::Request)
+        .map_err(api::ApiFailure::Request)
         .and_then(|r| {
             if r.status().is_success() {
                 Ok(r)
             } else if r.status() == StatusCode::FORBIDDEN {
-                Err(api::ApiError::Unauthorized(r.status().as_u16()))
+                Err(api::ApiFailure::Unauthorized(r.status().as_u16()))
             } else {
-                Err(api::ApiError::BadResponse(format!(
+                Err(api::ApiFailure::BadResponse(format!(
                     "Server responded with code {}",
                     r.status()
                 )))
@@ -106,13 +106,13 @@ impl Syspass {
         method: &str,
         args: RequestArguments,
         needs_password: bool,
-    ) -> miette::Result<HashMap<String, String>, api::ApiError> {
+    ) -> std::result::Result<HashMap<String, String>, api::ApiFailure> {
         let mut params = HashMap::with_capacity(args.as_ref().map_or(1, |a| a.len() + 1));
         params.insert("authToken".to_owned(), self.config.token.clone());
 
         if needs_password {
             let password = if self.config.password.is_empty() {
-                (*PASSWORD).as_ref().map_err(|e| api::ApiError::Other(e.to_string()))?.clone()
+                (*PASSWORD).as_ref().map_err(|e| api::ApiFailure::Other(e.to_string()))?.clone()
             } else {
                 self.config.password.clone()
             };
@@ -140,18 +140,22 @@ impl Syspass {
         Ok(params)
     }
 
-    fn send_request<T: DeserializeOwned>(&self, request_url: &str, req: &JsonReq) -> miette::Result<T, api::ApiError> {
+    fn send_request<T: DeserializeOwned>(
+        &self,
+        request_url: &str,
+        req: &JsonReq,
+    ) -> std::result::Result<T, api::ApiFailure> {
         debug!("Sending request to {request_url}:\n{}\n", req.redacted());
 
         let response = get_response(&self.client, request_url, req)?;
 
         let json: Value = response
             .json()
-            .map_err(|_| api::ApiError::ParseError("Server response did not contain JSON".to_string()))?;
+            .map_err(|_| api::ApiFailure::ParseError("Server response did not contain JSON".to_string()))?;
 
         debug!("Received response:\n{json:#?}\n");
 
-        serde_json::from_value::<T>(json).map_err(|e| api::ApiError::ParseError(e.to_string()))
+        serde_json::from_value::<T>(json).map_err(|e| api::ApiFailure::ParseError(e.to_string()))
     }
 }
 

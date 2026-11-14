@@ -132,8 +132,11 @@ fn main() -> ExitCode {
         Err(e) => return print_error(&e),
     };
 
-    let Ok(api) = Api::from_str(config.api_version.as_deref().unwrap_or("")) else {
-        return print_error(&miette!("No such API is supported"));
+    // The cause has to survive: a bare "No such API is supported" would drop which version
+    // was actually in the config.
+    let api = match Api::from_str(config.api_version.as_deref().unwrap_or("")) {
+        Ok(api) => api,
+        Err(error) => return print_error(&error),
     };
     let usage: Rc<dyn UsageStore> = match FileUsageStore::open(None) {
         Ok(store) => Rc::new(store),

@@ -1,6 +1,6 @@
 use clap::{ArgMatches, Command, ValueHint, arg};
 use log::warn;
-use miette::{Result, miette};
+use miette::Result;
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 use crate::api;
@@ -54,7 +54,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
         },
         matches,
         quiet,
-        &|| api::category::ask_for(api_client).map_err(|error| miette!("Failed to retrieve category: {error}")),
+        &|| api::category::ask_for(api_client),
     )?;
 
     let client_id = numeric(
@@ -66,7 +66,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
         },
         matches,
         quiet,
-        &|| api::client::ask_for(api_client, matches).map_err(|_| miette!("Failed to get client")),
+        &|| api::client::ask_for(api_client, matches),
     )?;
 
     let account: Account = Account::new(
@@ -132,9 +132,7 @@ pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Acc
     );
 
     warn!("Trying to save account");
-    let saved_account = api_client
-        .save_account(account)
-        .map_err(|error| miette!("Could not save account: {error}"))?;
+    let saved_account = api_client.save_account(account)?;
 
     warn!(
         "{} Account {} ({}) saved!",

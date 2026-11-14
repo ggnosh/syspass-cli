@@ -66,23 +66,19 @@ impl Entity for Category {
 }
 
 fn save_category(new_category: Category, api_client: &dyn api::Client) -> Result<u32> {
-    match api_client.save_category(new_category) {
-        Ok(client) => client.id.ok_or_else(|| miette!(ID_EMPTY)),
-        Err(error) => Err(miette!("Failed to save category: {error}")),
-    }
+    let category = api_client.save_category(new_category)?;
+    category.id.ok_or_else(|| miette!(ID_EMPTY))
 }
 
 pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
-    let categories = api_client
-        .get_categories()
-        .map_err(|error| miette!("{error}: Could not list categories"))?;
+    let categories = api_client.get_categories()?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right category (ESC for new):")
         .max_length(10)
         .items(&categories)
         .interact_opt()
-        .map_err(|e| miette!("{e}: Failed to list categories"))?
+        .map_err(|e| miette!("{e}: Failed to select category"))?
         .map_or_else(
             || {
                 loop {
@@ -104,7 +100,7 @@ pub fn ask_for(api_client: &dyn api::Client) -> Result<u32> {
 mod tests {
     use super::*;
     use crate::api::category::Category;
-    use crate::api::{ApiError, MockClient};
+    use crate::api::{ApiError, ApiFailure, MockClient, SAVING_CATEGORY};
 
     #[test]
     fn test_display_category() {
@@ -154,9 +150,12 @@ mod tests {
         let mut mock_client = MockClient::new();
         let category = Category::new(None, "Test Category".to_string(), Some("Test Description".to_string()));
 
-        mock_client
-            .expect_save_category()
-            .returning(|_| Err(ApiError::BadResponse("testing".to_string())));
+        mock_client.expect_save_category().returning(|_| {
+            Err(ApiError::new(
+                SAVING_CATEGORY,
+                ApiFailure::BadResponse("testing".to_string()),
+            ))
+        });
 
         let result = save_category(category, &mock_client);
         assert!(result.is_err());
