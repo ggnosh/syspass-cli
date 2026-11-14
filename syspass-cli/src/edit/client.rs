@@ -1,11 +1,12 @@
-use crate::api::client::{Client, ask_for};
-use crate::api::entity::Entity;
-use crate::prompt::get_match_string;
-use crate::{api, helper};
 use clap::{ArgMatches, Command, ValueHint, arg};
 use log::{info, warn};
 use miette::{Result, miette};
 use owo_colors::{OwoColorize, Stream::Stdout};
+
+use crate::api;
+use crate::api::client::{Client, ask_for};
+use crate::api::entity::Entity;
+use crate::input::{Field, InputPrompter, numeric, value};
 
 pub const COMMAND_NAME: &str = "client";
 
@@ -31,13 +32,20 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Client> {
     let quiet = matches.get_flag("quiet");
-    let id = helper::get_numeric_input(
-        "id",
-        matches,
-        new,
-        Ok(|| ask_for(api_client, matches).map_err(|e| miette!("{e}: Failed to get client"))),
-        quiet,
-    )?;
+    let field = Field {
+        id: "id",
+        prompt: "",
+        default: if new { "0" } else { "" },
+        required: !new,
+    };
+
+    let id = numeric(&field, matches, quiet, &|| {
+        if new {
+            Ok(0)
+        } else {
+            ask_for(api_client, matches).map_err(|e| miette!("{e}: Failed to get client"))
+        }
+    })?;
 
     edit_client(matches, api_client, id, quiet)
 }
@@ -52,16 +60,29 @@ fn edit_client(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, quie
             .map_err(|e| miette!("{e}: Failed to retrieve client"))?
     };
 
-    let name = get_match_string(matches, quiet, "name", "Name: ", client.name(), true)?;
-    client.set_name(&name);
-
-    let description = get_match_string(
+    let name = value(
+        &Field {
+            id: "name",
+            prompt: "Name: ",
+            default: client.name(),
+            required: true,
+        },
         matches,
         quiet,
-        "description",
-        "Description: ",
-        client.description().unwrap_or_default(),
-        false,
+        &InputPrompter,
+    )?;
+    client.set_name(&name);
+
+    let description = value(
+        &Field {
+            id: "description",
+            prompt: "Description: ",
+            default: client.description().unwrap_or_default(),
+            required: false,
+        },
+        matches,
+        quiet,
+        &InputPrompter,
     )?;
     client.set_description(Some(description));
 

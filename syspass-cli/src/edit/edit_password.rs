@@ -2,6 +2,7 @@ use miette::{Result, miette};
 
 use crate::api::account::{Account, ChangePassword};
 use crate::display::{self, SizeSource};
+use crate::input::{Field, Prompter, value};
 use crate::prompt::{ask_for_date, ask_for_password};
 use chrono::{NaiveDate, NaiveTime, Utc};
 use clap::{ArgMatches, Command, ValueHint, arg};
@@ -56,11 +57,7 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, size: &dyn SizeSource) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
-    let args: ChangeAccountArgs = get_args(matches, quiet)?;
-
-    if args.password.is_empty() {
-        Err(miette!("Password can't be empty"))?;
-    }
+    let args: ChangeAccountArgs = get_args(matches, quiet, &PasswordPrompter)?;
 
     let change = ChangePassword {
         id: args.id,
@@ -84,12 +81,20 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, size: 
     }
 }
 
-fn get_args(matches: &ArgMatches, quiet: bool) -> Result<ChangeAccountArgs> {
+fn get_args(matches: &ArgMatches, quiet: bool, prompter: &dyn Prompter) -> Result<ChangeAccountArgs> {
     let mut args: ChangeAccountArgs = ChangeAccountArgs::new(matches)?;
 
-    if args.password.is_empty() && !quiet {
-        args.password = get_password("New password:")?;
-    }
+    args.password = value(
+        &Field {
+            id: "password",
+            prompt: "New password:",
+            default: "",
+            required: true,
+        },
+        matches,
+        quiet,
+        prompter,
+    )?;
 
     if args.expiration_date.is_empty() {
         if !quiet {
@@ -152,9 +157,34 @@ pub fn get_password(prompt: &str) -> Result<String> {
     choice.map_or_else(|| ask_for_password(prompt, true), |choice| Ok(pairs[choice].clone()))
 }
 
+pub struct PasswordPrompter;
+
+impl Prompter for PasswordPrompter {
+    fn ask(&self, field: &Field) -> Result<String> {
+        get_password(field.prompt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::edit::edit_password::{expiration_timestamp, generate_passwords, get_args, parse_expire_date};
+    use crate::input::{Field, Prompter};
+
+    struct FakePrompter;
+
+    impl Prompter for FakePrompter {
+        fn ask(&self, field: &Field) -> miette::Result<String> {
+            Ok(format!("asked:{}", field.id))
+        }
+    }
+
+    fn command_line(args: &[&str]) -> clap::ArgMatches {
+        clap::Command::new("test")
+            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
+            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
+            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
+            .get_matches_from(args)
+    }
 
     #[test]
     fn test_parse_expire_date_allows_empty() {
@@ -173,25 +203,37 @@ mod tests {
 
     #[test]
     fn test_get_args_quiet_keeps_empty_expiration() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
-            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
-            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
-            .get_matches_from(vec!["test", "-i", "1", "-p", "secret"]);
+        let matches = command_line(&["test", "-i", "1", "-p", "secret"]);
 
-        let args = get_args(&matches, true).ok();
+        let args = get_args(&matches, true, &FakePrompter).ok();
         assert_eq!(Some(String::new()), args.map(|args| args.expiration_date));
     }
 
     #[test]
     fn test_get_args_quiet_rejects_invalid_expiration() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
-            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
-            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
-            .get_matches_from(vec!["test", "-i", "1", "-p", "secret", "-e", "not-a-date"]);
+        let matches = command_line(&["test", "-i", "1", "-p", "secret", "-e", "not-a-date"]);
 
-        assert!(get_args(&matches, true).is_err());
+        assert!(get_args(&matches, true, &FakePrompter).is_err());
+    }
+
+    #[test]
+    fn test_get_args_quiet_errors_for_a_missing_password() {
+        let matches = command_line(&["test", "-i", "1", "-e", "2024-01-01"]);
+
+        let error = get_args(&matches, true, &FakePrompter)
+            .err()
+            .expect("Quiet mode should error for a missing password");
+
+        assert_eq!("Field 'password' is required but no value was given", error.to_string());
+    }
+
+    #[test]
+    fn test_get_args_asks_for_the_password_when_not_quiet() {
+        let matches = command_line(&["test", "-i", "1", "-e", "2024-01-01"]);
+
+        let args = get_args(&matches, false, &FakePrompter).expect("Failed to get args");
+
+        assert_eq!("asked:password", args.password);
     }
 
     #[test]
