@@ -564,6 +564,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "fork"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b8b9dc1312e1668be5ffa350e3c0adc9b501b2eeebb1b31206477240cc96554"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "form_urlencoded"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2152,6 +2161,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "dialoguer",
+ "fork",
  "home",
  "itertools",
  "log",

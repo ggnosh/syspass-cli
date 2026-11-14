@@ -21,10 +21,12 @@ mod clipboard;
 mod config;
 mod display;
 mod edit;
+mod handoff;
 mod input;
 mod prompt;
 mod remove;
 mod search;
+mod selection;
 mod update;
 mod usage;
 
@@ -138,14 +140,32 @@ fn main() -> ExitCode {
         Err(e) => return print_error(&e),
     };
 
-    let api_client = api.get(config.clone(), usage.clone());
-    let size = display::TerminalSize;
+    // The fork has to happen while this process still has one thread, so it happens here: the API client
+    // spawns its runtime thread when it is built. The child waits on the channel for what to serve.
     let clipboard_adapter = clipboard::ArboardClipboard::default();
 
+    #[cfg(target_os = "linux")]
+    let handoff_adapter = match handoff::ForkedChild::new(&clipboard_adapter) {
+        Ok(handoff) => handoff,
+        Err(e) => return print_error(&e),
+    };
+    #[cfg(not(target_os = "linux"))]
+    let handoff_adapter = handoff::SelfProcess;
+
+    let api_client = api.get(config.clone(), usage.clone());
+    let size = display::TerminalSize;
+
     match matches.subcommand() {
-        Some((search::COMMAND_NAME, matches)) => {
-            search::command(matches, &*api_client, &config, &*usage, &size, &clipboard_adapter).map(|_| 0)
-        }
+        Some((search::COMMAND_NAME, matches)) => search::command(
+            matches,
+            &*api_client,
+            &config,
+            &*usage,
+            &size,
+            &clipboard_adapter,
+            &handoff_adapter,
+        )
+        .map(|()| 0),
         Some((edit::COMMAND_NAME_EDIT, matches)) => edit::command_edit(matches, &*api_client, &size).map(|()| 0),
         Some((remove::COMMAND_NAME, matches)) => remove::command(matches, &*api_client).map(|()| 0),
         Some((edit::COMMAND_NAME_NEW, matches)) => edit::command_new(matches, &*api_client).map(|()| 0),
