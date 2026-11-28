@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.12.0 - 2026-11-28
+
+- Library update.
+- Change from `chrono` to `time` crate since `chrono` is unmaintained.
+
 ## 0.11.1 - 2026-11-15
 
 - Fixed github build.
