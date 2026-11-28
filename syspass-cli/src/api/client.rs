@@ -55,7 +55,7 @@ impl Display for Client {
         write!(
             f,
             "{}. {}{}",
-            self.id().map_or_else(|| "?".to_string(), ToString::to_string),
+            self.display_id(),
             self.name(),
             if *self.is_global() > 0 {
                 " (*)".to_string()
@@ -77,16 +77,14 @@ impl Entity for Client {
 }
 
 pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32> {
-    let clients = api_client
-        .get_clients()
-        .map_err(|error| miette!("{error}: Could not list clients"))?;
+    let clients = api_client.get_clients()?;
 
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt("Select the right client (ESC for new):")
         .max_length(10)
         .items(&clients)
         .interact_opt()
-        .map_err(|_| miette!("Failed to select client"))?
+        .map_err(|e| miette!("{e}: Failed to select client"))?
         .map_or_else(
             || loop {
                 let new_client = Client {
@@ -103,7 +101,7 @@ pub fn ask_for(api_client: &dyn api::Client, matches: &ArgMatches) -> Result<u32
                     Ok(client) => break Ok(*client.id().ok_or_else(|| miette!(ID_EMPTY))?),
                     Err(error) => {
                         error!(
-                            "{} Failed to save client: {}",
+                            "{} {}",
                             "\u{2716}".if_supports_color(Stdout, |text| text.bright_red()),
                             error
                         );

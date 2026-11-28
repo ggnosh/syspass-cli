@@ -1,7 +1,8 @@
-use crate::api::Client;
-use crate::helper;
 use clap::{ArgMatches, Command, ValueHint, arg};
 use miette::{Result, miette};
+
+use crate::api::Client;
+use crate::input::{Field, numeric};
 
 mod account;
 mod category;
@@ -28,13 +29,15 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<()> {
     let quiet = matches.get_flag("quiet");
-    let id = helper::get_numeric_input::<fn() -> Result<u32>>(
-        "id",
-        matches,
-        false,
-        Err(miette!("Invalid ID provided")),
-        quiet,
-    )?;
+    let field = Field {
+        id: "id",
+        prompt: "",
+        default: "",
+        required: true,
+    };
+
+    // There is nothing to select from here; an id has to be given.
+    let id = numeric(&field, matches, quiet, &|| Err(miette!("Invalid ID provided")))?;
 
     match matches.subcommand() {
         Some((account::COMMAND_NAME, matches)) => account::command(matches, api_client, id),

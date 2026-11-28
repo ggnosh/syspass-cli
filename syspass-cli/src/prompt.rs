@@ -1,7 +1,10 @@
-use chrono::{NaiveDate, NaiveTime};
-use clap::ArgMatches;
 use dialoguer::{Input, Password, theme::ColorfulTheme};
 use miette::{Result, miette};
+use time::{Date, Time, format_description::FormatItem, macros::format_description};
+
+pub const DATE_FORMAT: &[FormatItem<'static>] = format_description!("[year]-[month]-[day]");
+pub const DATE_PARSE_FORMAT: &[FormatItem<'static>] =
+    format_description!("[year]-[month padding:none]-[day padding:none]");
 
 pub fn ask_prompt(text: &str, required: bool, default: &str) -> Result<String> {
     Input::with_theme(&ColorfulTheme::default())
@@ -12,38 +15,13 @@ pub fn ask_prompt(text: &str, required: bool, default: &str) -> Result<String> {
         .map_err(|e| miette!("Failed to get input: {e}"))
 }
 
-pub fn get_match_string(
-    matches: &ArgMatches,
-    quiet: bool,
-    match_id: &str,
-    prompt_text: &str,
-    default: &str,
-    required: bool,
-) -> Result<String> {
-    if let Some(value) = matches
-        .get_one::<String>(match_id)
-        .filter(|value| !value.is_empty() || (quiet && !required))
-    {
-        return Ok(value.clone());
-    }
-
-    if quiet {
-        if required && default.is_empty() {
-            return Err(miette!("Field '{match_id}' is required but no value was given"));
-        }
-
-        Ok(default.to_owned())
-    } else {
-        ask_prompt(prompt_text, required, default)
-    }
-}
-
-pub fn ask_for_date(prompt: &str, date: NaiveDate) -> Result<String> {
+pub fn ask_for_date(prompt: &str, date: Date) -> Result<String> {
+    let default = date.format(DATE_FORMAT).map_err(|e| miette!("Failed to format date: {e}"))?;
     let input = Input::with_theme(&ColorfulTheme::default())
         .with_prompt(prompt)
-        .with_initial_text(date.format("%Y-%m-%d").to_string())
+        .with_initial_text(default)
         .validate_with(|input: &String| {
-            if input.is_empty() || NaiveDate::parse_from_str(input, "%Y-%m-%d").is_ok() {
+            if input.is_empty() || Date::parse(input, DATE_PARSE_FORMAT).is_ok() {
                 Ok(())
             } else {
                 Err("Please enter a valid date in YYYY-mm-dd format or leave it empty.")
@@ -56,9 +34,17 @@ pub fn ask_for_date(prompt: &str, date: NaiveDate) -> Result<String> {
         return Ok(String::new());
     }
 
-    NaiveDate::parse_from_str(&input, "%Y-%m-%d")
-        .map(|date| date.and_time(NaiveTime::MIN).and_utc().timestamp().to_string())
-        .map_err(|e| miette!("Failed to parse date: {e}"))
+    let date = Date::parse(&input, DATE_PARSE_FORMAT).map_err(|e| miette!("Failed to parse date: {e}"))?;
+
+    end_of_day(date)
+}
+
+/// A typed date means the end of that day in UTC. Both paths go through here, so the expiration
+/// flag cannot mean two different instants.
+pub fn end_of_day(date: Date) -> Result<String> {
+    let time = Time::from_hms(23, 59, 59).map_err(|e| miette!("Invalid time: {e}"))?;
+
+    Ok(date.with_time(time).assume_utc().unix_timestamp().to_string())
 }
 
 pub fn ask_for_password(prompt: &str, confirm: bool) -> Result<String> {
@@ -83,36 +69,13 @@ pub fn ask_for_password(prompt: &str, confirm: bool) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::prompt::get_match_string;
+    use crate::prompt::end_of_day;
+    use time::macros::date;
 
     #[test]
-    fn test_get_match_string_default() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(--"name" <NAME> "Name argument"))
-            .get_matches_from(vec!["test"]);
+    fn test_a_typed_date_is_the_end_of_that_day() {
+        let date = date!(2024 - 01 - 01);
 
-        let result = get_match_string(&matches, true, "name", "Enter name:", "default", false)
-            .expect("Failed to get match string");
-        assert_eq!(result, "default", "Should return the default value");
-    }
-
-    #[test]
-    fn test_get_match_string_required_in_quiet_mode() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(--"name" <NAME> "Name argument"))
-            .get_matches_from(vec!["test"]);
-
-        let result = get_match_string(&matches, true, "name", "Enter name:", "", true);
-        assert!(result.is_err(), "Required field should error when no value is given");
-    }
-
-    #[test]
-    fn test_get_match_string_required_empty_value_in_quiet_mode() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(--"name" <NAME> "Name argument"))
-            .get_matches_from(vec!["test", "--name", ""]);
-
-        let result = get_match_string(&matches, true, "name", "Enter name:", "", true);
-        assert!(result.is_err(), "Required field should error when the value is empty");
+        assert_eq!(Some("1704153599".to_owned()), end_of_day(date).ok());
     }
 }

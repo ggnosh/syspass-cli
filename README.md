@@ -74,6 +74,9 @@ If `password` is empty it will be prompted when needed.
 
 `passwordTimeout` if the value is 0 this feature is ignored.
 Otherwise, the clipboard will be cleared after given seconds unless the `--showpassword` flag is given.
+It only clears when the clipboard still holds what syspass copied. If the content cannot be read — for
+example a Wayland session that denies clipboard access to the client — it clears anyway, so on that
+platform the behaviour is the same as an unconditional wipe.
 
 `apiVersion` defines which API to use. Supported values are `SyspassV2` and `SyspassV3`.
 If value is not defined the **syspass-cli** defaults to newest sysPass version.

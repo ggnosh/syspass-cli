@@ -1,13 +1,13 @@
 use clap::{ArgMatches, Command, ValueHint, arg};
 use log::warn;
-use miette::{Result, miette};
+use miette::Result;
 use owo_colors::{OwoColorize, Stream::Stdout};
 
+use crate::api;
 use crate::api::account::Account;
 use crate::api::entity::Entity;
-use crate::edit::edit_password::get_password;
-use crate::prompt::get_match_string;
-use crate::{api, helper};
+use crate::edit::edit_password::PasswordPrompter;
+use crate::input::{Field, InputPrompter, numeric, value};
 
 pub const COMMAND_NAME: &str = "password";
 
@@ -44,55 +44,101 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
-    let category_id = helper::get_numeric_input(
-        "category",
-        matches,
-        false,
-        Ok(|| api::category::ask_for(api_client).map_err(|error| miette!("Failed to retrieve category: {error}"))),
-        quiet,
-    )
-    .map_err(|e| miette!("{e}: Failed to retrieve a valid category ID"))?;
 
-    let client_id = helper::get_numeric_input(
-        "client",
+    let category_id = numeric(
+        &Field {
+            id: "category",
+            prompt: "",
+            default: "",
+            required: true,
+        },
         matches,
-        false,
-        Ok(|| api::client::ask_for(api_client, matches).map_err(|_| miette!("Failed to get client"))),
         quiet,
-    )
-    .map_err(|e| miette!("{e}: Failed to retrieve a valid client ID"))?;
+        &|| api::category::ask_for(api_client),
+    )?;
+
+    let client_id = numeric(
+        &Field {
+            id: "client",
+            prompt: "",
+            default: "",
+            required: true,
+        },
+        matches,
+        quiet,
+        &|| api::client::ask_for(api_client, matches),
+    )?;
 
     let account: Account = Account::new(
-        Some(0),
-        get_match_string(matches, quiet, "name", "Name: ", "", true)?,
-        get_match_string(matches, quiet, "login", "Username: ", "", false)?,
-        Some(get_match_string(matches, quiet, "url", "Url: ", "", false)?),
-        Some(get_match_string(matches, quiet, "note", "Notes: ", "", false)?),
+        None,
+        value(
+            &Field {
+                id: "name",
+                prompt: "Name: ",
+                default: "",
+                required: true,
+            },
+            matches,
+            quiet,
+            &InputPrompter,
+        )?,
+        value(
+            &Field {
+                id: "login",
+                prompt: "Username: ",
+                default: "",
+                required: false,
+            },
+            matches,
+            quiet,
+            &InputPrompter,
+        )?,
+        Some(value(
+            &Field {
+                id: "url",
+                prompt: "Url: ",
+                default: "",
+                required: false,
+            },
+            matches,
+            quiet,
+            &InputPrompter,
+        )?),
+        Some(value(
+            &Field {
+                id: "note",
+                prompt: "Notes: ",
+                default: "",
+                required: false,
+            },
+            matches,
+            quiet,
+            &InputPrompter,
+        )?),
         category_id,
         client_id,
-        Some(matches.get_one::<String>("password").map_or_else(
-            || {
-                if quiet {
-                    warn!("Could not ask for password");
-                    return Err(miette!("Password input required but not provided"));
-                }
-                get_password("Password: ")
+        Some(value(
+            &Field {
+                id: "password",
+                prompt: "Password: ",
+                default: "",
+                required: true,
             },
-            |password| Ok(password.clone()),
+            matches,
+            quiet,
+            &PasswordPrompter,
         )?),
         None,
     );
 
     warn!("Trying to save account");
-    let saved_account = api_client
-        .save_account(account)
-        .map_err(|error| miette!("Could not save account: {error}"))?;
+    let saved_account = api_client.save_account(account)?;
 
     warn!(
         "{} Account {} ({}) saved!",
         "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
         saved_account.name().if_supports_color(Stdout, |text| text.green()),
-        saved_account.id().expect("Id should not be empty")
+        saved_account.display_id()
     );
 
     Ok(saved_account)

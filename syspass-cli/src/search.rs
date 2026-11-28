@@ -1,27 +1,18 @@
-#[cfg(target_os = "linux")]
-use arboard::SetExtLinux;
-#[cfg(target_os = "linux")]
-use std::time::Instant;
+use std::process;
 
-use arboard::Clipboard;
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint, arg};
-use dialoguer::{FuzzySelect, theme::ColorfulTheme};
 use log::warn;
 use miette::{Result, miette};
-use owo_colors::{OwoColorize, Stream::Stdout};
-use std::collections::HashMap;
-use std::sync::atomic::Ordering;
-use std::time::Duration;
-use std::{cmp, env, process, thread};
-use term_table::row::Row;
-use term_table::table_cell::{Alignment, TableCell};
-use term_table::{Table, TableStyle};
 
-use crate::api::account::{Account, ViewPassword};
+use crate::api::account::Account;
 use crate::api::entity::Entity;
 use crate::api::{AccountSearchParams, Client};
+use crate::clipboard::ClipboardAdapter;
 use crate::config::Config;
-use crate::{TERMINAL_WIDTH, api};
+use crate::display::{self, SizeSource};
+use crate::handoff::ProcessHandoff;
+use crate::selection::{self, FuzzyChooser};
+use crate::usage::UsageStore;
 
 pub const COMMAND_NAME: &str = "search";
 
@@ -65,7 +56,14 @@ pub fn command_helper() -> Command {
                 .long("disable-usage")
                 .help("Do not sort account list by usage and do not track usage history"),
         )
-        .arg(arg!(--clear "Clear clipboard").hide(true).value_hint(ValueHint::Unknown))
+        .arg(
+            Arg::new("clear")
+                .long("clear")
+                .value_name("SECONDS")
+                .value_parser(clap::value_parser!(u64))
+                .help("Clear the clipboard after SECONDS if it still holds what we copied")
+                .hide(true),
+        )
 }
 
 fn get_accounts_list(
@@ -73,64 +71,25 @@ fn get_accounts_list(
     search_string: AccountSearchParams,
     usage_disabled: bool,
 ) -> Result<Vec<Account>> {
-    api_client
-        .search_account(search_string, usage_disabled)
-        .map_err(|error| miette!("Error while searching: {error}"))
-}
-
-fn clear_clipboard(timeout: u64) -> Result<()> {
-    if timeout > 0 {
-        thread::sleep(Duration::from_secs(timeout));
-
-        set_clipboard_text("")?;
-
-        Clipboard::new()
-            .map_err(|_| miette!("Could not clear clipboard"))?
-            .clear()
-            .map_err(|_| miette!("Failed to clear clipboard"))?;
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-pub fn set_clipboard_text(text: &str) -> Result<()> {
-    Clipboard::new()
-        .map_err(|_| miette!("Could not open clipboard"))?
-        .set()
-        .exclude_from_history()
-        .wait_until(Instant::now() + Duration::from_millis(15))
-        .text(text)
-        .map_err(|_| miette!("Failed to set clipboard value"))?;
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "linux"))]
-pub fn set_clipboard_text(text: &str) -> Result<()> {
-    Clipboard::new()
-        .map_err(|_| miette!("Could not open clipboard"))?
-        .set_text(text)
-        .map_err(|_| miette!("Failed to set clipboard value"))?;
-
-    thread::sleep(Duration::from_millis(15));
-
-    Ok(())
+    Ok(api_client.search_account(search_string, usage_disabled)?)
 }
 
 #[inline]
-pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<ViewPassword>> {
+pub fn command(
+    matches: &ArgMatches,
+    api_client: &dyn Client,
+    config: &Config,
+    usage: &dyn UsageStore,
+    size: &dyn SizeSource,
+    clipboard: &dyn ClipboardAdapter,
+    handoff: &dyn ProcessHandoff,
+) -> Result<()> {
     let quiet = matches.get_flag("quiet");
     let name = matches.get_one::<String>("name").cloned().unwrap_or_default();
     let id = matches.get_one::<u32>("id").copied().unwrap_or(0);
     let category = matches.get_one::<u32>("category").copied().unwrap_or(0);
-    let config = api_client.get_config();
+    let disable_usage = matches.get_flag("disable-usage");
     let show = matches.get_flag("show-password") || config.no_clipboard;
-
-    if matches.get_flag("clear") {
-        clear_clipboard(config.password_timeout.unwrap_or(10))?;
-        return Ok(None);
-    }
 
     let accounts = if id > 0 {
         vec![api_client.view_account(id)?]
@@ -138,74 +97,47 @@ pub fn command(matches: &ArgMatches, api_client: &dyn Client) -> Result<Option<V
         return Err(miette!("Name or id is required"));
     } else {
         let mut search_string = vec![("text", name.clone())];
+
         if category > 0 {
             search_string.push(("categoryId", category.to_string()));
         }
-        get_accounts_list(api_client, search_string, !matches.get_flag("disable-usage"))?
+
+        get_accounts_list(api_client, search_string, !disable_usage)?
     };
 
-    if accounts.len() > 1 && quiet {
-        return Err(miette!(
-            "Ambiguous match: {} accounts found for '{}'. Use -i <id> to select one.",
-            accounts.len(),
-            name
-        ));
-    }
+    let index = selection::select(&accounts, &name, quiet, &FuzzyChooser, size)?;
+    let account = api_client.get_password(&accounts[index])?;
 
-    let account: ViewPassword = {
-        if accounts.len() > 1 {
-            select_account(&accounts, api_client, matches.get_flag("disable-usage"))
-                .map_err(|error| miette!("Error while selecting account: {error}"))?
-        } else {
-            let account = accounts
-                .first()
-                .ok_or_else(|| api::ApiError::NoResults("accounts".to_string()))?;
-
-            api_client
-                .get_password(account)
-                .map_err(|error| miette!("Error while fetching password: {error}"))?
-        }
-    };
+    maybe_record_usage(usage, account.account.id(), disable_usage);
 
     if !show {
-        set_clipboard_text(&account.password)?;
-
-        if config.password_timeout.unwrap_or(10) > 0
-            && let Some(path) = env::current_exe()
-                .map_err(|e| miette!("{e}: Failed to get current executable path"))?
-                .as_path()
-                .to_str()
-        {
-            let mut args = vec!["search", "--clear"];
-            if let Some(config) = matches.get_one::<String>("config") {
-                args.push("--config");
-                args.push(config);
-            }
-
-            if cfg!(test) {
-                process::Command::new(path)
-                    .args(args)
-                    .spawn()
-                    .map_err(|e| miette!("{e}: Failed to start child process"))?
-                    .wait()
-                    .map_err(|e| miette!("{e}: Failed to wait for child process"))?;
-            } else {
-                process::Command::new(path)
-                    .args(args)
-                    .spawn()
-                    .map_err(|e| miette!("{e}: Failed to start child process"))?;
-            }
-        }
+        // The handoff copies as well as clears. On Linux the process that copies has to stay alive to
+        // serve the selection, so the copy and the window belong to the same process.
+        handoff.run(
+            clipboard,
+            &account.password,
+            config.password_timeout.unwrap_or(10),
+            &log_flags(matches),
+        )?;
     }
 
-    warn!("{}", print_table_for_account(&account, show));
+    warn!("{}", display::table(&account, show, size));
 
     if !config.no_shell && !matches.get_flag("no-shell") && account.account.url().unwrap_or_default().contains("ssh://")
     {
         open_shell(&account.account)?;
     }
 
-    Ok(Some(account))
+    Ok(())
+}
+
+/// The log flags the child inherits.
+fn log_flags(matches: &ArgMatches) -> Vec<&str> {
+    ["quiet", "verbose", "debug"]
+        .iter()
+        .filter(|flag| matches.get_flag(flag))
+        .copied()
+        .collect()
 }
 
 fn open_shell(account: &Account) -> Result<()> {
@@ -231,91 +163,228 @@ fn open_shell(account: &Account) -> Result<()> {
     Ok(())
 }
 
-fn select_account(accounts: &[Account], api_client: &dyn Client, disable_usage: bool) -> Result<ViewPassword> {
-    FuzzySelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select the right account:")
-        .default(0)
-        .max_length(10)
-        .items(accounts)
-        .interact()
-        .map_err(|err| miette!(err))
-        .and_then(|choice| {
-            if !disable_usage
-                && let Err(e) = Config::record_usage(*accounts[choice].id().expect("Id should be set"), None)
-            {
-                warn!("Could not record usage: {e}");
-            }
-            api_client.get_password(&accounts[choice]).map_err(|err| miette!(err))
-        })
-}
+fn maybe_record_usage(usage: &dyn UsageStore, id: Option<&u32>, disable_usage: bool) {
+    if disable_usage {
+        return;
+    }
 
-fn print_table_for_account(data: &ViewPassword, show: bool) -> String {
-    let mut table = Table::new();
-    let width = TERMINAL_WIDTH.load(Ordering::Relaxed);
-
-    table.max_column_widths = HashMap::from([
-        (0, width * 7 / 100),
-        (1, width * 29 / 100),
-        (2, cmp::max(width * 30 / 100, width - (width * 69 / 100))),
-        (3, width * 29 / 100),
-    ]);
-    table.style = TableStyle::rounded();
-
-    let cells = vec![
-        TableCell::new("Id".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Username".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Password".if_supports_color(Stdout, |text| text.green())),
-        TableCell::new("Address".if_supports_color(Stdout, |text| text.green())),
-    ];
-
-    table.add_row(Row::new(vec![
-        TableCell::builder(data.account.name())
-            .alignment(Alignment::Center)
-            .col_span(cells.len())
-            .build(),
-    ]));
-
-    table.add_row(Row::new(vec![
-        TableCell::builder(data.account.client_name().unwrap_or(""))
-            .alignment(Alignment::Center)
-            .col_span(cells.len())
-            .build(),
-    ]));
-
-    table.add_row(Row::new(cells));
-
-    table.add_row(Row::new(vec![
-        TableCell::new(data.account.id().expect("Id should not be empty")),
-        TableCell::new(data.account.login()),
-        TableCell::new(if show { &data.password } else { "Copied to clipboard" }),
-        TableCell::new(data.account.url().unwrap_or_default()),
-    ]));
-
-    table.render()
+    usage.record(id);
 }
 
 #[cfg(test)]
 mod tests {
-    use arboard::Clipboard;
+    use std::cell::RefCell;
+
+    use miette::{Result, miette};
 
     use crate::api::account::{Account, ViewPassword};
-    use crate::search::{clear_clipboard, open_shell, print_table_for_account, set_clipboard_text};
+    use crate::api::{ApiError, ApiFailure, Client, MockClient, SEARCHING};
+    use crate::clipboard::ClipboardAdapter;
+    use crate::config::Config;
+    use crate::display::FixedWidth;
+    use crate::handoff::ProcessHandoff;
+    use crate::search::{command, log_flags, maybe_record_usage, open_shell};
+    use crate::usage::{MemoryUsageStore, UsageStore};
 
-    fn get_test_account_data() -> ViewPassword {
-        ViewPassword {
-            account: Account::new(
-                Some(1),
-                "Test".to_owned(),
-                "test".to_owned(),
-                Some("https://example.org".to_owned()),
-                Some("notes".to_owned()),
-                4,
-                5,
-                None,
-                Some("test_client".to_owned()),
-            ),
-            password: "<PASSWORD>".to_owned(),
+    #[derive(Default)]
+    struct FakeClipboard {
+        written: RefCell<Vec<String>>,
+    }
+
+    impl ClipboardAdapter for FakeClipboard {
+        fn read(&self) -> Result<String> {
+            Err(miette!("nothing to read"))
         }
+
+        fn write(&self, text: &str) -> Result<()> {
+            self.written.borrow_mut().push(text.to_owned());
+
+            Ok(())
+        }
+
+        fn clear(&self) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeHandoff {
+        seen: RefCell<Vec<(String, u64, Vec<String>)>>,
+    }
+
+    impl ProcessHandoff for FakeHandoff {
+        fn run(&self, clipboard: &dyn ClipboardAdapter, text: &str, window: u64, flags: &[&str]) -> Result<()> {
+            // The fake copies through the clipboard seam, so a test can see what was handed over.
+            clipboard.write(text)?;
+
+            self.seen
+                .borrow_mut()
+                .push((text.to_owned(), window, flags.iter().map(ToString::to_string).collect()));
+
+            Ok(())
+        }
+    }
+
+    fn account(id: u32) -> Account {
+        Account::new(
+            Some(id),
+            "name".to_owned(),
+            "login".to_owned(),
+            Some("example.org".to_owned()),
+            None,
+            0,
+            0,
+            None,
+            None,
+        )
+    }
+
+    fn view(password: &str) -> ViewPassword {
+        ViewPassword {
+            account: account(1),
+            password: password.to_owned(),
+        }
+    }
+
+    fn search_matches(args: &[&str]) -> clap::ArgMatches {
+        let mut line = vec!["syspass-cli".to_string()];
+        line.extend(args.iter().map(ToString::to_string));
+
+        crate::get_command()
+            .try_get_matches_from(&line)
+            .expect("Failed to parse args")
+            .subcommand()
+            .expect("Expected a search subcommand")
+            .1
+            .clone()
+    }
+
+    fn run(
+        args: &[&str],
+        client: &dyn Client,
+        config: &Config,
+        clipboard: &dyn ClipboardAdapter,
+        handoff: &dyn ProcessHandoff,
+    ) -> Result<()> {
+        command(
+            &search_matches(args),
+            client,
+            config,
+            &MemoryUsageStore::default(),
+            &FixedWidth(80),
+            clipboard,
+            handoff,
+        )
+    }
+
+    #[test]
+    fn test_the_handoff_is_handed_the_content_and_the_window() {
+        let mut mock_client = MockClient::new();
+        mock_client.expect_search_account().returning(|_, _| Ok(vec![account(1)]));
+        mock_client.expect_get_password().returning(|_| Ok(view("hunter2")));
+
+        let clipboard = FakeClipboard::default();
+        let handoff = FakeHandoff::default();
+
+        run(
+            &["search", "test", "--quiet", "--debug"],
+            &mock_client,
+            &Config::default(),
+            &clipboard,
+            &handoff,
+        )
+        .expect("command should not fail");
+
+        assert_eq!(clipboard.written.borrow().to_owned(), vec!["hunter2".to_string()]);
+
+        let seen = handoff.seen.borrow();
+        let (text, window, flags) = seen.first().expect("the handoff should have run");
+        assert_eq!(text, "hunter2", "the child gets the content itself, not a digest");
+        assert_eq!(*window, 10, "the default window");
+        assert_eq!(
+            flags.to_owned(),
+            vec!["quiet".to_string(), "debug".to_string()],
+            "the child inherits the log flags"
+        );
+    }
+
+    #[test]
+    fn test_quiet_ambiguity_fails_before_the_prompt_or_any_write() {
+        let mut mock_client = MockClient::new();
+        mock_client
+            .expect_search_account()
+            .returning(|_, _| Ok(vec![account(1), account(2)]));
+
+        // No get_password expectation: reaching the prompt or the fetch panics the mock.
+        let clipboard = FakeClipboard::default();
+        let handoff = FakeHandoff::default();
+
+        let error = run(
+            &["search", "test", "--quiet"],
+            &mock_client,
+            &Config::default(),
+            &clipboard,
+            &handoff,
+        )
+        .expect_err("quiet ambiguity must be an error");
+
+        assert_eq!(
+            error.to_string(),
+            "Ambiguous match: 2 accounts found for 'test'. Use -i <id> to select one."
+        );
+        assert!(clipboard.written.borrow().is_empty(), "nothing was copied");
+        assert!(handoff.seen.borrow().is_empty(), "nothing to clear");
+    }
+
+    #[test]
+    fn test_show_password_copies_nothing_and_hands_over_nothing() {
+        let mut mock_client = MockClient::new();
+        mock_client.expect_search_account().returning(|_, _| Ok(vec![account(1)]));
+        mock_client.expect_get_password().returning(|_| Ok(view("hunter2")));
+
+        let clipboard = FakeClipboard::default();
+        let handoff = FakeHandoff::default();
+
+        run(
+            &["search", "test", "--show-password"],
+            &mock_client,
+            &Config::default(),
+            &clipboard,
+            &handoff,
+        )
+        .expect("command should not fail");
+
+        assert!(clipboard.written.borrow().is_empty());
+        assert!(handoff.seen.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_zero_timeout_copies_and_hands_over_no_window() {
+        let mut mock_client = MockClient::new();
+        mock_client.expect_search_account().returning(|_, _| Ok(vec![account(1)]));
+        mock_client.expect_get_password().returning(|_| Ok(view("hunter2")));
+
+        let clipboard = FakeClipboard::default();
+        let handoff = FakeHandoff::default();
+        let config = Config {
+            password_timeout: Some(0),
+            ..Config::default()
+        };
+
+        run(&["search", "test"], &mock_client, &config, &clipboard, &handoff).expect("command should not fail");
+
+        assert_eq!(clipboard.written.borrow().to_owned(), vec!["hunter2".to_string()]);
+
+        let seen = handoff.seen.borrow();
+        let (_, window, _) = seen.first().expect("the handoff should have run");
+        assert_eq!(*window, 0, "no window means nothing is ever cleared");
+    }
+
+    #[test]
+    fn test_log_flags_are_passed_through_the_interface() {
+        let matches = search_matches(&["search", "test", "--quiet", "--verbose"]);
+
+        assert_eq!(log_flags(&matches), ["quiet", "verbose"]);
     }
 
     #[test]
@@ -336,9 +405,36 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_with_password() {
-        let account = get_test_account_data();
-        let output = print_table_for_account(&account, true);
+    fn test_maybe_record_usage_records_account_id() {
+        let store = MemoryUsageStore::default();
+
+        maybe_record_usage(&store, Some(&1), false);
+
+        assert_eq!(store.usage(Some(&1)), 1);
+    }
+
+    #[test]
+    fn test_maybe_record_usage_skips_when_disabled() {
+        let store = MemoryUsageStore::default();
+
+        maybe_record_usage(&store, Some(&2), true);
+
+        assert_eq!(store.usage(Some(&2)), 0);
+    }
+
+    #[test]
+    fn test_maybe_record_usage_skips_account_without_id() {
+        let store = MemoryUsageStore::default();
+
+        maybe_record_usage(&store, None, false);
+
+        assert_eq!(store.usage(Some(&1)), 0, "nothing recorded for a missing id");
+    }
+
+    #[test]
+    fn test_table_shows_the_password_when_asked() {
+        let account = view("hunter2");
+        let output = crate::display::table(&account, true, &FixedWidth(80));
 
         assert!(output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
@@ -346,30 +442,34 @@ mod tests {
     }
 
     #[test]
-    fn test_print_table_for_account_without_password() {
-        let account = get_test_account_data();
-        let output = print_table_for_account(&account, false);
+    fn test_table_hides_the_password_when_not_asked() {
+        let account = view("hunter2");
+        let output = crate::display::table(&account, false, &FixedWidth(80));
 
         assert!(!output.contains(account.password.as_str()));
         assert!(output.contains(account.account.login()));
-        assert!(output.contains(account.account.url().unwrap_or_default()));
+        assert!(output.contains("Copied to clipboard"));
     }
 
     #[test]
-    #[ignore = "This test requires a running X11 session with clipboard access"]
-    fn test_clear_clipboard() {
-        let mut clipboard = match Clipboard::new() {
-            Ok(c) => c,
-            Err(e) => {
-                println!("No clipboard available, skipping: {e}");
-                return;
-            }
-        };
+    fn test_no_results_error_is_the_selection_policy_calling() {
+        let mut mock_client = MockClient::new();
+        mock_client
+            .expect_search_account()
+            .returning(|_, _| Err(ApiError::new(SEARCHING, ApiFailure::NoResults("accounts".to_string()))));
 
-        set_clipboard_text("testing").expect("Failed to set clipboard value");
+        let clipboard = FakeClipboard::default();
+        let handoff = FakeHandoff::default();
 
-        assert_eq!("testing", clipboard.get_text().expect("Failed to get clipboard data"));
-        clear_clipboard(1).expect("Failed to clear clipboard");
-        assert_eq!("", clipboard.get_text().expect("Failed to get clipboard data"));
+        let error = run(
+            &["search", "test", "--quiet"],
+            &mock_client,
+            &Config::default(),
+            &clipboard,
+            &handoff,
+        )
+        .expect_err("no accounts must be an error");
+
+        assert_eq!(error.to_string(), "Error while searching: Did not find any accounts");
     }
 }

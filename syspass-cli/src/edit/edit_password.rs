@@ -1,13 +1,15 @@
 use miette::{Result, miette};
 
 use crate::api::account::{Account, ChangePassword};
-use crate::prompt::{ask_for_date, ask_for_password};
-use chrono::{NaiveDate, NaiveTime, Utc};
+use crate::display::{self, SizeSource};
+use crate::input::{Field, Prompter, value};
+use crate::prompt::{DATE_PARSE_FORMAT, ask_for_date, ask_for_password, end_of_day};
 use clap::{ArgMatches, Command, ValueHint, arg};
 use dialoguer::{Select, theme::ColorfulTheme};
 use log::{info, warn};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use rand::RngExt;
+use time::{Date, Month, OffsetDateTime};
 
 pub const COMMAND_NAME: &str = "password";
 
@@ -53,13 +55,9 @@ pub fn command_helper() -> Command {
 }
 
 #[inline]
-pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Result<Account> {
+pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client, size: &dyn SizeSource) -> Result<Account> {
     let quiet = matches.get_flag("quiet");
-    let args: ChangeAccountArgs = get_args(matches, quiet)?;
-
-    if args.password.is_empty() {
-        Err(miette!("Password can't be empty"))?;
-    }
+    let args: ChangeAccountArgs = get_args(matches, quiet, &PasswordPrompter)?;
 
     let change = ChangePassword {
         id: args.id,
@@ -69,33 +67,35 @@ pub fn command(matches: &ArgMatches, api_client: &dyn crate::api::Client) -> Res
 
     info!("Trying to change passwords");
 
-    match api_client.change_password(&change) {
-        Ok(account) => {
-            warn!(
-                "{} Password changed for account {}",
-                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                format!("{account}").if_supports_color(Stdout, |text| text.green())
-            );
+    let account = api_client.change_password(&change)?;
 
-            Ok(account)
-        }
-        Err(error) => Err(error)?,
-    }
+    warn!(
+        "{} Password changed for account {}",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        display::line(&account, size).if_supports_color(Stdout, |text| text.green())
+    );
+
+    Ok(account)
 }
 
-fn get_args(matches: &ArgMatches, quiet: bool) -> Result<ChangeAccountArgs> {
+fn get_args(matches: &ArgMatches, quiet: bool, prompter: &dyn Prompter) -> Result<ChangeAccountArgs> {
     let mut args: ChangeAccountArgs = ChangeAccountArgs::new(matches)?;
 
-    if args.password.is_empty() && !quiet {
-        args.password = get_password("New password:")?;
-    }
+    args.password = value(
+        &Field {
+            id: "password",
+            prompt: "New password:",
+            default: "",
+            required: true,
+        },
+        matches,
+        quiet,
+        prompter,
+    )?;
 
     if args.expiration_date.is_empty() {
         if !quiet {
-            let date = Utc::now()
-                .checked_add_months(chrono::Months::new(18))
-                .ok_or_else(|| miette!("Could not modify date"))?
-                .date_naive();
+            let date = default_expiration_date(OffsetDateTime::now_utc().date())?;
 
             args.expiration_date = ask_for_date("Expiration date:", date)?;
         }
@@ -117,11 +117,23 @@ fn parse_expire_date(value: &str) -> Result<i64> {
 }
 
 fn expiration_timestamp(input: &str) -> Result<String> {
-    let date =
-        NaiveDate::parse_from_str(input, "%Y-%m-%d").map_err(|e| miette!("Failed to parse expiration date: {e}"))?;
-    let end_of_day = NaiveTime::from_hms_opt(23, 59, 59).ok_or_else(|| miette!("Invalid time"))?;
+    let date = Date::parse(input, DATE_PARSE_FORMAT).map_err(|e| miette!("Failed to parse expiration date: {e}"))?;
 
-    Ok(date.and_time(end_of_day).and_utc().timestamp().to_string())
+    end_of_day(date)
+}
+
+fn default_expiration_date(date: Date) -> Result<Date> {
+    let (year, month, day) = date.to_calendar_date();
+    let month_number = u8::from(month) + 6;
+    let year = year + 1 + i32::from(month_number > 12);
+    let month = Month::try_from(if month_number > 12 {
+        month_number - 12
+    } else {
+        month_number
+    })
+    .map_err(|e| miette!("Could not modify date: {e}"))?;
+    Date::from_calendar_date(year, month, day.min(month.length(year)))
+        .map_err(|e| miette!("Could not modify date: {e}"))
 }
 
 fn generate_passwords(random_count: usize) -> Vec<String> {
@@ -151,9 +163,37 @@ pub fn get_password(prompt: &str) -> Result<String> {
     choice.map_or_else(|| ask_for_password(prompt, true), |choice| Ok(pairs[choice].clone()))
 }
 
+pub struct PasswordPrompter;
+
+impl Prompter for PasswordPrompter {
+    fn ask(&self, field: &Field) -> Result<String> {
+        get_password(field.prompt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::edit::edit_password::{expiration_timestamp, generate_passwords, get_args, parse_expire_date};
+    use crate::edit::edit_password::{
+        default_expiration_date, expiration_timestamp, generate_passwords, get_args, parse_expire_date,
+    };
+    use crate::input::{Field, Prompter};
+    use time::macros::date;
+
+    struct FakePrompter;
+
+    impl Prompter for FakePrompter {
+        fn ask(&self, field: &Field) -> miette::Result<String> {
+            Ok(format!("asked:{}", field.id))
+        }
+    }
+
+    fn command_line(args: &[&str]) -> clap::ArgMatches {
+        clap::Command::new("test")
+            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
+            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
+            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
+            .get_matches_from(args)
+    }
 
     #[test]
     fn test_parse_expire_date_allows_empty() {
@@ -172,25 +212,37 @@ mod tests {
 
     #[test]
     fn test_get_args_quiet_keeps_empty_expiration() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
-            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
-            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
-            .get_matches_from(vec!["test", "-i", "1", "-p", "secret"]);
+        let matches = command_line(&["test", "-i", "1", "-p", "secret"]);
 
-        let args = get_args(&matches, true).ok();
+        let args = get_args(&matches, true, &FakePrompter).ok();
         assert_eq!(Some(String::new()), args.map(|args| args.expiration_date));
     }
 
     #[test]
     fn test_get_args_quiet_rejects_invalid_expiration() {
-        let matches = clap::Command::new("test")
-            .arg(clap::arg!(-i --id <ID> "Account ID").value_parser(clap::value_parser!(u32)))
-            .arg(clap::arg!(-p --password <PASSWORD> "Password"))
-            .arg(clap::arg!(-e --expiration <EXPIRATION> "Expiration"))
-            .get_matches_from(vec!["test", "-i", "1", "-p", "secret", "-e", "not-a-date"]);
+        let matches = command_line(&["test", "-i", "1", "-p", "secret", "-e", "not-a-date"]);
 
-        assert!(get_args(&matches, true).is_err());
+        assert!(get_args(&matches, true, &FakePrompter).is_err());
+    }
+
+    #[test]
+    fn test_get_args_quiet_errors_for_a_missing_password() {
+        let matches = command_line(&["test", "-i", "1", "-e", "2024-01-01"]);
+
+        let error = get_args(&matches, true, &FakePrompter)
+            .err()
+            .expect("Quiet mode should error for a missing password");
+
+        assert_eq!("Field 'password' is required but no value was given", error.to_string());
+    }
+
+    #[test]
+    fn test_get_args_asks_for_the_password_when_not_quiet() {
+        let matches = command_line(&["test", "-i", "1", "-e", "2024-01-01"]);
+
+        let args = get_args(&matches, false, &FakePrompter).expect("Failed to get args");
+
+        assert_eq!("asked:password", args.password);
     }
 
     #[test]
@@ -208,5 +260,32 @@ mod tests {
     #[test]
     fn test_expiration_timestamp_rejects_concatenated_time() {
         assert!(expiration_timestamp("2024-01-0123:59:59").is_err());
+    }
+
+    #[test]
+    fn test_default_expiration_date_adds_calendar_months() {
+        assert_eq!(
+            date!(2025 - 07 - 31),
+            default_expiration_date(date!(2024 - 01 - 31)).expect("valid date")
+        );
+        assert_eq!(
+            date!(2025 - 02 - 28),
+            default_expiration_date(date!(2023 - 08 - 31)).expect("valid date")
+        );
+        assert_eq!(
+            date!(2024 - 02 - 29),
+            default_expiration_date(date!(2022 - 08 - 31)).expect("valid date")
+        );
+        assert_eq!(
+            date!(2026 - 01 - 30),
+            default_expiration_date(date!(2024 - 07 - 30)).expect("valid date")
+        );
+    }
+
+    #[test]
+    fn test_expiration_timestamp_rejects_invalid_date() {
+        assert!(expiration_timestamp("2023-02-29").is_err());
+        assert_eq!(Some("1709251199".to_owned()), expiration_timestamp("2024-02-29").ok());
+        assert_eq!(Some("1704153599".to_owned()), expiration_timestamp("2024-1-1").ok());
     }
 }

@@ -1,12 +1,12 @@
+use clap::{ArgMatches, Command, ValueHint, arg};
+use log::{info, warn};
+use miette::Result;
+use owo_colors::{OwoColorize, Stream::Stdout};
+
 use crate::api;
 use crate::api::category::{Category, ask_for};
 use crate::api::entity::Entity;
-use crate::helper;
-use crate::prompt::get_match_string;
-use clap::{ArgMatches, Command, ValueHint, arg};
-use log::{info, warn};
-use miette::{Result, miette};
-use owo_colors::{OwoColorize, Stream::Stdout};
+use crate::input::{Field, InputPrompter, numeric, value};
 
 pub const COMMAND_NAME: &str = "category";
 
@@ -33,13 +33,16 @@ pub fn command_helper() -> Command {
 #[inline]
 pub fn command(matches: &ArgMatches, api_client: &dyn api::Client, new: bool) -> Result<Category> {
     let quiet = matches.get_flag("quiet");
-    let id = helper::get_numeric_input(
-        "id",
-        matches,
-        new,
-        Ok(|| ask_for(api_client).map_err(|e| miette!("{e}: Failed to get category"))),
-        quiet,
-    )?;
+    let field = Field {
+        id: "id",
+        prompt: "",
+        default: if new { "0" } else { "" },
+        required: !new,
+    };
+
+    let id = numeric(&field, matches, quiet, &|| {
+        if new { Ok(0) } else { ask_for(api_client) }
+    })?;
 
     edit_category(matches, api_client, id, quiet)
 }
@@ -49,39 +52,49 @@ fn edit_category(matches: &ArgMatches, api_client: &dyn api::Client, id: u32, qu
         warn!("Creating a new category");
         Category::default()
     } else {
-        api_client
-            .get_category(id)
-            .map_err(|e| miette!("{e}: Failed to retrieve category"))?
+        api_client.get_category(id)?
     };
 
     update_category_fields(matches, &mut category, quiet)?;
 
     info!("Trying to edit category");
 
-    api_client
-        .save_category(category)
-        .map_err(|e| miette!("{e}: Could not save category"))
-        .inspect(|category| {
-            warn!(
-                "{} Category {} ({}) saved!",
-                "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
-                category.name().if_supports_color(Stdout, |text| text.green()),
-                category.id().expect("Id should be set after saving")
-            );
-        })
+    let saved_category = api_client.save_category(category)?;
+
+    warn!(
+        "{} Category {} ({}) saved!",
+        "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
+        saved_category.name().if_supports_color(Stdout, |text| text.green()),
+        saved_category.display_id()
+    );
+
+    Ok(saved_category)
 }
 
 fn update_category_fields(matches: &ArgMatches, category: &mut Category, quiet: bool) -> Result<()> {
-    let name = get_match_string(matches, quiet, "name", "Name: ", category.name(), true)?;
-    category.set_name(&name);
-
-    let description = get_match_string(
+    let name = value(
+        &Field {
+            id: "name",
+            prompt: "Name: ",
+            default: category.name(),
+            required: true,
+        },
         matches,
         quiet,
-        "description",
-        "Description: ",
-        category.description().unwrap_or_default(),
-        false,
+        &InputPrompter,
+    )?;
+    category.set_name(&name);
+
+    let description = value(
+        &Field {
+            id: "description",
+            prompt: "Description: ",
+            default: category.description().unwrap_or_default(),
+            required: false,
+        },
+        matches,
+        quiet,
+        &InputPrompter,
     )?;
     category.set_description(Some(description));
 
