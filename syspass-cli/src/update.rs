@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use clap::{ArgMatches, Command};
 use log::warn;
 use miette::{Result, miette};
@@ -7,6 +6,7 @@ use reqwest::blocking::{Client, ClientBuilder};
 use reqwest::header::{ACCEPT, USER_AGENT};
 use serde::Deserialize;
 use std::time::Duration;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use version_compare::Version;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -15,7 +15,6 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const FAILED_TO_GET_VERSION: &str = "Failed to get version number";
 const FAILED_TO_PARSE_DATETIME: &str = "Failed to parse datetime";
 const COULD_NOT_PARSE_RELEASE_INFO: &str = "Could not parse release information";
-const DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S%Z";
 const USER_AGENT_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub const COMMAND_NAME: &str = "check-update";
@@ -50,13 +49,13 @@ fn get_version() -> Result<Version<'static>> {
 
 fn process_release(release: &GithubRelease, version: &Version) -> Result<()> {
     if has_new_release(release, version)? {
-        let published = NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT)
-            .map_err(|_| miette!(FAILED_TO_PARSE_DATETIME))?;
+        let published =
+            OffsetDateTime::parse(&release.published_at, &Rfc3339).map_err(|_| miette!(FAILED_TO_PARSE_DATETIME))?;
         warn!(
             "{} New version {} was released on {}\nDownload from: {}",
             "\u{2714}".if_supports_color(Stdout, |text| text.bright_green()),
             release.tag_name,
-            published.format("%Y-%m-%d"),
+            published.date(),
             release.html_url
         );
     } else {
@@ -98,13 +97,13 @@ struct GithubRelease {
 mod tests {
     use std::error::Error;
 
-    use chrono::NaiveDateTime;
     use reqwest::blocking::ClientBuilder;
+    use time::{OffsetDateTime, format_description::well_known::Rfc3339};
     use version_compare::Version;
 
     use crate::update::{
-        DATETIME_FORMAT, FAILED_TO_PARSE_DATETIME, GithubRelease, create_client, get_github_release, get_version,
-        has_new_release, process_release,
+        FAILED_TO_PARSE_DATETIME, GithubRelease, create_client, get_github_release, get_version, has_new_release,
+        process_release,
     };
 
     fn get_test_release() -> GithubRelease {
@@ -153,10 +152,9 @@ mod tests {
         release.tag_name = "v0.2.3".to_string();
         assert_eq!(Some(true), has_new_release(&release, &test_version).ok());
 
-        let published =
-            NaiveDateTime::parse_from_str(&release.published_at, DATETIME_FORMAT).expect(FAILED_TO_PARSE_DATETIME);
+        let published = OffsetDateTime::parse(&release.published_at, &Rfc3339).expect(FAILED_TO_PARSE_DATETIME);
 
-        assert_eq!("2023-08-07", published.format("%Y-%m-%d").to_string());
+        assert_eq!("2023-08-07", published.date().to_string());
     }
 
     #[test]
